@@ -1,0 +1,1838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AML IntelliGent Platform — KYC / CDD Module</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#F7F7F7;}
+:root{--red:#CC0000;--red-dark:#990000;--red-light:#F9E6E6;--black:#1A1A1A;--gray:#F5F5F5;--border:#E0E0E0;--text:#2C2C2C;--muted:#666;}
+.portal{min-height:100vh;}
+.topbar{background:var(--black);color:white;display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;position:sticky;top:0;z-index:100;}
+.logo-title{font-size:13px;color:#ccc;margin-left:10px;}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;}
+.topbar-user{display:flex;align-items:center;gap:10px;font-size:13px;color:#aaa;}
+.layout{display:flex;min-height:calc(100vh - 52px);}
+.sidebar{width:220px;background:white;border-right:1px solid var(--border);padding:20px 0;flex-shrink:0;position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto;position:relative;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;font-size:13px;color:var(--muted);cursor:pointer;transition:background .15s;}
+.nav-item:hover{background:var(--gray);}
+.nav-item.active{background:var(--red-light);color:var(--red);border-left:3px solid var(--red);font-weight:500;}
+.nav-label{padding:20px 20px 6px;font-size:11px;color:#AAA;text-transform:uppercase;letter-spacing:.5px;}
+.main{flex:1;padding:24px;overflow-x:hidden;}
+.screen{display:none;}
+.screen.active{display:block;animation:fi .2s ease;}
+@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.bc{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-bottom:16px;flex-wrap:wrap;}
+.bc .lk{cursor:pointer;}.bc .lk:hover{color:var(--red);text-decoration:underline;}
+.bc .sep{color:#ccc;}
+.ph h1{font-size:20px;font-weight:500;color:var(--black);}
+.ph p{font-size:13px;color:var(--muted);margin-top:4px;}
+.ph{margin-bottom:20px;}
+.sbar{display:flex;align-items:center;gap:12px;background:white;border:1px solid var(--border);border-radius:8px;padding:12px 18px;margin-bottom:16px;flex-wrap:wrap;}
+.sbar .sid{font-size:15px;font-weight:500;color:var(--black);}
+.sbar .sname{font-size:13px;color:var(--muted);}
+.mla{margin-left:auto;}
+.card{background:white;border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px;}
+.card h3{font-size:14px;font-weight:500;color:var(--black);margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:10px;}
+.badge{display:inline-block;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:500;}
+.b-new{background:#E6F1FB;color:#185FA5;}
+.b-approv{background:#FAEEDA;color:#854F0B;}
+.b-wait{background:#F1EFE8;color:#5F5E5A;}
+.b-done{background:#EAF3DE;color:#3B6D11;}
+.b-prog{background:#EEEDFE;color:#534AB7;}
+.b-high{background:#FCEBEB;color:#A32D2D;}
+.b-med{background:#FAEEDA;color:#854F0B;}
+.b-low{background:#EAF3DE;color:#3B6D11;}
+.b-input{background:#FFF3CD;color:#856404;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;}
+.btn-p{background:var(--red);color:white;}.btn-p:hover{background:var(--red-dark);}
+.btn-o{background:white;color:var(--text);border:1px solid var(--border);}.btn-o:hover{background:var(--gray);}
+.btn-g{background:transparent;color:var(--muted);border:1px solid transparent;}.btn-g:hover{background:var(--gray);}
+/* STATS — clickable */
+.stats{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;}
+.sc{background:white;border:2px solid var(--border);border-radius:8px;padding:14px 18px;flex:1;min-width:110px;cursor:pointer;transition:all .2s;}
+.sc:hover{border-color:#aaa;background:#FAFAFA;}
+.sc.active-filter{border-color:var(--red);background:var(--red-light);}
+.sc .n{font-size:26px;font-weight:500;color:var(--black);}
+.sc .l{font-size:12px;color:var(--muted);margin-top:2px;}
+.sc.red .n{color:var(--red);}
+.sc.active-filter .n{color:var(--red);}
+/* TABLE */
+.tw{background:white;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{background:#FAFAFA;border-bottom:1px solid var(--border);padding:10px 14px;text-align:left;font-weight:500;font-size:12px;color:var(--muted);}
+td{padding:11px 14px;border-bottom:1px solid #F0F0F0;color:var(--text);}
+tr:last-child td{border-bottom:none;}
+tr.cl:hover td{background:#FFF5F5;cursor:pointer;}
+tr.hidden-row{display:none;}
+/* FILTERS */
+.fb{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+select{border:1px solid var(--border);border-radius:6px;padding:7px 12px;font-size:12px;color:var(--text);background:white;cursor:pointer;}
+select:focus{outline:none;border-color:var(--red);}
+/* DETAIL */
+.ig{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.ii .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;}
+.ii .val{font-size:13px;color:var(--text);font-weight:500;}
+.motivo{background:var(--red-light);border-left:3px solid var(--red);border-radius:4px;padding:12px 16px;margin-top:12px;}
+.motivo .ml{font-size:11px;font-weight:500;color:var(--red);text-transform:uppercase;letter-spacing:.5px;}
+.motivo .mt{font-size:13px;color:#991111;margin-top:4px;line-height:1.5;}
+/* ACTION CHOICE */
+.ac{display:flex;gap:16px;margin-top:20px;}
+.acard{flex:1;border:2px solid var(--border);border-radius:10px;padding:20px;cursor:pointer;transition:all .2s;text-align:center;}
+.acard:hover{border-color:var(--red);background:var(--red-light);}
+.acard .ai{font-size:28px;margin-bottom:10px;}
+.acard .at{font-size:15px;font-weight:500;color:var(--black);margin-bottom:6px;}
+.acard .ad{font-size:12px;color:var(--muted);line-height:1.5;}
+.acard.rec{border-color:var(--red);}.acard.rec .at{color:var(--red);}
+.rectag{display:inline-block;background:var(--red);color:white;font-size:10px;padding:2px 8px;border-radius:10px;margin-bottom:8px;font-weight:500;}
+/* AGENT SELECTION */
+.agent-sel-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;}
+.agent-sel-card{border:2px solid var(--border);border-radius:10px;padding:16px;cursor:pointer;transition:all .2s;position:relative;}
+.agent-sel-card:hover{border-color:#aaa;}
+.agent-sel-card.selected{border-color:var(--red);background:var(--red-light);}
+.agent-sel-card .asc-header{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.agent-sel-card .asc-icon{font-size:22px;}
+.agent-sel-card .asc-name{font-size:14px;font-weight:500;color:var(--black);}
+.agent-sel-card .asc-desc{font-size:12px;color:var(--muted);line-height:1.5;}
+.agent-sel-card .asc-check{position:absolute;top:12px;right:12px;width:20px;height:20px;border-radius:50%;border:2px solid var(--border);background:white;display:flex;align-items:center;justify-content:center;font-size:11px;transition:all .2s;}
+.agent-sel-card.selected .asc-check{background:var(--red);border-color:var(--red);color:white;}
+.default-tag{display:inline-block;background:#E6F1FB;color:#185FA5;font-size:10px;padding:2px 7px;border-radius:8px;margin-left:6px;vertical-align:middle;}
+.super-agent-sel{border:2px solid var(--border);border-radius:10px;padding:16px;margin-bottom:20px;cursor:pointer;transition:all .2s;position:relative;}
+.super-agent-sel:hover{border-color:#aaa;}
+.super-agent-sel.selected{border-color:var(--red);background:var(--red-light);}
+.super-agent-sel .sa-header{display:flex;align-items:center;gap:12px;}
+.super-agent-sel .sa-icon{font-size:26px;}
+.super-agent-sel .sa-info .sa-name{font-size:15px;font-weight:500;color:var(--black);}
+.super-agent-sel .sa-info .sa-desc{font-size:12px;color:var(--muted);margin-top:3px;}
+.super-agent-sel .asc-check{position:absolute;top:14px;right:14px;width:20px;height:20px;border-radius:50%;border:2px solid var(--border);background:white;display:flex;align-items:center;justify-content:center;font-size:11px;transition:all .2s;}
+.super-agent-sel.selected .asc-check{background:var(--red);border-color:var(--red);color:white;}
+/* SPINNING AGENTS */
+.spin-layout{display:grid;grid-template-columns:1fr 400px;gap:16px;}
+@media(max-width:900px){.spin-layout{grid-template-columns:1fr;}}
+.spin-panel{background:white;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.panel-hdr{background:var(--black);color:white;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;}
+.panel-hdr span{font-size:14px;font-weight:500;}
+.spin-agent{display:flex;align-items:center;gap:14px;padding:14px 16px;border-bottom:1px solid #F0F0F0;}
+.spin-agent:last-child{border-bottom:none;}
+.spin-logo{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;position:relative;}
+.spin-ring{position:absolute;inset:-4px;border-radius:50%;border:3px solid transparent;border-top-color:var(--red);animation:spin 1s linear infinite;}
+.spin-ring.done{border-top-color:#639922;animation:none;border-color:#639922;opacity:.5;}
+.spin-ring.wait{border-top-color:#ccc;animation:none;border-color:#ccc;opacity:.4;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin-info{flex:1;}
+.spin-name{font-size:13px;font-weight:500;color:var(--black);}
+.spin-task{font-size:12px;color:var(--muted);margin-top:2px;}
+.spin-status{font-size:11px;margin-top:5px;}
+.spin-status.working{color:var(--red);font-weight:500;}
+.spin-status.done{color:#3B6D11;font-weight:500;}
+.spin-status.wait{color:#888;}
+.pb-wrap{height:3px;background:#EEE;border-radius:2px;margin-top:7px;overflow:hidden;}
+.pb{height:100%;background:var(--red);border-radius:2px;transition:width .8s;}
+.super-box{background:var(--red-light);border:1.5px solid var(--red);border-radius:8px;padding:14px 16px;margin:12px;}
+.super-box .sbn{font-size:13px;font-weight:700;color:var(--red);}
+.super-box .sbd{font-size:12px;color:#991111;margin-top:3px;}
+.overall-pb-label{display:flex;justify-content:space-between;font-size:11px;color:#A32D2D;margin-bottom:4px;}
+/* RIGHT PANEL — Opinion being compiled */
+.np-section{border-bottom:1px solid var(--border);}
+.np-section:last-child{border-bottom:none;}
+.np-sh{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;cursor:pointer;background:#FAFAFA;transition:background .15s;}
+.np-sh:hover{background:#F0F0F0;}
+.np-st{font-size:12px;font-weight:500;color:var(--text);}
+.np-body{padding:10px 16px;font-size:12px;color:var(--text);line-height:1.6;background:white;display:none;}
+.np-body.open{display:block;}
+.typing{border-right:2px solid var(--red);padding-right:2px;}
+.typing::after{content:'';display:none;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+/* LOG */
+.log-box{background:white;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:12px;}
+.log-hdr{background:#1A1A1A;padding:9px 14px;display:flex;align-items:center;gap:8px;}
+.log-hdr span{font-size:10px;color:#888;font-family:'Courier New',monospace;letter-spacing:1px;}
+.log-area{padding:10px 14px;background:#FAFAFA;max-height:100px;overflow-y:auto;}
+.log-line{font-size:11px;color:var(--muted);font-family:'Courier New',monospace;margin-bottom:3px;}
+.log-line.r{color:var(--red);}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;display:inline-block;}
+.dot-w{background:var(--red);animation:pulse 1.2s infinite;}
+.dot-d{background:#639922;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+/* RESULTS */
+.res-layout{display:grid;grid-template-columns:1fr 300px;gap:16px;}
+@media(max-width:900px){.res-layout{grid-template-columns:1fr;}}
+.nota-full{background:white;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.nf-hdr{background:var(--black);color:white;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;}
+.nf-section{border-bottom:1px solid var(--border);}
+.nf-section:last-child{border-bottom:none;}
+.nf-sh{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;background:#FAFAFA;transition:background .15s;}
+.nf-sh:hover{background:#F0F0F0;}
+.nf-st{font-size:13px;font-weight:500;color:var(--text);flex:1;padding-right:8px;}
+.nf-body{padding:14px 16px;font-size:13px;color:var(--text);line-height:1.6;background:white;display:none;}
+.nf-body.open{display:block;}
+.input-required-box{background:#FFFBEC;border:1px solid #F0D060;border-radius:8px;padding:14px 16px;margin-top:8px;}
+.irb-label{font-size:11px;font-weight:500;color:#856404;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+.irb-text{font-size:13px;color:#5D4500;line-height:1.5;margin-bottom:12px;}
+.irb-actions{display:flex;gap:8px;}
+.agents-mini{background:white;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.am-hdr{background:var(--black);color:white;padding:12px 16px;font-size:13px;font-weight:500;}
+.am-item{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid #F0F0F0;}
+.am-item:last-child{border-bottom:none;}
+.am-icon{width:32px;height:32px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.am-name{font-size:12px;font-weight:500;color:var(--black);}
+.am-st{font-size:11px;margin-top:2px;}
+.risk-score{display:inline-flex;align-items:center;gap:8px;background:var(--red-light);border:1px solid #F7C1C1;border-radius:8px;padding:8px 14px;}
+.rs-lbl{font-size:12px;color:var(--red);}
+.rs-val{font-size:22px;font-weight:700;color:var(--red);}
+.approve-row{display:flex;gap:10px;padding:16px 20px;border-top:1px solid var(--border);background:#FAFAFA;border-radius:0 0 8px 8px;flex-wrap:wrap;}
+.risk-change{display:flex;align-items:center;gap:10px;margin-top:8px;}
+.risk-arrow{font-size:18px;color:var(--red);}
+/* REPORTING */
+.rep-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+.rep-chart-card{background:white;border:1px solid var(--border);border-radius:8px;padding:20px;}
+.rep-chart-card h4{font-size:13px;font-weight:500;color:var(--black);margin-bottom:4px;}
+.rep-chart-card p{font-size:12px;color:var(--muted);margin-bottom:16px;}
+.rep-filters{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;background:white;border:1px solid var(--border);border-radius:8px;padding:14px 18px;}
+.rep-filters label{font-size:12px;color:var(--muted);font-weight:500;}
+
+.client-tab { transition: all .15s; }
+.client-tab:hover { background: var(--gray); }
+.client-tab.active { color: var(--red) !important; border-bottom: 2px solid var(--red) !important; background: white; }
+.client-panel { animation: fi .2s ease; }
+</style>
+</head>
+<body>
+<div class="portal">
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <img src="data:image/png;base64,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" style="height:30px;width:auto;display:block;filter:brightness(0) invert(1);" alt="Bain &amp; Company">
+    <span style="color:#555;margin:0 8px;">/</span>
+    <span class="logo-title">AML IntelliGent Platform — KYC / CDD Module</span>
+  </div>
+  <div class="topbar-user"><img src="data:image/jpeg;base64,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" style="width:32px;height:32px;border-radius:50%;object-fit:cover;object-position:center top;border:2px solid #555;"><span>Davide DAponte</span></div>
+</div>
+
+<div class="layout">
+<div class="sidebar">
+  <div class="nav-item active" id="nav-s1" data-action="goNav('s1')">📋 Case Dashboard</div>
+  <div class="nav-label">Management</div>
+  <div class="nav-item" id="nav-s1b" data-action="goNav('s1')">🗂 Due Diligence</div>
+  <div class="nav-item" id="nav-srep" data-action="goNav('srep')">📊 Reporting</div>
+  <div class="nav-item">⚙ Configuration</div>
+  <div class="nav-label">AI Agents</div>
+  <div class="nav-item" id="nav-sagents" data-action="goNav('sagents')">✦ Agent Performance</div>
+  
+  <div style="position:absolute;bottom:0;left:0;width:220px;border-top:1px solid var(--border);background:white;">
+    <div class="nav-item" id="nav-options" data-action="toggleOptionsMenu()" style="color:var(--muted);justify-content:space-between;">
+      <span style="display:flex;align-items:center;gap:10px;">⚙ Options</span>
+      <span id="options-arrow" style="font-size:10px;color:#bbb;">▲</span>
+    </div>
+    <div id="options-menu" style="display:none;background:#FAFAFA;border-top:1px solid var(--border);padding:8px 0;">
+      <div id="btn-demo-reset" style="padding:9px 20px;font-size:12px;color:#A32D2D;cursor:pointer;display:flex;align-items:center;gap:8px;" onmouseenter="this.style.background='#F9E6E6'" onmouseleave="this.style.background='transparent'">
+        ↺ Reset demo to initial state
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- ═══ S1 · CASE LIST ═══ -->
+<div class="screen active" id="s1">
+  <div class="ph"><h1>Customer Due Diligence — Case List</h1><p>AML case management and review — updated March 20, 2026</p></div>
+  <div class="stats">
+    <div class="sc red" id="stat-high" data-filter="high"><div class="n">6</div><div class="l">High priority</div></div>
+    <div class="sc" id="stat-new" data-filter="new"><div class="n">4</div><div class="l">New cases</div></div>
+    <div class="sc" id="stat-approv" data-filter="approv"><div class="n">3</div><div class="l">Pending approval</div></div>
+    <div class="sc" id="stat-wait" data-filter="wait"><div class="n">2</div><div class="l">Awaiting response</div></div>
+    <div class="sc" id="stat-done" data-filter="done"><div class="n">2</div><div class="l">Completed (30d)</div></div>
+    <div class="sc" id="stat-all" data-filter="all"><div class="n">12</div><div class="l">All cases</div></div>
+  </div>
+  <div id="active-filter-strip" style="display:none;background:#F9E6E6;border:1px solid #F7C1C1;border-radius:6px;padding:7px 14px;margin-bottom:12px;font-size:12px;color:#A32D2D;align-items:center;gap:8px;"><span id="filter-strip-text"></span><button id="btn-strip-clear" style="background:none;border:none;color:#A32D2D;cursor:pointer;font-size:12px;margin-left:auto;text-decoration:underline;">Clear</button></div>
+<div class="fb">
+    <select id="f-type"><option value="">Counterparty type: All</option><option value="Individual">Individual</option><option value="Legal entity">Legal entity</option><option value="Group / Holding">Group / Holding</option></select>
+    <select id="f-risk"><option value="">Risk Profile: All</option><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option></select>
+    <select id="f-tier"><option value="">Priority: All</option><option value="Tier 1">Tier 1</option><option value="Tier 2">Tier 2</option><option value="Tier 3">Tier 3</option></select>
+    <select id="f-rev"><option value="">Review type: All</option><option value="Periodic">Periodic</option><option value="Event Driven">Event Driven</option><option value="AFC Request">AFC Request</option><option value="New Business">New Business</option></select>
+    <button class="btn btn-o" style="font-size:12px;padding:6px 12px;" id="btn-clear-filters">Clear filters</button>
+  </div>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Case ID</th><th>Counterparty</th><th>Type</th><th>Review type</th><th>Risk Profile</th><th>Priority</th><th>Status</th><th>Due date</th></tr></thead>
+      <tbody id="case-tbody">
+        <tr class="cl case-row" data-type="Legal entity" data-risk="High" data-tier="Tier 1" data-status="new" data-rev="Event Driven" data-action="go('s2')" data-action="go(\'s2\')"><td><strong>AV-2026-0341</strong></td><td>Meridian Capital S.r.l.</td><td>Legal entity</td><td>Event Driven</td><td><span class="badge b-high">High</span></td><td><span class="badge b-high">Tier 1</span></td><td><span class="badge b-new">New</span></td><td style="color:#A32D2D;font-weight:500;">Mar 22, 2026</td></tr>
+        <tr class="cl case-row" data-type="Individual" data-risk="Medium" data-tier="Tier 1" data-status="approv" data-rev="Periodic" data-action="go('s2')" data-action="go(\'s2\')"><td><strong>AV-2026-0338</strong></td><td>Luca Ferretti</td><td>Individual</td><td>Periodic</td><td><span class="badge b-med">Medium</span></td><td><span class="badge b-high">Tier 1</span></td><td><span class="badge b-approv">Pending approval</span></td><td>Mar 28, 2026</td></tr>
+        <tr class="cl case-row" data-type="Group / Holding" data-risk="High" data-tier="Tier 2" data-status="wait" data-rev="AFC Request" data-action="go('s2')" data-action="go(\'s2\')"><td><strong>AV-2026-0325</strong></td><td>Global Trade Holding AG</td><td>Group / Holding</td><td>AFC Request</td><td><span class="badge b-high">High</span></td><td><span class="badge b-med">Tier 2</span></td><td><span class="badge b-wait">Awaiting response</span></td><td style="color:#A32D2D;font-weight:500;">Mar 21, 2026</td></tr>
+        <tr class="case-row" data-type="Legal entity" data-risk="Low" data-tier="Tier 3" data-status="done" data-rev="Periodic"><td><strong>AV-2026-0312</strong></td><td>Arco Finanziaria S.p.A.</td><td>Legal entity</td><td>Periodic</td><td><span class="badge b-low">Low</span></td><td><span class="badge b-low">Tier 3</span></td><td><span class="badge b-done">Completed</span></td><td>Mar 15, 2026</td></tr>
+        <tr class="case-row" data-type="Individual" data-risk="Medium" data-tier="Tier 2" data-status="prog" data-rev="Event Driven"><td><strong>AV-2026-0309</strong></td><td>Sofia De Martino</td><td>Individual</td><td>Event Driven</td><td><span class="badge b-med">Medium</span></td><td><span class="badge b-med">Tier 2</span></td><td><span class="badge b-prog">In progress</span></td><td>Mar 25, 2026</td></tr>
+        <tr class="case-row" data-type="Legal entity" data-risk="High" data-tier="Tier 1" data-status="new" data-rev="New Business"><td><strong>AV-2026-0301</strong></td><td>NovaTech Industries Ltd.</td><td>Legal entity</td><td>New Business</td><td><span class="badge b-high">High</span></td><td><span class="badge b-high">Tier 1</span></td><td><span class="badge b-new">New</span></td><td>Mar 30, 2026</td></tr>
+        <tr class="case-row" data-type="Individual" data-risk="Low" data-tier="Tier 2" data-status="approv" data-rev="Periodic"><td><strong>AV-2026-0289</strong></td><td>Roberto Amati</td><td>Individual</td><td>Periodic</td><td><span class="badge b-low">Low</span></td><td><span class="badge b-med">Tier 2</span></td><td><span class="badge b-approv">Pending approval</span></td><td>Apr 5, 2026</td></tr>
+        <tr class="case-row" data-type="Legal entity" data-risk="High" data-tier="Tier 1" data-status="new" data-rev="Event Driven"><td><strong>AV-2026-0277</strong></td><td>Apex Holdings B.V.</td><td>Legal entity</td><td>Event Driven</td><td><span class="badge b-high">High</span></td><td><span class="badge b-high">Tier 1</span></td><td><span class="badge b-new">New</span></td><td style="color:#A32D2D;font-weight:500;">Mar 23, 2026</td></tr>
+        <tr class="case-row" data-type="Individual" data-risk="Medium" data-tier="Tier 2" data-status="wait" data-rev="AFC Request"><td><strong>AV-2026-0265</strong></td><td>Elena Marchetti</td><td>Individual</td><td>AFC Request</td><td><span class="badge b-med">Medium</span></td><td><span class="badge b-med">Tier 2</span></td><td><span class="badge b-wait">Awaiting response</span></td><td>Apr 2, 2026</td></tr>
+        <tr class="case-row" data-type="Legal entity" data-risk="Low" data-tier="Tier 3" data-status="done" data-rev="Periodic"><td><strong>AV-2026-0258</strong></td><td>Solaris Energy S.p.A.</td><td>Legal entity</td><td>Periodic</td><td><span class="badge b-low">Low</span></td><td><span class="badge b-low">Tier 3</span></td><td><span class="badge b-done">Completed</span></td><td>Mar 10, 2026</td></tr>
+        <tr class="case-row" data-type="Group / Holding" data-risk="High" data-tier="Tier 1" data-status="new" data-rev="New Business"><td><strong>AV-2026-0244</strong></td><td>Orion Capital Group</td><td>Group / Holding</td><td>New Business</td><td><span class="badge b-high">High</span></td><td><span class="badge b-high">Tier 1</span></td><td><span class="badge b-new">New</span></td><td>Apr 4, 2026</td></tr>
+        <tr class="case-row" data-type="Individual" data-risk="Medium" data-tier="Tier 3" data-status="approv" data-rev="Periodic"><td><strong>AV-2026-0231</strong></td><td>Marco Zanetti</td><td>Individual</td><td>Periodic</td><td><span class="badge b-med">Medium</span></td><td><span class="badge b-low">Tier 3</span></td><td><span class="badge b-approv">Pending approval</span></td><td>Apr 8, 2026</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ S2 · CASE DETAIL ═══ -->
+<div class="screen" id="s2">
+  <div class="bc"><span class="lk" data-action="go('s1')">Case Dashboard</span><span class="sep">›</span><span>AV-2026-0341</span></div>
+  <div class="sbar">
+    <div><div class="sid">AV-2026-0341</div><div class="sname">Meridian Capital S.r.l. — Customer Due Diligence</div></div>
+    <div class="mla" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <span class="badge b-high">Risk Profile: High</span>
+      <span class="badge b-new">New</span>
+      <span class="badge b-high">Tier 1</span>
+      <button class="btn btn-o" data-action="go('s-client')" style="font-size:12px;padding:6px 14px;display:flex;align-items:center;gap:6px;"><span style="font-size:14px;">👤</span> View client profile</button>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Key counterparty information</h3>
+    <div class="ig">
+      <div class="ii"><div class="lbl">Company name</div><div class="val">Meridian Capital S.r.l.</div></div>
+      <div class="ii"><div class="lbl">Entity type</div><div class="val">Legal entity — Joint-stock company</div></div>
+      <div class="ii"><div class="lbl">Tax ID / VAT</div><div class="val">IT 04821930215</div></div>
+      <div class="ii"><div class="lbl">Registered office</div><div class="val">Milan, Lombardy (IT)</div></div>
+      <div class="ii"><div class="lbl">Business sector</div><div class="val">Wealth management &amp; investments</div></div>
+      <div class="ii"><div class="lbl">Beneficial owner</div><div class="val">Alessandro Greco (82% shares)</div></div>
+      <div class="ii"><div class="lbl">Annual turnover</div><div class="val">€ 14.2M (2024)</div></div>
+      <div class="ii"><div class="lbl">Banking relationship</div><div class="val">Client since 2018 — Corporate Banking</div></div>
+    </div>
+    <div class="motivo">
+      <div class="ml">Review trigger</div>
+      <div class="mt">Change in ownership structure: entry of a new shareholder with a stake exceeding 25% (identified as PEP — Politically Exposed Person) and a significant increase in transaction volume (+340% over the last 6 months). High-risk classification flagged by the automated system.</div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Review mode</h3>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Select how to proceed with the review of this case.</p>
+    <div class="ac">
+      <div class="acard" data-action="go('s3-manual')">
+        <div class="ai">👤</div>
+        <div class="at">Manual review</div>
+        <div class="ad">The case officer manually analyses and fills in the Opinion Report. Estimated time: 3–5 working hours.</div>
+      </div>
+      <div class="acard rec" data-action="go('s3-select')">
+        <div class="rectag">★ Recommended</div>
+        <div class="ai">🤖</div>
+        <div class="at">Activate AI Agents</div>
+        <div class="ad">Select and configure specialised AI agents. The system pre-selects the most relevant ones for this case. Estimated time: 4–8 minutes.</div>
+      </div>
+    </div>
+  </div>
+  <button class="btn btn-g" data-action="go('s1')">← Back to list</button>
+</div>
+
+
+<!-- ═══ S-CLIENT · CLIENT PROFILE ═══ -->
+<div class="screen" id="s-client">
+  <div class="bc">
+    <span class="lk" data-action="go('s1')">Case Dashboard</span>
+    <span class="sep">›</span>
+    <span class="lk" data-action="go('s2')">AV-2026-0341</span>
+    <span class="sep">›</span>
+    <span>Client profile</span>
+  </div>
+
+  <!-- Header -->
+  <div style="background:white;border:1px solid var(--border);border-radius:8px;padding:18px 20px;margin-bottom:16px;display:flex;align-items:center;gap:16px;">
+    <div style="width:52px;height:52px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:white;flex-shrink:0;">MC</div>
+    <div style="flex:1;">
+      <div style="font-size:18px;font-weight:500;color:var(--black);">Meridian Capital S.r.l.</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:2px;">Client ID: C-00482 &nbsp;·&nbsp; Onboarded: March 2018 &nbsp;·&nbsp; Relationship Manager: G. Ferrara</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <span class="badge b-high">Risk Profile: High</span>
+      <span class="badge b-approv" style="background:#EEEDFE;color:#534AB7;">Active client</span>
+    </div>
+  </div>
+
+  <!-- Tab nav -->
+  <div style="display:flex;gap:0;background:white;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px;" id="client-tabs">
+    <div class="client-tab active" data-tab="tab-anag" style="padding:11px 18px;font-size:13px;font-weight:500;cursor:pointer;border-right:1px solid var(--border);color:var(--red);border-bottom:2px solid var(--red);">Anagrafica</div>
+    <div class="client-tab" data-tab="tab-rapporti" style="padding:11px 18px;font-size:13px;cursor:pointer;border-right:1px solid var(--border);color:var(--muted);">Accounts &amp; relationships</div>
+    <div class="client-tab" data-tab="tab-legami" style="padding:11px 18px;font-size:13px;cursor:pointer;border-right:1px solid var(--border);color:var(--muted);">Corporate links</div>
+    <div class="client-tab" data-tab="tab-movimenti" style="padding:11px 18px;font-size:13px;cursor:pointer;border-right:1px solid var(--border);color:var(--muted);">Transactions (3M)</div>
+    <div class="client-tab" data-tab="tab-evidenze" style="padding:11px 18px;font-size:13px;cursor:pointer;border-right:1px solid var(--border);color:var(--muted);">Past cases</div>
+    <div class="client-tab" data-tab="tab-sar" style="padding:11px 18px;font-size:13px;cursor:pointer;border-right:1px solid var(--border);color:var(--muted);">SARs</div>
+    <div class="client-tab" data-tab="tab-news" style="padding:11px 18px;font-size:13px;cursor:pointer;color:var(--muted);">Negative news</div>
+  </div>
+
+  <!-- Tab content panels -->
+  <div id="tab-anag" class="client-panel">
+    <div class="card" style="margin-bottom:12px;">
+      <h3>Registry information</h3>
+      <div class="ig">
+        <div class="ii"><div class="lbl">Legal name</div><div class="val">Meridian Capital S.r.l.</div></div>
+        <div class="ii"><div class="lbl">Legal form</div><div class="val">S.r.l. — Società a responsabilità limitata</div></div>
+        <div class="ii"><div class="lbl">Tax ID / VAT</div><div class="val">IT 04821930215</div></div>
+        <div class="ii"><div class="lbl">Registration no.</div><div class="val">MI-2312847</div></div>
+        <div class="ii"><div class="lbl">Registered office</div><div class="val">Via Montenapoleone 8, 20121 Milan (IT)</div></div>
+        <div class="ii"><div class="lbl">Operational office</div><div class="val">Via della Moscova 3, 20121 Milan (IT)</div></div>
+        <div class="ii"><div class="lbl">Incorporation date</div><div class="val">14 June 2011</div></div>
+        <div class="ii"><div class="lbl">Business sector</div><div class="val">Wealth management &amp; investments (ATECO 66.30)</div></div>
+        <div class="ii"><div class="lbl">Annual turnover</div><div class="val">€ 14.2M (2024) — € 9.8M (2023)</div></div>
+        <div class="ii"><div class="lbl">Employees</div><div class="val">23</div></div>
+        <div class="ii"><div class="lbl">AUM (declared)</div><div class="val">€ 220M (Dec 2025)</div></div>
+        <div class="ii"><div class="lbl">Last KYC update</div><div class="val" style="color:#A32D2D;">March 2021 ⚠ Outdated</div></div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:0;">
+      <h3>Beneficial owners &amp; key persons</h3>
+      <table style="width:100%;font-size:13px;border-collapse:collapse;">
+        <thead><tr style="background:#FAFAFA;"><th style="padding:9px 12px;text-align:left;font-weight:500;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);">Name</th><th style="padding:9px 12px;text-align:left;font-weight:500;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);">Role</th><th style="padding:9px 12px;text-align:left;font-weight:500;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);">Stake</th><th style="padding:9px 12px;text-align:left;font-weight:500;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);">Flags</th></tr></thead>
+        <tbody>
+          <tr style="border-bottom:1px solid #F0F0F0;"><td style="padding:10px 12px;">Alessandro Greco</td><td style="padding:10px 12px;">CEO &amp; UBO</td><td style="padding:10px 12px;">82%</td><td style="padding:10px 12px;"><span class="badge b-done">Clean</span></td></tr>
+          <tr style="border-bottom:1px solid #F0F0F0;"><td style="padding:10px 12px;">Karim Al-Rashid</td><td style="padding:10px 12px;">Shareholder (from Feb 2026)</td><td style="padding:10px 12px;">30%</td><td style="padding:10px 12px;"><span class="badge b-high">PEP Tier 1</span></td></tr>
+          <tr style="border-bottom:1px solid #F0F0F0;"><td style="padding:10px 12px;">Sofia Greco</td><td style="padding:10px 12px;">Director</td><td style="padding:10px 12px;">—</td><td style="padding:10px 12px;"><span class="badge b-done">Clean</span></td></tr>
+          <tr><td style="padding:10px 12px;">Marco Bianchi</td><td style="padding:10px 12px;">CFO</td><td style="padding:10px 12px;">—</td><td style="padding:10px 12px;"><span class="badge b-done">Clean</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="tab-rapporti" class="client-panel" style="display:none;">
+    <div style="display:flex;gap:10px;margin-bottom:14px;align-items:center;">
+      <select id="acc-filter" style="font-size:12px;">
+        <option value="active">Active accounts only</option>
+        <option value="all">All accounts (incl. closed)</option>
+      </select>
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Account no.</th><th>Type</th><th>Currency</th><th>Balance</th><th>Opened</th><th>Status</th></tr></thead>
+        <tbody id="accounts-tbody">
+          <tr data-acc-status="active"><td><strong>IT60 X054 2811 1010 0000 0123 456</strong></td><td>Current account</td><td>EUR</td><td style="font-weight:500;">€ 2,847,320</td><td>Mar 2018</td><td><span class="badge b-done">Active</span></td></tr>
+          <tr data-acc-status="active"><td><strong>IT60 X054 2811 1010 0000 0123 457</strong></td><td>Investment account</td><td>EUR</td><td style="font-weight:500;">€ 18,420,000</td><td>Jun 2019</td><td><span class="badge b-done">Active</span></td></tr>
+          <tr data-acc-status="active"><td><strong>IT60 X054 2811 1010 0000 0123 458</strong></td><td>Current account</td><td>USD</td><td style="font-weight:500;">$ 1,230,450</td><td>Jan 2021</td><td><span class="badge b-done">Active</span></td></tr>
+          <tr data-acc-status="closed" style="display:none;"><td><strong>IT60 X054 2811 1010 0000 0123 399</strong></td><td>Savings account</td><td>EUR</td><td style="font-weight:500;color:var(--muted);">€ 0</td><td>Mar 2018</td><td><span class="badge b-wait">Closed — Jan 2022</span></td></tr>
+          <tr data-acc-status="closed" style="display:none;"><td><strong>IT60 X054 2811 1010 0000 0123 312</strong></td><td>Credit facility</td><td>EUR</td><td style="font-weight:500;color:var(--muted);">€ 0</td><td>Sep 2020</td><td><span class="badge b-wait">Closed — Mar 2023</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="tab-legami" class="client-panel" style="display:none;">
+    <div class="card" style="margin-bottom:12px;">
+      <h3>Corporate structure &amp; links</h3>
+      <div style="background:#FAFAFA;border-radius:8px;padding:20px;text-align:center;">
+        <!-- Simple ASCII-style org chart using divs -->
+        <div style="display:flex;flex-direction:column;align-items:center;gap:0;">
+          <div style="background:var(--red);color:white;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:500;min-width:200px;">Meridian Capital S.r.l.</div>
+          <div style="width:2px;height:20px;background:#ccc;"></div>
+          <div style="display:flex;gap:40px;align-items:flex-start;">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:0;">
+              <div style="width:2px;height:20px;background:#ccc;"></div>
+              <div style="background:white;border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-size:12px;min-width:160px;text-align:center;">
+                <div style="font-weight:500;">MC Asset Mgmt SA</div>
+                <div style="color:var(--muted);margin-top:3px;">Subsidiary — Luxembourg</div>
+                <div style="margin-top:4px;"><span class="badge b-med" style="font-size:10px;">100% owned</span></div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:0;">
+              <div style="width:2px;height:20px;background:#ccc;"></div>
+              <div style="background:white;border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-size:12px;min-width:160px;text-align:center;">
+                <div style="font-weight:500;">Meridian RE S.r.l.</div>
+                <div style="color:var(--muted);margin-top:3px;">Subsidiary — Italy</div>
+                <div style="margin-top:4px;"><span class="badge b-done" style="font-size:10px;">75% owned</span></div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:0;">
+              <div style="width:2px;height:20px;background:#ccc;"></div>
+              <div style="background:white;border:1px solid #F7C1C1);border-radius:8px;padding:10px 16px;font-size:12px;min-width:160px;text-align:center;border:1.5px solid #F7C1C1;">
+                <div style="font-weight:500;">Falcon Holdings FZE</div>
+                <div style="color:var(--muted);margin-top:3px;">Associated — UAE</div>
+                <div style="margin-top:4px;"><span class="badge b-high" style="font-size:10px;">⚠ Under review</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:0;">
+      <h3>Joint accounts &amp; co-ownership</h3>
+      <p style="font-size:13px;color:var(--muted);">No joint accounts or co-ownership arrangements identified in current active portfolio.</p>
+    </div>
+  </div>
+
+  <div id="tab-movimenti" class="client-panel" style="display:none;">
+    <div style="display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap;">
+      <select style="font-size:12px;" id="mov-direction">
+        <option>Direction: All</option>
+        <option>Inbound only</option>
+        <option>Outbound only</option>
+      </select>
+      <select style="font-size:12px;" id="mov-flag">
+        <option>Flag: All</option>
+        <option>Flagged only</option>
+        <option>Clean only</option>
+      </select>
+      <span style="font-size:12px;color:var(--muted);margin-left:auto;">Showing last 90 days · Total inbound: <strong>€ 6.2M</strong> · Total outbound: <strong>€ 4.8M</strong></span>
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Date</th><th>Description</th><th>Counterparty</th><th>Country</th><th>Amount</th><th>Direction</th><th>Flag</th></tr></thead>
+        <tbody>
+          <tr><td>Feb 28, 2026</td><td>Wire transfer in</td><td>Falcon Holdings FZE</td><td>🇦🇪 UAE</td><td style="color:#3B6D11;font-weight:500;">+ € 1,200,000</td><td><span class="badge b-new">Inbound</span></td><td><span class="badge b-high">⚠ Flagged</span></td></tr>
+          <tr><td>Feb 22, 2026</td><td>Wire transfer in</td><td>Helios Partners Ltd</td><td>🇲🇹 Malta</td><td style="color:#3B6D11;font-weight:500;">+ € 480,000</td><td><span class="badge b-new">Inbound</span></td><td><span class="badge b-high">⚠ Flagged</span></td></tr>
+          <tr><td>Feb 18, 2026</td><td>Wire transfer out</td><td>MC Asset Mgmt SA</td><td>🇱🇺 Luxembourg</td><td style="color:#A32D2D;font-weight:500;">− € 950,000</td><td><span class="badge b-wait">Outbound</span></td><td><span class="badge b-done">Clean</span></td></tr>
+          <tr><td>Feb 10, 2026</td><td>Wire transfer in</td><td>Kyros Capital Cyprus</td><td>🇨🇾 Cyprus</td><td style="color:#3B6D11;font-weight:500;">+ € 8,400</td><td><span class="badge b-new">Inbound</span></td><td><span class="badge b-high">⚠ Structuring</span></td></tr>
+          <tr><td>Feb 10, 2026</td><td>Wire transfer in</td><td>Kyros Capital Cyprus</td><td>🇨🇾 Cyprus</td><td style="color:#3B6D11;font-weight:500;">+ € 9,200</td><td><span class="badge b-new">Inbound</span></td><td><span class="badge b-high">⚠ Structuring</span></td></tr>
+          <tr><td>Feb 03, 2026</td><td>Wire transfer in</td><td>Falcon Holdings FZE</td><td>🇦🇪 UAE</td><td style="color:#3B6D11;font-weight:500;">+ € 340,000</td><td><span class="badge b-new">Inbound</span></td><td><span class="badge b-high">⚠ Flagged</span></td></tr>
+          <tr><td>Jan 28, 2026</td><td>Wire transfer out</td><td>Helios Partners Ltd</td><td>🇲🇹 Malta</td><td style="color:#A32D2D;font-weight:500;">− € 470,000</td><td><span class="badge b-wait">Outbound</span></td><td><span class="badge b-high">⚠ Round-trip</span></td></tr>
+          <tr><td>Jan 15, 2026</td><td>Management fees</td><td>Various clients</td><td>🇮🇹 Italy</td><td style="color:#3B6D11;font-weight:500;">+ € 124,500</td><td><span class="badge b-new">Inbound</span></td><td><span class="badge b-done">Clean</span></td></tr>
+          <tr><td>Jan 08, 2026</td><td>Wire transfer out</td><td>Meridian RE S.r.l.</td><td>🇮🇹 Italy</td><td style="color:#A32D2D;font-weight:500;">− € 280,000</td><td><span class="badge b-wait">Outbound</span></td><td><span class="badge b-done">Clean</span></td></tr>
+          <tr><td>Dec 20, 2025</td><td>Wire transfer in</td><td>Gulf Invest Partners</td><td>🇦🇪 UAE</td><td style="color:#3B6D11;font-weight:500;">+ € 620,000</td><td><span class="badge b-new">Inbound</span></td><td><span class="badge b-high">⚠ Flagged</span></td></tr>
+          <tr><td>Dec 12, 2025</td><td>Advisory fee income</td><td>Various clients</td><td>🇮🇹 Italy</td><td style="color:#3B6D11;font-weight:500;">+ € 98,200</td><td><span class="badge b-new">Inbound</span></td><td><span class="badge b-done">Clean</span></td></tr>
+          <tr><td>Dec 05, 2025</td><td>Wire transfer out</td><td>MC Asset Mgmt SA</td><td>🇱🇺 Luxembourg</td><td style="color:#A32D2D;font-weight:500;">− € 1,100,000</td><td><span class="badge b-wait">Outbound</span></td><td><span class="badge b-done">Clean</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="tab-evidenze" class="client-panel" style="display:none;">
+    <div class="tw">
+      <table>
+        <thead><tr><th>Case ID</th><th>Type</th><th>Opened</th><th>Closed</th><th>Outcome</th><th>Key finding</th></tr></thead>
+        <tbody>
+          <tr><td><strong>AV-2026-0341</strong></td><td><span class="badge b-prog">CDD — EDD</span></td><td>Mar 2026</td><td>In progress</td><td><span class="badge b-input">⚠ Pending</span></td><td>PEP entry + volume spike</td></tr>
+          <tr><td><strong>TM-2025-1847</strong></td><td><span class="badge b-new">Transaction Monitoring</span></td><td>Nov 2025</td><td>Dec 2025</td><td><span class="badge b-done">No SAR</span></td><td>Large inflow from UAE — explained</td></tr>
+          <tr><td><strong>AV-2023-0512</strong></td><td><span class="badge b-approv">CDD — Periodic</span></td><td>Jan 2023</td><td>Feb 2023</td><td><span class="badge b-done">Risk: Medium</span></td><td>Periodic review — no anomalies</td></tr>
+          <tr><td><strong>TM-2022-0934</strong></td><td><span class="badge b-new">Transaction Monitoring</span></td><td>Jun 2022</td><td>Jul 2022</td><td><span class="badge b-done">No SAR</span></td><td>Round-trip pattern — explained</td></tr>
+          <tr><td><strong>ONB-2018-0142</strong></td><td><span class="badge b-wait">Onboarding</span></td><td>Mar 2018</td><td>Mar 2018</td><td><span class="badge b-done">Risk: Low</span></td><td>Initial KYC — standard profile</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="tab-sar" class="client-panel" style="display:none;">
+    <div style="background:#FFFBEC;border:1px solid #F0D060;border-radius:8px;padding:14px 16px;margin-bottom:14px;font-size:13px;color:#5D4500;">
+      <strong>⚠ Restricted</strong> — SAR information is confidential under D.Lgs. 231/2007 art. 35. Disclosure to the subject is prohibited (tipping-off restriction).
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr><th>SAR ID</th><th>Filed date</th><th>Filed by</th><th>Status</th><th>UIF reference</th></tr></thead>
+        <tbody>
+          <tr><td><strong>SAR-2026-0012</strong></td><td>Mar 5, 2026</td><td>AML Officer</td><td><span class="badge b-prog">Pending UIF response</span></td><td>—</td></tr>
+          <tr><td><em style="color:var(--muted);">No prior SARs on record</em></td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="tab-news" class="client-panel" style="display:none;">
+    <div style="display:flex;gap:10px;margin-bottom:14px;align-items:center;">
+      <select style="font-size:12px;">
+        <option>Severity: All</option>
+        <option>High only</option>
+        <option>Medium only</option>
+        <option>Low only</option>
+      </select>
+      <select style="font-size:12px;">
+        <option>Source: All sources</option>
+        <option>World-Check</option>
+        <option>Dow Jones</option>
+        <option>Open media</option>
+      </select>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div style="background:white;border:1px solid var(--border);border-radius:8px;padding:14px 16px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px;">
+          <div style="font-size:13px;font-weight:500;color:var(--black);">Karim Al-Rashid — Ministerial inquiry concluded (2019)</div>
+          <span class="badge b-med" style="flex-shrink:0;">Medium</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Source: Il Sole 24 Ore · Nov 14, 2019 · World-Check reference: WC-2019-44821</div>
+        <div style="font-size:13px;color:var(--text);line-height:1.5;">Parliamentary inquiry into ministerial expenditure during tenure as Minister of Finance. Inquiry concluded without charges or formal proceedings. Subject cooperated fully with authorities.</div>
+      </div>
+      <div style="background:white;border:1px solid var(--border);border-radius:8px;padding:14px 16px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px;">
+          <div style="font-size:13px;font-weight:500;color:var(--black);">Falcon Holdings FZE — Beneficial ownership opacity (2025)</div>
+          <span class="badge b-high" style="flex-shrink:0;">High</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Source: Dow Jones Risk · Sep 3, 2025 · Reference: DJ-2025-98120</div>
+        <div style="font-size:13px;color:var(--text);line-height:1.5;">UAE-based entity Falcon Holdings FZE flagged for opaque beneficial ownership structure. UBO chain leads to multiple nominee directors. Entity appears in multiple high-value cross-border transfers to European wealth managers.</div>
+      </div>
+      <div style="background:white;border:1px solid #F0F0F0;border-radius:8px;padding:14px 16px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px;">
+          <div style="font-size:13px;font-weight:500;color:var(--black);">Meridian Capital — Record AUM growth announced (2024)</div>
+          <span class="badge b-done" style="flex-shrink:0;">Low / Informational</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Source: Milano Finanza · Mar 22, 2024</div>
+        <div style="font-size:13px;color:var(--text);line-height:1.5;">Press release announcing AUM reaching € 220M, attributed to new institutional mandates and expansion into MENA markets. No adverse content.</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px;">
+    <button class="btn btn-g" data-action="go('s2')">← Back to case</button>
+  </div>
+</div>
+
+<!-- ═══ S3-SELECT · AGENT SELECTION ═══ -->
+<div class="screen" id="s3-select">
+  <div class="bc"><span class="lk" data-action="go('s1')">Case Dashboard</span><span class="sep">›</span><span class="lk" data-action="go('s2')">AV-2026-0341</span><span class="sep">›</span><span>Configure AI Agents</span></div>
+  <div class="sbar"><div><div class="sid">Configure AI Agents</div><div class="sname">Select agents to activate for Meridian Capital S.r.l.</div></div></div>
+  <div class="card" style="margin-bottom:16px;">
+    <h3>Super Agent — Orchestrator</h3>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">The Super Agent coordinates specialised agents, manages dependencies and synthesises the final Opinion Report.</p>
+    <div class="super-agent-sel selected" id="sa-card">
+      <div class="sa-header">
+        <div class="sa-icon">✦</div>
+        <div class="sa-info">
+          <div class="sa-name">Super Agent <span class="default-tag">Recommended</span></div>
+          <div class="sa-desc">Automatic orchestration, dependency management, final Opinion Report synthesis. Active by default on Tier 1 and High Risk cases.</div>
+        </div>
+      </div>
+      <div class="asc-check" id="sa-check">✓</div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Specialised agents</h3>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Agents tagged <span class="default-tag">Suggested</span> are pre-selected based on case type (Event Driven, PEP, High Risk).</p>
+    <div class="agent-sel-grid">
+      <div class="agent-sel-card selected" id="ag-ana">
+        <div class="asc-header"><div class="asc-icon">📄</div><div class="asc-name">Registry Agent <span class="default-tag">Suggested</span></div></div>
+        <div class="asc-desc">Corporate data, Chamber of Commerce, Companies Register, Orbis and internal databases.</div>
+        <div class="asc-check" id="ck-ag-ana">✓</div>
+      </div>
+      <div class="agent-sel-card selected" id="ag-ubo">
+        <div class="asc-header"><div class="asc-icon">👤</div><div class="asc-name">UBO / PEP Agent <span class="default-tag">Suggested</span></div></div>
+        <div class="asc-desc">Beneficial owner identification, PEP screening on World-Check, Dow Jones Risk and sanctions lists.</div>
+        <div class="asc-check" id="ck-ag-ubo">✓</div>
+      </div>
+      <div class="agent-sel-card selected" id="ag-trx">
+        <div class="asc-header"><div class="asc-icon">📈</div><div class="asc-name">Transaction Agent <span class="default-tag">Suggested</span></div></div>
+        <div class="asc-desc">Transaction flow analysis, anomaly pattern detection, AML scoring vs expected profile.</div>
+        <div class="asc-check" id="ck-ag-trx">✓</div>
+      </div>
+      <div class="agent-sel-card selected" id="ag-rep">
+        <div class="asc-header"><div class="asc-icon">🔍</div><div class="asc-name">Reputational Agent <span class="default-tag">Suggested</span></div></div>
+        <div class="asc-desc">Media search, CONSOB, Bank of Italy, EU Sanctions List, OFAC.</div>
+        <div class="asc-check" id="ck-ag-rep">✓</div>
+      </div>
+      <div class="agent-sel-card selected" id="ag-eco">
+        <div class="asc-header"><div class="asc-icon">💰</div><div class="asc-name">Economic Assessment Agent <span class="default-tag">Suggested</span></div></div>
+        <div class="asc-desc">Economic profile consistency, financials, turnover and proposed risk profile update.</div>
+        <div class="asc-check" id="ck-ag-eco">✓</div>
+      </div>
+      <div class="agent-sel-card" id="ag-doc">
+        <div class="asc-header"><div class="asc-icon">📁</div><div class="asc-name">Document Agent</div></div>
+        <div class="asc-desc">KYC documentation completeness verification and missing document requests.</div>
+        <div class="asc-check" id="ck-ag-doc"></div>
+      </div>
+      <div class="agent-sel-card" id="ag-geo">
+        <div class="asc-header"><div class="asc-icon">🌍</div><div class="asc-name">Geographic Agent</div></div>
+        <div class="asc-desc">Exposure to high-risk jurisdictions, FATF grey/black list countries and correspondents.</div>
+        <div class="asc-check" id="ck-ag-geo"></div>
+      </div>
+      <div class="agent-sel-card selected" id="ag-syn">
+        <div class="asc-header"><div class="asc-icon">🧬</div><div class="asc-name">Final Valuation Agent <span class="default-tag">Suggested</span></div></div>
+        <div class="asc-desc">Final opinion drafting, AFC recommendation and proposed risk classification update.</div>
+        <div class="asc-check" id="ck-ag-syn">✓</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;padding-top:16px;border-top:1px solid var(--border);">
+      <span style="font-size:12px;color:var(--muted);" id="sel-count">6 agents selected</span>
+      <div class="mla" style="display:flex;gap:10px;">
+        <button class="btn btn-g" data-action="go('s2')">← Cancel</button>
+        <button class="btn btn-p" data-action="startAgents()">Start analysis →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ S3-RUN · AGENTS RUNNING ═══ -->
+<div class="screen" id="s3-run">
+  <div class="bc"><span class="lk" data-action="go('s1')">Case Dashboard</span><span class="sep">›</span><span class="lk" data-action="go('s2')">AV-2026-0341</span><span class="sep">›</span><span>Processing</span></div>
+  <div class="sbar">
+    <div><div class="sid">AV-2026-0341 — Meridian Capital S.r.l.</div><div class="sname">AI Agents running...</div></div>
+    <div class="mla"><span class="badge b-prog" style="font-size:12px;padding:5px 12px;">● Processing</span></div>
+  </div>
+  <div class="spin-layout">
+    <div>
+      <div class="spin-panel">
+        <div class="panel-hdr"><span>Agents running</span><span style="font-size:12px;color:#aaa;" id="run-pct-label">0%</span></div>
+        <div class="super-box">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:24px;">✦</span>
+            <div><div class="sbn">Super Agent — Orchestrator</div><div class="sbd">Coordinates agents and manages the analysis workflow</div></div>
+          </div>
+          <div style="margin-top:10px;">
+            <div class="overall-pb-label"><span>Overall progress</span><span id="run-pct">0%</span></div>
+            <div style="height:4px;background:#F7C1C1;border-radius:2px;overflow:hidden;"><div id="run-pb" style="height:100%;background:var(--red);border-radius:2px;width:0%;transition:width .8s;"></div></div>
+          </div>
+        </div>
+        <div class="spin-agent"><div class="spin-logo" style="background:#E6F1FB;">📄<div class="spin-ring" id="sr-ana"></div></div><div class="spin-info"><div class="spin-name">Registry Agent</div><div class="spin-task">Chamber of Commerce, Orbis, internal repository</div><div class="spin-status wait" id="ss-ana">Waiting...</div><div class="pb-wrap"><div class="pb" id="pb-ana" style="width:0%"></div></div></div></div>
+        <div class="spin-agent"><div class="spin-logo" style="background:#EEEDFE;">👤<div class="spin-ring" id="sr-ubo"></div></div><div class="spin-info"><div class="spin-name">UBO / PEP Agent</div><div class="spin-task">World-Check, Dow Jones Risk, sanctions lists</div><div class="spin-status wait" id="ss-ubo">Waiting...</div><div class="pb-wrap"><div class="pb" id="pb-ubo" style="width:0%"></div></div></div></div>
+        <div class="spin-agent"><div class="spin-logo" style="background:#EAF3DE;">📈<div class="spin-ring" id="sr-trx"></div></div><div class="spin-info"><div class="spin-name">Transaction Agent</div><div class="spin-task">Anomaly patterns, AML scoring, flows</div><div class="spin-status wait" id="ss-trx">Waiting...</div><div class="pb-wrap"><div class="pb" id="pb-trx" style="width:0%"></div></div></div></div>
+        <div class="spin-agent"><div class="spin-logo" style="background:#FCEBEB;">🔍<div class="spin-ring" id="sr-rep"></div></div><div class="spin-info"><div class="spin-name">Reputational Agent</div><div class="spin-task">Media search, CONSOB, Bank of Italy, OFAC</div><div class="spin-status wait" id="ss-rep">Waiting...</div><div class="pb-wrap"><div class="pb" id="pb-rep" style="width:0%"></div></div></div></div>
+        <div class="spin-agent"><div class="spin-logo" style="background:#FAEEDA;">💰<div class="spin-ring" id="sr-eco"></div></div><div class="spin-info"><div class="spin-name">Economic Assessment Agent</div><div class="spin-task">Profile consistency, financials, risk update proposal</div><div class="spin-status wait" id="ss-eco">Waiting...</div><div class="pb-wrap"><div class="pb" id="pb-eco" style="width:0%"></div></div></div></div>
+        <div class="spin-agent"><div class="spin-logo" style="background:#F9E6E6;">🧬<div class="spin-ring" id="sr-syn"></div></div><div class="spin-info"><div class="spin-name">Final Valuation Agent</div><div class="spin-task">Final opinion, AFC recommendation</div><div class="spin-status wait" id="ss-syn">Waiting...</div><div class="pb-wrap"><div class="pb" id="pb-syn" style="width:0%"></div></div></div></div>
+      </div>
+      <div class="log-box" style="margin-top:12px;">
+        <div class="log-hdr"><span>ACTIVITY LOG</span><div class="dot dot-w" style="margin-left:auto;"></div></div>
+        <div class="log-area" id="run-log"></div>
+      </div>
+    </div>
+    <!-- RIGHT: Opinion being compiled -->
+    <div>
+      <div class="spin-panel" style="height:100%;">
+        <div class="panel-hdr"><span>Opinion Report — being compiled</span><span style="font-size:12px;color:#aaa;" id="sec-count">0 / 10</span></div>
+        <div class="np-section"><div class="np-sh" data-action="toggleNP('np1')"><span class="np-st">1. Registry &amp; corporate structure</span><span id="st-np1"><span style="font-size:11px;color:#888;">—</span></span></div><div class="np-body" id="np1"></div></div>
+        <div class="np-section"><div class="np-sh" data-action="toggleNP('np2')"><span class="np-st">2. Beneficial owner (UBO identification)</span><span id="st-np2"><span style="font-size:11px;color:#888;">—</span></span></div><div class="np-body" id="np2"></div></div>
+        <div class="np-section"><div class="np-sh" data-action="toggleNP('np3')"><span class="np-st">3. Transaction analysis</span><span id="st-np3"><span style="font-size:11px;color:#888;">—</span></span></div><div class="np-body" id="np3"></div></div>
+        <div class="np-section"><div class="np-sh" data-action="toggleNP('np4')"><span class="np-st">4. Key findings from TM / screening</span><span id="st-np4"><span style="font-size:11px;color:#888;">—</span></span></div><div class="np-body" id="np4"></div></div>
+        <div class="np-section"><div class="np-sh" data-action="toggleNP('np5')"><span class="np-st">5. PEP / RCA flag verification</span><span id="st-np5"><span style="font-size:11px;color:#888;">—</span></span></div><div class="np-body" id="np5"></div></div>
+        <div class="np-section"><div class="np-sh" data-action="toggleNP('np6')"><span class="np-st">6. Reputational screening</span><span id="st-np6"><span style="font-size:11px;color:#888;">—</span></span></div><div class="np-body" id="np6"></div></div>
+        <div class="np-section"><div class="np-sh" data-action="toggleNP('np7')"><span class="np-st">7. Risk factor analysis</span><span id="st-np7"><span style="font-size:11px;color:#888;">—</span></span></div><div class="np-body" id="np7"></div></div>
+        <div class="np-section"><div class="np-sh" data-action="toggleNP('np8')"><span class="np-st">8. Supplementary analysis (EDD — High / Very High only)</span><span id="st-np8"><span style="font-size:11px;color:#888;">—</span></span></div><div class="np-body" id="np8"></div></div>
+        <div class="np-section"><div class="np-sh" data-action="toggleNP('np9')"><span class="np-st">9. Agent preliminary assessment</span><span id="st-np9"><span style="font-size:11px;color:#888;">—</span></span></div><div class="np-body" id="np9"></div></div>
+        <div class="np-section"><div class="np-sh" data-action="toggleNP('np10')"><span class="np-st">10. Final valuation &amp; recommendation</span><span id="st-np10"><span style="font-size:11px;color:#888;">—</span></span></div><div class="np-body" id="np10"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ S4 · RESULTS ═══ -->
+<div class="screen" id="s4">
+  <div class="bc"><span class="lk" data-action="go('s1')">Case Dashboard</span><span class="sep">›</span><span class="lk" data-action="go('s2')">AV-2026-0341</span><span class="sep">›</span><span>Opinion Report</span></div>
+  <div class="sbar">
+    <div><div class="sid">AV-2026-0341 — Meridian Capital S.r.l.</div><div class="sname">Opinion Report — processing completed, 1 input required</div></div>
+    <div class="mla" style="display:flex;gap:8px;flex-wrap:wrap;">
+      <span class="badge b-done">✓ 8 completed</span>
+      <span class="badge b-prog">● 1 in progress</span>
+      <span class="badge b-input">⚠ 1 input required</span>
+    </div>
+  </div>
+  <div class="res-layout">
+    <div class="nota-full">
+      <div class="nf-hdr">
+        <span>AML Opinion Report — Enhanced Due Diligence (EDD)</span>
+        <span style="font-size:12px;color:#aaa;">03/20/2026 — 8 min 32 sec</span>
+      </div>
+
+      <div class="nf-section">
+        <div class="nf-sh" data-action="toggleNF('nf1')"><span class="nf-st">1. Registry &amp; corporate structure</span><span class="badge b-done">✓ Completed</span></div>
+        <div class="nf-body open" id="nf1">Meridian Capital S.r.l. — headquartered in Milan, wealth management sector. Corporate change Feb 2026: entry of Karim Al-Rashid (30%, classified PEP Tier 1 — former public official, MENA jurisdiction). Share capital € 500,000 fully paid-up. Ownership structure verified on official sources and Orbis. No pending insolvency proceedings or judicial measures identified.</div>
+      </div>
+
+      <div class="nf-section">
+        <div class="nf-sh" data-action="toggleNF('nf2')"><span class="nf-st">2. Beneficial owner (UBO identification)</span><span class="badge b-done">✓ Completed</span></div>
+        <div class="nf-body" id="nf2">Primary UBO: Alessandro Greco (82% shares) — Italian national, no adverse records. Secondary UBO: Karim Al-Rashid (30%) — classified PEP Tier 1, former Minister of Finance, MENA jurisdiction. UBO chain verified to ultimate natural persons. No bearer shares or nominee structures identified. CDD documentation last updated 2021 — update required.</div>
+      </div>
+
+      <div class="nf-section">
+        <div class="nf-sh" data-action="toggleNF('nf3')"><span class="nf-st">3. Transaction analysis</span><span class="badge b-done">✓ Completed</span></div>
+        <div class="nf-body" id="nf3">47 inbound transactions from UAE, Malta, Cyprus for € 8.4M (Jan 2025 – Feb 2026). Volume increase +340% vs prior year. Average transaction size: € 178,723. Largest single transfer: € 1.2M from UAE entity (Feb 3, 2026). Geographic concentration: 68% from FATF high-risk jurisdictions. Cash-equivalent flows: none detected.</div>
+      </div>
+
+      <div class="nf-section">
+        <div class="nf-sh" data-action="toggleNF('nf4')"><span class="nf-st">4. Key findings from TM / screening</span><span class="badge b-done">✓ Completed</span></div>
+        <div class="nf-body" id="nf4">Transaction monitoring system generated 3 alerts in the period: (1) structuring pattern — 8 transactions just below € 10,000 threshold; (2) suspected round-tripping — outflow to Malta entity followed by equivalent inflow 12 days later; (3) 6 transactions with unidentified beneficial counterparty. All three alerts escalated for manual review. No prior SARs filed on this client.</div>
+      </div>
+
+      <div class="nf-section">
+        <div class="nf-sh" data-action="toggleNF('nf5')"><span class="nf-st">5. PEP / RCA flag verification</span><span class="badge b-done">✓ Completed</span></div>
+        <div class="nf-body" id="nf5">Karim Al-Rashid confirmed as PEP Tier 1 on World-Check (last updated Jan 2026), Dow Jones Risk &amp; Compliance, and Refinitiv. No active international sanctions on OFAC SDN List, EU Consolidated Sanctions List, or UN Security Council list. Relative/Close Associate (RCA) screening performed — spouse and two business associates identified, no adverse findings. Senior Management approval required per EDD policy before relationship continuation.</div>
+      </div>
+
+      <div class="nf-section">
+        <div class="nf-sh" data-action="toggleNF('nf6')"><span class="nf-st">6. Reputational screening</span><span class="badge b-done">✓ Completed</span></div>
+        <div class="nf-body" id="nf6">No adverse news on Meridian Capital S.r.l. in national or international media. Alessandro Greco: clean profile across all sources. Karim Al-Rashid: cited in institutional and diplomatic contexts; one 2019 article referencing a ministerial inquiry, concluded without charges. CONSOB: no administrative measures. Banca d'Italia: no supervisory actions. Adverse media score: Low (2/10).</div>
+      </div>
+
+      <div class="nf-section">
+        <div class="nf-sh" data-action="toggleNF('nf7')"><span class="nf-st">7. Risk factor analysis</span><span class="badge b-done">✓ Completed</span></div>
+        <div class="nf-body" id="nf7">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+            <div style="background:#FCEBEB;border-radius:6px;padding:8px 10px;font-size:12px;"><strong style="color:#A32D2D;">High</strong><div style="color:#666;margin-top:2px;">PEP Tier 1 shareholding</div></div>
+            <div style="background:#FCEBEB;border-radius:6px;padding:8px 10px;font-size:12px;"><strong style="color:#A32D2D;">High</strong><div style="color:#666;margin-top:2px;">High-risk jurisdiction exposure (68%)</div></div>
+            <div style="background:#FAEEDA;border-radius:6px;padding:8px 10px;font-size:12px;"><strong style="color:#854F0B;">Medium</strong><div style="color:#666;margin-top:2px;">TM alerts — structuring pattern</div></div>
+            <div style="background:#FAEEDA;border-radius:6px;padding:8px 10px;font-size:12px;"><strong style="color:#854F0B;">Medium</strong><div style="color:#666;margin-top:2px;">Outdated KYC documentation</div></div>
+            <div style="background:#FAEEDA;border-radius:6px;padding:8px 10px;font-size:12px;"><strong style="color:#854F0B;">Medium</strong><div style="color:#666;margin-top:2px;">Unexplained volume increase +340%</div></div>
+            <div style="background:#EAF3DE;border-radius:6px;padding:8px 10px;font-size:12px;"><strong style="color:#3B6D11;">Low</strong><div style="color:#666;margin-top:2px;">No sanctions / adverse media</div></div>
+          </div>
+          <div style="font-size:12px;color:#666;">Aggregate risk score: <strong style="color:#A32D2D;">78 / 100 — Very High</strong></div>
+        </div>
+      </div>
+
+      <div class="nf-section">
+        <div class="nf-sh" data-action="toggleNF('nf8')"><span class="nf-st">8. Supplementary analysis (EDD — High / Very High risk)</span><span class="badge b-done">✓ Completed</span></div>
+        <div class="nf-body" id="nf8">EDD triggered by: PEP Tier 1 + aggregate risk score ≥ 70. Source of wealth verification: Karim Al-Rashid — declared wealth from public salary and real estate portfolio; documentation provided partially consistent with disclosed assets. Source of funds for shareholding acquisition (€ 2.1M, Feb 2026): wire transfer from Falcon Holdings FZE (UAE) — beneficial owner chain not fully traceable. Enhanced monitoring frequency: upgraded from annual to quarterly. Senior Management sign-off: pending.</div>
+      </div>
+
+      <div class="nf-section">
+        <div class="nf-sh" data-action="toggleNF('nf9')">
+          <span class="nf-st">9. Agent preliminary assessment &amp; proposed risk profile update</span>
+          <span class="badge b-input" id="badge-s5">⚠ Input required</span>
+        </div>
+        <div class="nf-body open" id="nf9">
+          <p style="margin-bottom:12px;">Declared turnover (€ 14.2M) partially consistent with detected flows; transaction volume significantly exceeds expected profile. Updated corporate documents (2026 articles of association, deed of corporate amendment for new shareholder) were not found in the internal repository or open sources.</p>
+          <div class="input-required-box" id="irb-s5">
+            <div class="irb-label">⚠ User input required</div>
+            <div class="irb-text">The Agent did not find the updated corporate documents (post-amendment articles of association, notarial deed for new shareholder entry). It is recommended to contact the client to request updated documentation before proceeding with the risk profile assessment.</div>
+            <div class="irb-actions">
+              <button class="btn btn-p" id="btn-contact-client" style="font-size:12px;padding:7px 14px;">✉ Contact client</button>
+              <button class="btn btn-o" id="btn-skip-docs" style="font-size:12px;padding:7px 14px;">Proceed without documents</button>
+            </div>
+          </div>
+          <div id="input-done-s5" style="display:none;"></div>
+        </div>
+      </div>
+
+      <div class="nf-section">
+        <div class="nf-sh" data-action="toggleNF('nf10')"><span class="nf-st">10. Final valuation &amp; recommendation</span><span class="badge b-prog" id="badge-s6">● Awaiting input</span></div>
+        <div class="nf-body" id="nf10" style="color:var(--muted);font-style:italic;">Awaiting documentation requested in section 9 before proceeding with the final valuation.</div>
+      </div>
+
+      <div class="approve-row" id="approve-row">
+        <button class="btn btn-g" data-action="go('s2')">← Back to detail</button>
+        <button class="btn btn-o" style="margin-left:auto;">⬇ Download draft PDF</button>
+        <button class="btn btn-o">✎ Edit manually</button>
+        <button class="btn btn-p" id="approve-btn" disabled style="opacity:.5;cursor:not-allowed;">✓ Approve &amp; Close</button>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="agents-mini">
+        <div class="am-hdr">Agents Status</div>
+        <div class="am-item"><div class="am-icon" style="background:#E6F1FB;">📄</div><div><div class="am-name">Registry Agent</div><div class="am-st" style="color:#3B6D11;">✓ Completed</div></div></div>
+        <div class="am-item"><div class="am-icon" style="background:#EEEDFE;">👤</div><div><div class="am-name">UBO / PEP Agent</div><div class="am-st" style="color:#3B6D11;">✓ Completed</div></div></div>
+        <div class="am-item"><div class="am-icon" style="background:#EAF3DE;">📈</div><div><div class="am-name">Transaction Agent</div><div class="am-st" style="color:#3B6D11;">✓ Completed</div></div></div>
+        <div class="am-item"><div class="am-icon" style="background:#FCEBEB;">🔍</div><div><div class="am-name">Reputational Agent</div><div class="am-st" style="color:#3B6D11;">✓ Completed</div></div></div>
+        <div class="am-item"><div class="am-icon" style="background:#FAEEDA;">💰</div><div><div class="am-name">Economic Assessment Agent</div><div class="am-st" style="color:#856404;">⚠ Input required</div></div></div>
+        <div class="am-item"><div class="am-icon" style="background:#F9E6E6;">🧬</div><div><div class="am-name">Final Valuation Agent</div><div class="am-st" style="color:#534AB7;">● Waiting</div></div></div>
+      </div>
+      <div class="card" style="margin-bottom:0;">
+        <h3 style="border:none;margin-bottom:10px;padding:0;">Proposed risk profile</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Awaiting documentation for confirmation. Preliminary proposal:</p>
+        <div class="risk-change">
+          <div style="text-align:center;"><div style="font-size:10px;color:var(--muted);margin-bottom:4px;">Current</div><span class="badge b-high" style="font-size:13px;padding:6px 14px;">High</span></div>
+          <div class="risk-arrow">→</div>
+          <div style="text-align:center;"><div style="font-size:10px;color:var(--muted);margin-bottom:4px;">Proposed</div><span style="background:#7A0000;color:white;font-size:13px;padding:6px 14px;border-radius:12px;font-weight:500;">Very High</span></div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5;">Rationale: PEP Tier 1, 3 TM alerts, +340% unexplained volume, 68% high-risk jurisdiction exposure.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MANUAL REVIEW ═══ -->
+<div class="screen" id="s3-manual">
+  <div class="bc"><span class="lk" data-action="go('s1')">Case Dashboard</span><span class="sep">›</span><span class="lk" data-action="go('s2')">AV-2026-0341</span><span class="sep">›</span><span>Manual review</span></div>
+  <div class="card">
+    <h3>Opinion Report — Manual compilation</h3>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Fill in all sections of the opinion report.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div><label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;">1. Registry</label><textarea style="width:100%;border:1px solid var(--border);border-radius:6px;padding:10px;font-size:13px;height:80px;resize:vertical;font-family:inherit;" placeholder="Enter registry information..."></textarea></div>
+      <div><label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;">2. UBO Analysis</label><textarea style="width:100%;border:1px solid var(--border);border-radius:6px;padding:10px;font-size:13px;height:80px;resize:vertical;font-family:inherit;" placeholder="Beneficial owner..."></textarea></div>
+      <div><label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;">3. Transaction analysis</label><textarea style="width:100%;border:1px solid var(--border);border-radius:6px;padding:10px;font-size:13px;height:80px;resize:vertical;font-family:inherit;" placeholder="Transaction patterns..."></textarea></div>
+      <div><label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;">4. Reputational analysis</label><textarea style="width:100%;border:1px solid var(--border);border-radius:6px;padding:10px;font-size:13px;height:80px;resize:vertical;font-family:inherit;" placeholder="Reputational research outcome..."></textarea></div>
+    </div>
+    <div style="margin-top:16px;display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-g" data-action="go('s2')">← Cancel</button>
+      <button class="btn btn-o">Save draft</button>
+      <button class="btn btn-p">Submit for approval</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SAGENTS · AGENTS STATUS & PERFORMANCE ═══ -->
+<div class="screen" id="sagents">
+  <div class="ph"><h1>AI Agents — Performance</h1><p>Live agent registry and operational KPIs — updated March 20, 2026</p></div>
+
+  <!-- KPI strip -->
+  <div class="stats" style="margin-bottom:20px;">
+    <div class="sc"><div class="n">8</div><div class="l">Agents available</div></div>
+    <div class="sc"><div class="n" style="color:#3B6D11;">7</div><div class="l">Operational</div></div>
+    <div class="sc red"><div class="n">1</div><div class="l">Under maintenance</div></div>
+    <div class="sc"><div class="n">247</div><div class="l">Runs (last 30d)</div></div>
+    <div class="sc"><div class="n">94%</div><div class="l">Success rate</div></div>
+    <div class="sc"><div class="n">4.1<span style="font-size:14px;font-weight:400;color:var(--muted);">m</span></div><div class="l">Avg. run time</div></div>
+  </div>
+
+  <!-- Agent cards grid -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;margin-bottom:24px;">
+
+    <!-- Super Agent -->
+    <div style="background:white;border:2px solid var(--red);border-radius:10px;padding:18px;position:relative;">
+      <div style="position:absolute;top:12px;right:14px;"><span class="badge b-done" style="font-size:10px;">● Operational</span></div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+        <div style="width:44px;height:44px;border-radius:10px;background:var(--red-light);display:flex;align-items:center;justify-content:center;font-size:22px;">✦</div>
+        <div>
+          <div style="font-size:14px;font-weight:500;color:var(--black);">Super Agent</div>
+          <div style="font-size:11px;color:var(--red);font-weight:500;text-transform:uppercase;letter-spacing:.5px;margin-top:2px;">Orchestrator</div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;">Coordinates all specialised agents, manages inter-agent dependencies, sequences execution and synthesises the final Opinion Report. Activated by default on Tier 1 and High / Very High risk cases.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:var(--black);">142</div><div style="font-size:10px;color:var(--muted);">Runs (30d)</div></div>
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:#3B6D11;">98%</div><div style="font-size:10px;color:var(--muted);">Success</div></div>
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:var(--black);">1.2m</div><div style="font-size:10px;color:var(--muted);">Avg. time</div></div>
+      </div>
+    </div>
+
+    <!-- Registry Agent -->
+    <div style="background:white;border:1px solid var(--border);border-radius:10px;padding:18px;position:relative;">
+      <div style="position:absolute;top:12px;right:14px;"><span class="badge b-done" style="font-size:10px;">● Operational</span></div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+        <div style="width:44px;height:44px;border-radius:10px;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:22px;">📄</div>
+        <div>
+          <div style="font-size:14px;font-weight:500;color:var(--black);">Registry Agent</div>
+          <div style="font-size:11px;color:#185FA5;font-weight:500;text-transform:uppercase;letter-spacing:.5px;margin-top:2px;">Data collection</div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;">Retrieves corporate registry data from Chamber of Commerce, Companies Register and Orbis. Cross-checks with internal CRM and KYC repository. Flags outdated documentation.</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Data sources: <strong>CCIAA · Registro Imprese · Orbis · Internal CRM</strong></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:var(--black);">241</div><div style="font-size:10px;color:var(--muted);">Runs (30d)</div></div>
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:#3B6D11;">99%</div><div style="font-size:10px;color:var(--muted);">Success</div></div>
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:var(--black);">0.8m</div><div style="font-size:10px;color:var(--muted);">Avg. time</div></div>
+      </div>
+    </div>
+
+    <!-- UBO / PEP Agent -->
+    <div style="background:white;border:1px solid var(--border);border-radius:10px;padding:18px;position:relative;">
+      <div style="position:absolute;top:12px;right:14px;"><span class="badge b-done" style="font-size:10px;">● Operational</span></div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+        <div style="width:44px;height:44px;border-radius:10px;background:#EEEDFE;display:flex;align-items:center;justify-content:center;font-size:22px;">👤</div>
+        <div>
+          <div style="font-size:14px;font-weight:500;color:var(--black);">UBO / PEP Agent</div>
+          <div style="font-size:11px;color:#534AB7;font-weight:500;text-transform:uppercase;letter-spacing:.5px;margin-top:2px;">Screening</div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;">Identifies beneficial owners through multi-source screening. Runs PEP, RCA and sanctions checks against international databases. Generates UBO chain up to natural person level.</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Data sources: <strong>World-Check · Dow Jones Risk · Refinitiv · OFAC · EU Sanctions</strong></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:var(--black);">238</div><div style="font-size:10px;color:var(--muted);">Runs (30d)</div></div>
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:#3B6D11;">97%</div><div style="font-size:10px;color:var(--muted);">Success</div></div>
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:var(--black);">1.4m</div><div style="font-size:10px;color:var(--muted);">Avg. time</div></div>
+      </div>
+    </div>
+
+    <!-- Transaction Agent -->
+    <div style="background:white;border:1px solid var(--border);border-radius:10px;padding:18px;position:relative;">
+      <div style="position:absolute;top:12px;right:14px;"><span class="badge b-done" style="font-size:10px;">● Operational</span></div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+        <div style="width:44px;height:44px;border-radius:10px;background:#EAF3DE;display:flex;align-items:center;justify-content:center;font-size:22px;">📈</div>
+        <div>
+          <div style="font-size:14px;font-weight:500;color:var(--black);">Transaction Agent</div>
+          <div style="font-size:11px;color:#3B6D11;font-weight:500;text-transform:uppercase;letter-spacing:.5px;margin-top:2px;">Analysis</div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;">Analyses transaction flows over configurable lookback periods. Detects anomaly patterns (structuring, round-tripping, layering). Computes AML risk score and compares against expected client profile.</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Data sources: <strong>Core Banking · TM System · SWIFT messages · Internal alerts</strong></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:var(--black);">235</div><div style="font-size:10px;color:var(--muted);">Runs (30d)</div></div>
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:#3B6D11;">95%</div><div style="font-size:10px;color:var(--muted);">Success</div></div>
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:var(--black);">2.1m</div><div style="font-size:10px;color:var(--muted);">Avg. time</div></div>
+      </div>
+    </div>
+
+    <!-- Reputational Agent -->
+    <div style="background:white;border:1px solid var(--border);border-radius:10px;padding:18px;position:relative;">
+      <div style="position:absolute;top:12px;right:14px;"><span class="badge b-done" style="font-size:10px;">● Operational</span></div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+        <div style="width:44px;height:44px;border-radius:10px;background:#FCEBEB;display:flex;align-items:center;justify-content:center;font-size:22px;">🔍</div>
+        <div>
+          <div style="font-size:14px;font-weight:500;color:var(--black);">Reputational Agent</div>
+          <div style="font-size:11px;color:#A32D2D;font-weight:500;text-transform:uppercase;letter-spacing:.5px;margin-top:2px;">Adverse media</div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;">Scans national and international media, regulatory registers and watchlists for adverse mentions. Produces a scored reputational report with source attribution and date-stamped evidence.</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Data sources: <strong>CONSOB · Banca d'Italia · EU registers · Open media (50+ sources)</strong></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:var(--black);">230</div><div style="font-size:10px;color:var(--muted);">Runs (30d)</div></div>
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:#3B6D11;">96%</div><div style="font-size:10px;color:var(--muted);">Success</div></div>
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:var(--black);">1.8m</div><div style="font-size:10px;color:var(--muted);">Avg. time</div></div>
+      </div>
+    </div>
+
+    <!-- Economic Assessment Agent -->
+    <div style="background:white;border:1px solid var(--border);border-radius:10px;padding:18px;position:relative;">
+      <div style="position:absolute;top:12px;right:14px;"><span class="badge b-done" style="font-size:10px;">● Operational</span></div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+        <div style="width:44px;height:44px;border-radius:10px;background:#FAEEDA;display:flex;align-items:center;justify-content:center;font-size:22px;">💰</div>
+        <div>
+          <div style="font-size:14px;font-weight:500;color:var(--black);">Economic Assessment Agent</div>
+          <div style="font-size:11px;color:#854F0B;font-weight:500;text-transform:uppercase;letter-spacing:.5px;margin-top:2px;">Risk profile</div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;">Evaluates consistency between declared economic profile and observed financial behaviour. Analyses balance sheets, turnover trends and asset volumes. Proposes risk profile update with supporting rationale.</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Data sources: <strong>Financial statements · Core Banking · Fiscal registry · Internal CRM</strong></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:var(--black);">228</div><div style="font-size:10px;color:var(--muted);">Runs (30d)</div></div>
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:#856404;">91%</div><div style="font-size:10px;color:var(--muted);">Success</div></div>
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:var(--black);">2.4m</div><div style="font-size:10px;color:var(--muted);">Avg. time</div></div>
+      </div>
+    </div>
+
+    <!-- Document Agent -->
+    <div style="background:white;border:1px solid var(--border);border-radius:10px;padding:18px;position:relative;">
+      <div style="position:absolute;top:12px;right:14px;"><span class="badge b-done" style="font-size:10px;">● Operational</span></div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+        <div style="width:44px;height:44px;border-radius:10px;background:#F1EFE8;display:flex;align-items:center;justify-content:center;font-size:22px;">📁</div>
+        <div>
+          <div style="font-size:14px;font-weight:500;color:var(--black);">Document Agent</div>
+          <div style="font-size:11px;color:#5F5E5A;font-weight:500;text-transform:uppercase;letter-spacing:.5px;margin-top:2px;">KYC documents</div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;">Verifies completeness and validity of KYC documentation in the internal repository. Checks expiry dates, cross-references with registry data and flags missing or outdated documents for collection.</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Data sources: <strong>KYC repository · Document management system · Internal archive</strong></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:var(--black);">189</div><div style="font-size:10px;color:var(--muted);">Runs (30d)</div></div>
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:#3B6D11;">98%</div><div style="font-size:10px;color:var(--muted);">Success</div></div>
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:var(--black);">0.6m</div><div style="font-size:10px;color:var(--muted);">Avg. time</div></div>
+      </div>
+    </div>
+
+    <!-- Final Valuation Agent -->
+    <div style="background:white;border:1px solid var(--border);border-radius:10px;padding:18px;position:relative;">
+      <div style="position:absolute;top:12px;right:14px;"><span class="badge b-done" style="font-size:10px;">● Operational</span></div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+        <div style="width:44px;height:44px;border-radius:10px;background:#F9E6E6;display:flex;align-items:center;justify-content:center;font-size:22px;">🧬</div>
+        <div>
+          <div style="font-size:14px;font-weight:500;color:var(--black);">Final Valuation Agent</div>
+          <div style="font-size:11px;color:#A32D2D;font-weight:500;text-transform:uppercase;letter-spacing:.5px;margin-top:2px;">Synthesis</div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;">Aggregates outputs from all other agents into a coherent final opinion. Drafts the AFC recommendation, proposes updated risk classification and flags items requiring human review before sign-off.</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Depends on: <strong>All upstream agents</strong></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:var(--black);">138</div><div style="font-size:10px;color:var(--muted);">Runs (30d)</div></div>
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:#3B6D11;">93%</div><div style="font-size:10px;color:var(--muted);">Success</div></div>
+        <div style="background:#FAFAFA;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:var(--black);">1.9m</div><div style="font-size:10px;color:var(--muted);">Avg. time</div></div>
+      </div>
+    </div>
+
+    <!-- Geographic Agent — maintenance -->
+    <div style="background:#FAFAFA;border:1px solid var(--border);border-radius:10px;padding:18px;position:relative;opacity:0.7;">
+      <div style="position:absolute;top:12px;right:14px;"><span class="badge b-med" style="font-size:10px;">⚙ Maintenance</span></div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+        <div style="width:44px;height:44px;border-radius:10px;background:#F1EFE8;display:flex;align-items:center;justify-content:center;font-size:22px;">🌍</div>
+        <div>
+          <div style="font-size:14px;font-weight:500;color:var(--black);">Geographic Agent</div>
+          <div style="font-size:11px;color:#5F5E5A;font-weight:500;text-transform:uppercase;letter-spacing:.5px;margin-top:2px;">Jurisdiction risk</div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;">Maps exposure to high-risk jurisdictions against FATF grey/black lists. Analyses cross-border flow concentration and correspondent banking risk. Temporarily offline for FATF list update (estimated back: Mar 24).</div>
+      <div style="font-size:11px;color:#854F0B;margin-bottom:10px;">⚙ Scheduled maintenance — estimated return Mar 24, 2026</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div style="background:white;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:var(--black);">94</div><div style="font-size:10px;color:var(--muted);">Runs (30d)</div></div>
+        <div style="background:white;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:#3B6D11;">97%</div><div style="font-size:10px;color:var(--muted);">Success</div></div>
+        <div style="background:white;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:500;color:var(--black);">1.1m</div><div style="font-size:10px;color:var(--muted);">Avg. time</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Performance charts -->
+  <div class="ph" style="margin-bottom:16px;"><h1 style="font-size:16px;">Performance analytics</h1></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+    <div class="rep-chart-card">
+      <h4>Daily runs — last 30 days</h4>
+      <p>Total agent executions per day across all case types</p>
+      <canvas id="chart-agent-daily" height="180"></canvas>
+    </div>
+    <div class="rep-chart-card">
+      <h4>Avg. run time by agent (minutes)</h4>
+      <p>Mean completion time over last 30 days</p>
+      <canvas id="chart-agent-time" height="180"></canvas>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div class="rep-chart-card">
+      <h4>Success rate by agent</h4>
+      <p>% of runs completed without errors or manual intervention</p>
+      <canvas id="chart-agent-success" height="180"></canvas>
+    </div>
+    <div class="rep-chart-card">
+      <h4>Human input requests generated</h4>
+      <p>Cases where agent could not complete autonomously — by agent type</p>
+      <canvas id="chart-agent-input" height="180"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SREP · REPORTING ═══ -->
+<div class="screen" id="srep">
+  <div class="ph"><h1>Reporting — AML / CDD Analytics</h1><p>Historical trends and current case portfolio — updated March 20, 2026</p></div>
+  <div class="rep-filters">
+    <label>Period:</label>
+    <select id="rep-period"><option value="12">Last 12 months</option><option value="6">Last 6 months</option><option value="3">Last 3 months</option></select>
+    <label style="margin-left:12px;">Review type:</label>
+    <select id="rep-revtype"><option value="all">All types</option><option value="periodic">Periodic</option><option value="event">Event Driven</option><option value="afc">AFC Request</option></select>
+    <label style="margin-left:12px;">Risk Profile:</label>
+    <select id="rep-risk"><option value="all">All</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+    <button class="btn btn-o" style="font-size:12px;padding:6px 12px;margin-left:auto;" id="btn-reset-rep">Reset filters</button>
+  </div>
+
+  <!-- KPI row -->
+  <div class="stats" style="margin-bottom:20px;">
+    <div class="sc"><div class="n" id="kpi-total">12</div><div class="l">Cases closed (period)</div></div>
+    <div class="sc red"><div class="n" id="kpi-high">5</div><div class="l">High risk confirmed</div></div>
+    <div class="sc"><div class="n" id="kpi-avg">3.8</div><div class="l">Avg. days to close</div></div>
+    <div class="sc"><div class="n" id="kpi-ai">75%</div><div class="l">AI-assisted cases</div></div>
+    <div class="sc"><div class="n" id="kpi-sar">2</div><div class="l">SARs filed</div></div>
+  </div>
+
+  <div class="rep-grid">
+    <div class="rep-chart-card">
+      <h4>Cases closed by month</h4>
+      <p>Total cases resolved per month — all review types</p>
+      <canvas id="chart-monthly" height="200"></canvas>
+    </div>
+    <div class="rep-chart-card">
+      <h4>Cases by status — current portfolio</h4>
+      <p>Distribution of active and recent cases by status</p>
+      <canvas id="chart-status" height="200"></canvas>
+    </div>
+  </div>
+  <div class="rep-grid">
+    <div class="rep-chart-card">
+      <h4>Risk profile distribution over time</h4>
+      <p>Monthly breakdown by High / Medium / Low risk profile</p>
+      <canvas id="chart-risk" height="200"></canvas>
+    </div>
+    <div class="rep-chart-card">
+      <h4>Processing time — AI vs Manual</h4>
+      <p>Average days to close by method (waterfall comparison)</p>
+      <canvas id="chart-time" height="200"></canvas>
+    </div>
+  </div>
+</div>
+
+</div></div></div>
+
+<script>
+/* ── GLOBAL EVENT DISPATCHER ──
+   Parses onclick/onchange attributes and calls window[fn](...args).
+   Works in any sandbox because it only uses window scope.              */
+function _dispatch(attrVal){
+  if(!attrVal) return;
+  // Match: funcName(arg1, arg2, ...) — args can be strings or bare words
+  var m = attrVal.match(/^(\w+)\((.*)\)\s*;?$/);
+  if(!m) return;
+  var fn = m[1];
+  var rawArgs = m[2].trim();
+  var args = [];
+  if(rawArgs.length){
+    // Split by comma, strip quotes
+    args = rawArgs.split(',').map(function(a){
+      a = a.trim();
+      if((a[0]==='"'||a[0]==="'") && (a[a.length-1]==='"'||a[a.length-1]==="'"))
+        return a.slice(1,-1);
+      if(a==='true') return true;
+      if(a==='false') return false;
+      if(!isNaN(a)) return Number(a);
+      return a;
+    });
+  }
+  if(typeof window[fn]==='function'){
+    window[fn].apply(window, args);
+  } else {
+    console.warn('_dispatch: function not found:', fn);
+  }
+}
+
+document.addEventListener('change', function(e){
+  var act = e.target.getAttribute && e.target.getAttribute('data-action');
+  if(act) _dispatch(act);
+  // Also handle selects with their own id-based wiring (already done via addEventListener)
+});
+
+document.addEventListener('click', function(e){
+  var t = e.target;
+  while(t && t !== document){
+    var act = t.getAttribute && t.getAttribute('data-action');
+    if(act){ _dispatch(act); e.stopPropagation(); return; }
+    t = t.parentNode;
+  }
+});
+
+document.addEventListener('DOMContentLoaded', function(){
+
+
+/* ── NAVIGATION ── */
+function go(id){
+  document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+  var el = document.getElementById(id);
+  if(el){ el.classList.add('active'); window.scrollTo(0,0); }
+  // Sidebar highlight
+  document.querySelectorAll('.nav-item').forEach(function(n){ n.classList.remove('active'); });
+  var ddScreens = ['s1','s2','s3-select','s3-run','s4','s3-manual','s-client'];
+  if(ddScreens.indexOf(id) !== -1){
+    var n1 = document.getElementById('nav-s1'); if(n1) n1.classList.add('active');
+    var n1b = document.getElementById('nav-s1b'); if(n1b) n1b.classList.add('active');
+  }
+  if(id === 'srep'){
+    var nr = document.getElementById('nav-srep'); if(nr) nr.classList.add('active');
+    setTimeout(initCharts, 150);
+  }
+  if(id === 'sagents'){
+    var na = document.getElementById('nav-sagents'); if(na) na.classList.add('active');
+    setTimeout(initAgentCharts, 150);
+  }
+}
+function goNav(id){ go(id); }
+
+/* ── STAT CARD + DROPDOWN FILTERS ── */
+var activeStatFilter = null;
+
+function applyFilters(){
+  var fType = document.getElementById('f-type').value;
+  var fRisk = document.getElementById('f-risk').value;
+  var fTier = document.getElementById('f-tier').value;
+  var fRev  = document.getElementById('f-rev').value;
+  var statusMap = {high:null, new:'new', approv:'approv', wait:'wait', done:'done', all:null};
+  var fStatus = activeStatFilter ? statusMap[activeStatFilter] : null;
+  var fHighPriority = (activeStatFilter === 'high');
+
+  document.querySelectorAll('.case-row').forEach(function(row){
+    var show = true;
+    if(fType   && row.dataset.type  !== fType)   show = false;
+    if(fRisk   && row.dataset.risk  !== fRisk)   show = false;
+    if(fTier   && row.dataset.tier  !== fTier)   show = false;
+    if(fRev    && row.dataset.rev   !== fRev)    show = false;
+    if(fHighPriority){
+      if(row.dataset.tier !== 'Tier 1' && row.dataset.risk !== 'High') show = false;
+    } else if(fStatus){
+      if(row.dataset.status !== fStatus) show = false;
+    }
+    row.style.display = show ? '' : 'none';
+  });
+  updateFilterStrip();
+}
+
+function filterStat(type){
+  activeStatFilter = (activeStatFilter === type) ? null : type;
+  document.querySelectorAll('.sc').forEach(function(s){ s.classList.remove('active-filter'); });
+  if(activeStatFilter){
+    var el = document.getElementById('stat-' + activeStatFilter);
+    if(el) el.classList.add('active-filter');
+  }
+  applyFilters();
+}
+
+function clearFilters(){
+  document.getElementById('f-type').value = '';
+  document.getElementById('f-risk').value = '';
+  document.getElementById('f-tier').value = '';
+  document.getElementById('f-rev').value  = '';
+  activeStatFilter = null;
+  document.querySelectorAll('.sc').forEach(function(s){ s.classList.remove('active-filter'); });
+  document.querySelectorAll('.case-row').forEach(function(r){ r.style.display = ''; });
+  var strip = document.getElementById('active-filter-strip');
+  if(strip) strip.style.display = 'none';
+}
+
+function updateFilterStrip(){
+  var strip = document.getElementById('active-filter-strip');
+  if(!strip) return;
+  var labels = {high:'High priority', new:'New cases', approv:'Pending approval',
+                wait:'Awaiting response', done:'Completed (30d)', all:'All cases'};
+  var hasDropdown = document.getElementById('f-type').value ||
+                    document.getElementById('f-risk').value ||
+                    document.getElementById('f-tier').value ||
+                    document.getElementById('f-rev').value;
+  if(activeStatFilter || hasDropdown){
+    strip.style.display = 'flex';
+    var parts = [];
+    if(activeStatFilter) parts.push(labels[activeStatFilter] || activeStatFilter);
+    if(document.getElementById('f-type').value) parts.push(document.getElementById('f-type').value);
+    if(document.getElementById('f-risk').value) parts.push(document.getElementById('f-risk').value + ' risk');
+    if(document.getElementById('f-tier').value) parts.push(document.getElementById('f-tier').value);
+    if(document.getElementById('f-rev').value) parts.push(document.getElementById('f-rev').value);
+    document.getElementById('filter-strip-text').textContent = 'Filtered by: ' + parts.join(' · ');
+  } else {
+    strip.style.display = 'none';
+  }
+}
+
+// Wire up stat cards via event delegation (no inline onclick needed)
+document.querySelectorAll('.sc[data-filter]').forEach(function(card){
+  card.addEventListener('click', function(){
+    filterStat(this.dataset.filter);
+  });
+});
+
+// Wire up dropdowns
+['f-type','f-risk','f-tier','f-rev'].forEach(function(id){
+  var el = document.getElementById(id);
+  if(el) el.addEventListener('change', applyFilters);
+});
+
+// Wire up clear buttons
+var btnClear = document.getElementById('btn-clear-filters');
+if(btnClear) btnClear.addEventListener('click', clearFilters);
+var btnStripClear = document.getElementById('btn-strip-clear');
+if(btnStripClear) btnStripClear.addEventListener('click', clearFilters);
+
+/* ── AGENT SELECTION ── */
+var selectedAgents = new Set(['ag-ana','ag-ubo','ag-trx','ag-rep','ag-eco','ag-syn']);
+var superAgentOn = true;
+
+function toggleAgent(id){
+  var card = document.getElementById(id);
+  var ck   = document.getElementById('ck-' + id);
+  if(selectedAgents.has(id)){
+    selectedAgents.delete(id);
+    card.classList.remove('selected');
+    ck.textContent = '';
+  } else {
+    selectedAgents.add(id);
+    card.classList.add('selected');
+    ck.textContent = '✓';
+  }
+  document.getElementById('sel-count').textContent = selectedAgents.size + ' agents selected';
+}
+
+function toggleSuperAgent(){
+  superAgentOn = !superAgentOn;
+  var card = document.getElementById('sa-card');
+  var ck   = document.getElementById('sa-check');
+  if(superAgentOn){ card.classList.add('selected'); ck.textContent = '✓'; }
+  else             { card.classList.remove('selected'); ck.textContent = ''; }
+}
+
+// Wire agent cards
+document.querySelectorAll('.agent-sel-card').forEach(function(card){
+  card.addEventListener('click', function(){ toggleAgent(this.id); });
+});
+var saCard = document.getElementById('sa-card');
+if(saCard) saCard.addEventListener('click', toggleSuperAgent);
+
+/* ── AGENT RUN ANIMATION ── */
+var logs = [
+  {t:500,  cls:'r', msg:'[Super Agent] Case AV-2026-0341 taken in charge'},
+  {t:1200, cls:'',  msg:'[Registry Agent] Searching Companies Register...'},
+  {t:2000, cls:'',  msg:'[Registry Agent] Chamber of Commerce records retrieved ✓'},
+  {t:2800, cls:'',  msg:'[Registry Agent] Orbis data integrated ✓'},
+  {t:3500, cls:'r', msg:'[Super Agent] Registry Agent completed — starting UBO/PEP Agent'},
+  {t:4200, cls:'',  msg:'[UBO/PEP Agent] World-Check screening in progress...'},
+  {t:5000, cls:'r', msg:'[UBO/PEP Agent] PEP detected: Karim Al-Rashid — flagged Tier 1'},
+  {t:5800, cls:'',  msg:'[UBO/PEP Agent] World-Check: no active sanctions ✓'},
+  {t:6500, cls:'r', msg:'[Super Agent] UBO/PEP completed — parallel start Trx + Rep'},
+  {t:7200, cls:'',  msg:'[Transaction Agent] 47 transactions under analysis...'},
+  {t:8000, cls:'r', msg:'[Transaction Agent] 3 anomaly patterns detected — EDD required'},
+  {t:9000, cls:'',  msg:'[Reputational Agent] Media scan launched...'},
+  {t:10000,cls:'',  msg:'[Reputational Agent] CONSOB: no measures ✓'},
+  {t:11500,cls:'',  msg:'[Transaction Agent] Completed ✓'},
+  {t:12500,cls:'',  msg:'[Reputational Agent] Completed ✓'},
+  {t:13200,cls:'r', msg:'[Super Agent] Starting Economic Assessment Agent'},
+  {t:14500,cls:'r', msg:'[Economic Assessment Agent] Corporate documents not found — user input required'},
+  {t:15500,cls:'',  msg:'[Super Agent] Section 5 awaiting input — partial analysis started'},
+  {t:17000,cls:'r', msg:'[Super Agent] Processing completed — 1 section requires input'},
+];
+
+var agentTimeline = [
+  {id:'ana', start:1200,  end:3500},
+  {id:'ubo', start:3500,  end:6500},
+  {id:'trx', start:6500,  end:11500},
+  {id:'rep', start:6500,  end:12500},
+  {id:'eco', start:13200, end:17000},
+  {id:'syn', start:17500, end:20000},
+];
+
+var sectionTimeline = [
+  {id:'np1',  time:3000,  typeStart:1000,  text:'Meridian Capital S.r.l. — Milan, wealth management. Corporate change Feb 2026: entry of Karim Al-Rashid (30%, PEP Tier 1). Share capital € 500,000 fully paid-up. Structure verified on official sources and Orbis. No pending insolvency or judicial measures.'},
+  {id:'np2',  time:5500,  typeStart:3200,  text:'Primary UBO: Alessandro Greco (82%) — no adverse records. Secondary UBO: Karim Al-Rashid (30%) — PEP Tier 1, former Minister of Finance. UBO chain verified to ultimate natural persons. No bearer shares or nominees. CDD documentation outdated (2021) — update required.'},
+  {id:'np3',  time:8500,  typeStart:6000,  text:'47 inbound transactions from UAE, Malta, Cyprus — € 8.4M (Jan 2025–Feb 2026). Volume +340% YoY. Avg. transaction: € 178,723. Largest: € 1.2M from UAE (Feb 3, 2026). 68% from FATF high-risk jurisdictions. No cash-equivalent flows detected.'},
+  {id:'np4',  time:11000, typeStart:9000,  text:'TM generated 3 alerts: structuring pattern (8 transactions below € 10k threshold); suspected round-tripping (Malta outflow + equivalent inflow after 12 days); 6 transactions with unidentified beneficial counterparty. All escalated. No prior SARs on this client.'},
+  {id:'np5',  time:13500, typeStart:11500, text:'Karim Al-Rashid confirmed PEP Tier 1 on World-Check, Dow Jones and Refinitiv. No active sanctions on OFAC SDN, EU Consolidated or UN SC lists. RCA screening done — spouse and 2 business associates identified, no adverse findings. Senior Management approval required.'},
+  {id:'np6',  time:15500, typeStart:13700, text:'No adverse news on Meridian Capital. Alessandro Greco: clean profile. Karim Al-Rashid: 2019 ministerial inquiry — concluded without charges. CONSOB: no measures. Banca d\'Italia: no supervisory actions. Adverse media score: Low (2/10).'},
+  {id:'np7',  time:17000, typeStart:15700, text:'Risk factors — HIGH: PEP Tier 1 shareholding; 68% high-risk jurisdiction exposure. MEDIUM: TM structuring alerts; outdated KYC docs; unexplained volume +340%. LOW: no sanctions or adverse media. Aggregate risk score: 78/100 — Very High.'},
+  {id:'np8',  time:18500, typeStart:17200, text:'EDD triggered (PEP Tier 1 + score ≥ 70). Source of wealth: partial documentation provided. Source of funds for acquisition (€ 2.1M): wire from Falcon Holdings FZE (UAE) — UBO chain not fully traceable. Enhanced monitoring upgraded to quarterly. Senior Management sign-off: pending.'},
+  {id:'np9',  time:20000, typeStart:18700, text:'⚠ Input required — Turnover (€ 14.2M) partially consistent with flows. Transaction volume exceeds expected profile. Updated corporate documents (2026 articles, shareholder deed) not found in internal repository or open sources. Preliminary risk proposal: upgrade to Very High.'},
+];
+
+var runStartTime;
+
+function startAgents(){
+  go('s3-run');
+  document.getElementById('run-log').innerHTML = '';
+  sectionTimeline.forEach(function(s){
+    var el = document.getElementById(s.id);
+    if(el){ el.textContent = ''; el.classList.remove('open','typing'); el.dataset.typed = ''; }
+    var st = document.getElementById('st-' + s.id);
+    if(st) st.innerHTML = '<span style="font-size:11px;color:#888;">—</span>';
+  });
+  document.getElementById('sec-count').textContent = '0 / 10';
+  document.getElementById('run-pct').textContent   = '0%';
+  document.getElementById('run-pct-label').textContent = '0%';
+  document.getElementById('run-pb').style.width = '0%';
+  ['ana','ubo','trx','rep','eco','syn'].forEach(function(id){
+    var ss = document.getElementById('ss-'+id); if(ss){ ss.className='spin-status wait'; ss.textContent='Waiting...'; }
+    var pb = document.getElementById('pb-'+id); if(pb) pb.style.width='0%';
+    var sr = document.getElementById('sr-'+id); if(sr) sr.className='spin-ring wait';
+  });
+  runStartTime = Date.now();
+  runLoop();
+}
+
+function runLoop(){
+  var elapsed = Date.now() - runStartTime;
+  var total   = 21000;
+  var pct = Math.min(Math.round(elapsed / total * 100), 99);
+  document.getElementById('run-pb').style.width = pct + '%';
+  document.getElementById('run-pct').textContent = pct + '%';
+  document.getElementById('run-pct-label').textContent = pct + '%';
+
+  logs.forEach(function(l){
+    if(elapsed >= l.t && !document.getElementById('log-'+l.t)){
+      var d = document.createElement('div');
+      d.className = 'log-line ' + l.cls;
+      d.id = 'log-' + l.t;
+      d.textContent = l.msg;
+      var la = document.getElementById('run-log');
+      la.appendChild(d);
+      la.scrollTop = la.scrollHeight;
+    }
+  });
+
+  agentTimeline.forEach(function(a){
+    var ss = document.getElementById('ss-'+a.id);
+    var pb = document.getElementById('pb-'+a.id);
+    var sr = document.getElementById('sr-'+a.id);
+    if(!ss) return;
+    if(elapsed < a.start){
+      ss.className='spin-status wait'; ss.textContent='Waiting...';
+      pb.style.width='0%'; sr.className='spin-ring wait';
+    } else if(elapsed < a.end){
+      ss.className='spin-status working'; ss.textContent='Processing...';
+      pb.style.width = Math.min(Math.round((elapsed-a.start)/(a.end-a.start)*100),99) + '%';
+      sr.className='spin-ring';
+    } else {
+      ss.className='spin-status done'; ss.textContent='✓ Completed';
+      pb.style.width='100%'; sr.className='spin-ring done';
+    }
+  });
+
+  var secDone = 0;
+  sectionTimeline.forEach(function(s){
+    var el = document.getElementById(s.id);
+    var st = document.getElementById('st-' + s.id);
+    if(!el) return;
+
+    if(elapsed >= s.time){
+      // Fully done — show complete text (no cursor)
+      el.classList.remove('typing');
+      if(el.dataset.typed !== 'done'){
+        el.dataset.typed = 'done';
+        el.textContent = s.text;
+        el.classList.add('open');
+      }
+      if(st) st.innerHTML = '<span class="badge b-done" style="font-size:10px;">✓</span>';
+      secDone++;
+
+    } else if(elapsed >= s.typeStart){
+      // Typewriter phase: show chars proportional to time elapsed in window
+      var typeWindow = s.time - s.typeStart;
+      var typeElapsed = elapsed - s.typeStart;
+      var ratio = Math.min(typeElapsed / typeWindow, 0.97); // never fully complete until done
+      var charsToShow = Math.floor(ratio * s.text.length);
+      el.dataset.typed = 'typing';
+      el.classList.add('open','typing');
+      el.textContent = s.text.substring(0, charsToShow);
+      if(st) st.innerHTML = '<span class="badge b-prog" style="font-size:10px;">●</span>';
+    }
+  });
+  document.getElementById('sec-count').textContent = secDone + ' / 10';
+
+  if(elapsed < total) setTimeout(runLoop, 80);
+  else setTimeout(function(){ go('s4'); }, 500);
+}
+
+/* ── OPINION REPORT TOGGLES ── */
+function toggleNP(id){ var el=document.getElementById(id); if(el) el.classList.toggle('open'); }
+function toggleNF(id){ var el=document.getElementById(id); if(el) el.classList.toggle('open'); }
+
+/* ── USER INPUT ACTIONS ── */
+function acceptInput(){
+  document.getElementById('irb-s5').style.display = 'none';
+  var done = document.getElementById('input-done-s5');
+  done.style.display = 'block';
+  done.innerHTML = '<div style="background:#EAF3DE;border:1px solid #C0DD97;border-radius:8px;padding:12px 14px;margin-top:8px;font-size:13px;color:#3B6D11;">✓ Documentation request sent to client — section will be updated once documents are received.</div>';
+  document.getElementById('badge-s5').className = 'badge b-prog';
+  document.getElementById('badge-s5').textContent = '● In progress';
+  var btn = document.getElementById('approve-btn');
+  if(btn){ btn.style.opacity='0.7'; btn.title='Waiting for client documents before final approval'; }
+}
+
+function skipInput(){
+  document.getElementById('irb-s5').style.display = 'none';
+  var done = document.getElementById('input-done-s5');
+  done.style.display = 'block';
+  done.innerHTML = '<div style="background:#F1EFE8;border:1px solid #D3D1C7;border-radius:8px;padding:12px 14px;margin-top:8px;font-size:13px;color:#444;">Proceeding without updated documentation. Preliminary risk upgrade to Very High confirmed. Assessment flagged for review at next periodic cycle.</div>';
+  document.getElementById('badge-s5').className = 'badge b-approv';
+  document.getElementById('badge-s5').textContent = '⚠ Partial';
+  // Unlock section 10 (final valuation)
+  var nf10 = document.getElementById('nf10');
+  if(nf10){
+    nf10.innerHTML = '<strong>Risk profile:</strong> Upgrade from High to <strong style="color:#7A0000;">Very High</strong> confirmed on preliminary basis.<br><br><strong>Rationale:</strong> PEP Tier 1 shareholding, 3 TM anomalies, +340% unexplained volume increase, 68% high-risk jurisdiction exposure, EDD source-of-funds partially unresolved.<br><br><strong>Recommendation:</strong> Approve &amp; close — apply Very High risk classification. Schedule Senior Management sign-off within 5 business days. Enhanced quarterly monitoring. SOS evaluation deferred pending documentation receipt.';
+    nf10.classList.add('open');
+    nf10.style.fontStyle = 'normal';
+    nf10.style.color = 'var(--text)';
+  }
+  document.getElementById('badge-s6').className = 'badge b-done';
+  document.getElementById('badge-s6').textContent = '✓ Completed';
+  // Enable approve button
+  var btn = document.getElementById('approve-btn');
+  btn.disabled = false;
+  btn.style.opacity = '1';
+  btn.style.cursor = 'pointer';
+  btn.textContent = '✓ Approve & Close';
+  btn.onclick = function(){
+    // Update row status to Completed in dashboard
+    document.querySelectorAll('.case-row').forEach(function(r){
+      var strong = r.querySelector('td strong');
+      if(strong && strong.textContent === 'AV-2026-0341'){
+        var cells = r.querySelectorAll('td');
+        if(cells[6]) cells[6].innerHTML = '<span class="badge b-done">✓ Completed</span>';
+        r.dataset.status = 'done';
+        r.classList.remove('cl');
+        r.style.cursor = 'default';
+      }
+    });
+    // Update stat card counts
+    var nDone = document.querySelectorAll('.case-row[data-status="done"]').length;
+    var nNew  = document.querySelectorAll('.case-row[data-status="new"]').length;
+    var doneCard = document.getElementById('stat-done');
+    var newCard  = document.getElementById('stat-new');
+    if(doneCard) doneCard.querySelector('.n').textContent = nDone;
+    if(newCard)  newCard.querySelector('.n').textContent  = nNew;
+    var allCard  = document.getElementById('stat-all');
+    if(allCard)  allCard.querySelector('.n').textContent  = document.querySelectorAll('.case-row').length;
+    go('s1');
+  };
+}
+
+/* ── REPORTING CHARTS ── */
+var charts = {};
+var chartsInited = false;
+
+function initCharts(){
+  if(chartsInited) return;
+  if(typeof Chart === 'undefined'){ setTimeout(initCharts, 300); return; }
+  chartsInited = true;
+
+  var red  = '#CC0000';
+  var redL = 'rgba(204,0,0,0.15)';
+  var months = ['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
+
+  var ctx1 = document.getElementById('chart-monthly').getContext('2d');
+  charts.monthly = new Chart(ctx1, {type:'bar', data:{labels:months, datasets:[{
+    label:'Cases closed',
+    data:[18,22,19,25,21,28,24,31,27,20,23,29],
+    backgroundColor: months.map(function(_,i){ return i===11 ? red : redL; }),
+    borderColor:     months.map(function(_,i){ return i===11 ? red : 'rgba(204,0,0,0.4)'; }),
+    borderWidth:1.5, borderRadius:4
+  }]}, options:{plugins:{legend:{display:false}}, scales:{
+    y:{beginAtZero:true, grid:{color:'#F0F0F0'}, ticks:{font:{size:11}}},
+    x:{grid:{display:false}, ticks:{font:{size:11}}}
+  }}});
+
+  var ctx2 = document.getElementById('chart-status').getContext('2d');
+  charts.status = new Chart(ctx2, {type:'bar', data:{
+    labels:['New','In progress','Pending approval','Awaiting response','Completed'],
+    datasets:[{label:'Cases',
+      data:[12,5,14,9,41],
+      backgroundColor:['#E6F1FB','#EEEDFE','#FAEEDA','#F1EFE8','#EAF3DE'],
+      borderColor:['#185FA5','#534AB7','#854F0B','#5F5E5A','#3B6D11'],
+      borderWidth:1.5, borderRadius:4
+    }]
+  }, options:{plugins:{legend:{display:false}}, scales:{
+    y:{beginAtZero:true, grid:{color:'#F0F0F0'}, ticks:{font:{size:11}}},
+    x:{grid:{display:false}, ticks:{font:{size:11}}}
+  }}});
+
+  var ctx3 = document.getElementById('chart-risk').getContext('2d');
+  charts.risk = new Chart(ctx3, {type:'bar', data:{labels:months, datasets:[
+    {label:'High',   data:[6,8,7,9,8,10,9,11,10,7,8,10], backgroundColor:'rgba(204,0,0,0.7)',  borderRadius:2},
+    {label:'Medium', data:[8,9,8,11,9,12,10,13,11,9,10,12], backgroundColor:'rgba(186,117,23,0.5)', borderRadius:2},
+    {label:'Low',    data:[4,5,4,5,4,6,5,7,6,4,5,7],   backgroundColor:'rgba(99,153,34,0.4)',  borderRadius:2},
+  ]}, options:{plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:12}}}, scales:{
+    x:{stacked:true, grid:{display:false}, ticks:{font:{size:11}}},
+    y:{stacked:true, beginAtZero:true, grid:{color:'#F0F0F0'}, ticks:{font:{size:11}}}
+  }}});
+
+  var ctx4 = document.getElementById('chart-time').getContext('2d');
+  charts.time = new Chart(ctx4, {type:'bar', data:{
+    labels:['Manual review','AI-assisted','AI + Super Agent','Target'],
+    datasets:[{label:'Avg. days to close',
+      data:[8.4, 3.1, 1.8, 1.5],
+      backgroundColor:['rgba(136,135,128,0.4)', redL, 'rgba(204,0,0,0.6)', red],
+      borderColor:['#888','rgba(204,0,0,0.5)', red, red],
+      borderWidth:1.5, borderRadius:4
+    }]
+  }, options:{plugins:{legend:{display:false}}, scales:{
+    y:{beginAtZero:true, grid:{color:'#F0F0F0'}, ticks:{font:{size:11}, callback:function(v){ return v+'d'; }}},
+    x:{grid:{display:false}, ticks:{font:{size:11}}}
+  }}});
+
+  // Wire reporting filters
+  var repPeriod = document.getElementById('rep-period');
+  var repRev    = document.getElementById('rep-revtype');
+  var repRisk   = document.getElementById('rep-risk');
+  if(repPeriod) repPeriod.addEventListener('change', updateCharts);
+  if(repRev)    repRev.addEventListener('change', updateCharts);
+  if(repRisk)   repRisk.addEventListener('change', updateCharts);
+  var btnRep = document.getElementById('btn-reset-rep');
+  if(btnRep) btnRep.addEventListener('click', resetRepFilters);
+}
+
+function updateCharts(){
+  if(!chartsInited) return;
+  var period = parseInt(document.getElementById('rep-period').value);
+  var months12 = ['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
+  var data12   = [18,22,19,25,21,28,24,31,27,20,23,29];
+  var sliced     = months12.slice(12 - period);
+  var slicedData = data12.slice(12 - period);
+  charts.monthly.data.labels = sliced;
+  charts.monthly.data.datasets[0].data = slicedData;
+  charts.monthly.data.datasets[0].backgroundColor = sliced.map(function(_,i){ return i===sliced.length-1 ? '#CC0000' : 'rgba(204,0,0,0.15)'; });
+  charts.monthly.data.datasets[0].borderColor      = sliced.map(function(_,i){ return i===sliced.length-1 ? '#CC0000' : 'rgba(204,0,0,0.4)'; });
+  charts.monthly.update();
+  var kpis = {12:{total:12,high:5,avg:3.8,ai:'75%',sar:2}, 6:{total:8,high:3,avg:3.4,ai:'78%',sar:1}, 3:{total:4,high:2,avg:3.1,ai:'80%',sar:1}};
+  var k = kpis[period] || kpis[12];
+  document.getElementById('kpi-total').textContent = k.total;
+  document.getElementById('kpi-high').textContent  = k.high;
+  document.getElementById('kpi-avg').textContent   = k.avg;
+  document.getElementById('kpi-ai').textContent    = k.ai;
+  document.getElementById('kpi-sar').textContent   = k.sar;
+}
+
+function initAgentCharts(){
+  if(typeof Chart === 'undefined'){ setTimeout(initAgentCharts, 300); return; }
+  if(window._agentChartsInited) return;
+  window._agentChartsInited = true;
+
+  var red  = '#CC0000';
+  var redL = 'rgba(204,0,0,0.15)';
+  var days = Array.from({length:30}, function(_,i){
+    var d = new Date(2026,1,19); d.setDate(d.getDate()-29+i);
+    return (d.getMonth()+1)+'/'+d.getDate();
+  });
+  var dailyData = [7,9,8,11,10,12,9,8,13,11,10,14,12,9,11,13,10,12,14,11,9,12,10,13,11,14,12,10,13,8];
+
+  var ctx1 = document.getElementById('chart-agent-daily');
+  if(ctx1) new Chart(ctx1.getContext('2d'), {type:'bar', data:{
+    labels: days,
+    datasets:[{
+      label:'Runs',
+      data: dailyData,
+      backgroundColor: days.map(function(_,i){ return i===29?red:redL; }),
+      borderColor:     days.map(function(_,i){ return i===29?red:'rgba(204,0,0,0.4)'; }),
+      borderWidth:1.5, borderRadius:3
+    }]
+  }, options:{plugins:{legend:{display:false}}, scales:{
+    y:{beginAtZero:true, grid:{color:'#F0F0F0'}, ticks:{font:{size:10}}},
+    x:{grid:{display:false}, ticks:{font:{size:9}, maxRotation:45, maxTicksLimit:10}}
+  }}});
+
+  var agentNames = ['Super Agent','Registry','UBO/PEP','Transaction','Reputational','Econ. Assess.','Document','Final Valuation'];
+  var agentColors = ['rgba(204,0,0,0.7)','rgba(24,95,165,0.6)','rgba(83,74,183,0.6)','rgba(99,153,34,0.6)','rgba(163,45,45,0.6)','rgba(133,79,11,0.6)','rgba(95,94,90,0.6)','rgba(163,45,45,0.4)'];
+
+  var ctx2 = document.getElementById('chart-agent-time');
+  if(ctx2) new Chart(ctx2.getContext('2d'), {type:'bar', data:{
+    labels: agentNames,
+    datasets:[{
+      label:'Avg. minutes',
+      data:[1.2,0.8,1.4,2.1,1.8,2.4,0.6,1.9],
+      backgroundColor: agentColors,
+      borderWidth:0, borderRadius:4
+    }]
+  }, options:{indexAxis:'y', plugins:{legend:{display:false}}, scales:{
+    x:{beginAtZero:true, grid:{color:'#F0F0F0'}, ticks:{font:{size:10}, callback:function(v){return v+'m';}}},
+    y:{grid:{display:false}, ticks:{font:{size:10}}}
+  }}});
+
+  var ctx3 = document.getElementById('chart-agent-success');
+  if(ctx3) new Chart(ctx3.getContext('2d'), {type:'bar', data:{
+    labels: agentNames,
+    datasets:[{
+      label:'Success %',
+      data:[98,99,97,95,96,91,98,93],
+      backgroundColor: [98,99,97,95,96,91,98,93].map(function(v){
+        return v>=97?'rgba(99,153,34,0.7)':v>=94?'rgba(186,117,23,0.6)':'rgba(204,0,0,0.6)';
+      }),
+      borderWidth:0, borderRadius:4
+    }]
+  }, options:{indexAxis:'y', plugins:{legend:{display:false}}, scales:{
+    x:{min:85, max:100, grid:{color:'#F0F0F0'}, ticks:{font:{size:10}, callback:function(v){return v+'%';}}},
+    y:{grid:{display:false}, ticks:{font:{size:10}}}
+  }}});
+
+  var ctx4 = document.getElementById('chart-agent-input');
+  if(ctx4) new Chart(ctx4.getContext('2d'), {type:'bar', data:{
+    labels: agentNames,
+    datasets:[{
+      label:'Input requests',
+      data:[0,2,1,4,1,12,3,2],
+      backgroundColor: [0,2,1,4,1,12,3,2].map(function(v){
+        return v===0?'rgba(99,153,34,0.5)':v<=3?'rgba(186,117,23,0.5)':'rgba(204,0,0,0.6)';
+      }),
+      borderWidth:0, borderRadius:4
+    }]
+  }, options:{plugins:{legend:{display:false}}, scales:{
+    y:{beginAtZero:true, grid:{color:'#F0F0F0'}, ticks:{font:{size:10}}},
+    x:{grid:{display:false}, ticks:{font:{size:10}}}
+  }}});
+}
+
+function resetRepFilters(){
+  document.getElementById('rep-period').value  = '12';
+  document.getElementById('rep-revtype').value = 'all';
+  document.getElementById('rep-risk').value    = 'all';
+  updateCharts();
+}
+
+// ── OPTIONS MENU ──
+function toggleOptionsMenu(){
+  var menu = document.getElementById('options-menu');
+  var arrow = document.getElementById('options-arrow');
+  if(!menu) return;
+  var isOpen = menu.style.display !== 'none';
+  menu.style.display = isOpen ? 'none' : 'block';
+  if(arrow) arrow.textContent = isOpen ? '▲' : '▼';
+}
+
+function resetDemo(){
+  // Reset all case row statuses to original
+  var origStatus = {
+    'AV-2026-0341': {status:'new',      badge:'b-new',    label:'New',               style:''},
+    'AV-2026-0338': {status:'approv',   badge:'b-approv', label:'Pending approval',  style:''},
+    'AV-2026-0325': {status:'wait',     badge:'b-wait',   label:'Awaiting response', style:''},
+    'AV-2026-0312': {status:'done',     badge:'b-done',   label:'Completed',         style:''},
+    'AV-2026-0309': {status:'prog',     badge:'b-prog',   label:'In progress',       style:''},
+    'AV-2026-0301': {status:'new',      badge:'b-new',    label:'New',               style:''},
+    'AV-2026-0289': {status:'approv',   badge:'b-approv', label:'Pending approval',  style:''},
+    'AV-2026-0277': {status:'new',      badge:'b-new',    label:'New',               style:'color:#A32D2D;font-weight:500;'},
+    'AV-2026-0265': {status:'wait',     badge:'b-wait',   label:'Awaiting response', style:''},
+    'AV-2026-0258': {status:'done',     badge:'b-done',   label:'Completed',         style:''},
+    'AV-2026-0244': {status:'new',      badge:'b-new',    label:'New',               style:''},
+    'AV-2026-0231': {status:'approv',   badge:'b-approv', label:'Pending approval',  style:''},
+  };
+  document.querySelectorAll('.case-row').forEach(function(r){
+    var strong = r.querySelector('td strong');
+    if(!strong) return;
+    var id = strong.textContent.trim();
+    var orig = origStatus[id];
+    if(!orig) return;
+    var cells = r.querySelectorAll('td');
+    if(cells[6]) cells[6].innerHTML = '<span class="badge ' + orig.badge + '">' + orig.label + '</span>';
+    r.dataset.status = orig.status;
+    r.classList.add('cl');
+    r.style.cursor = '';
+  });
+  // Reset stat cards
+  document.getElementById('stat-high').querySelector('.n').textContent  = '6';
+  document.getElementById('stat-new').querySelector('.n').textContent   = '4';
+  document.getElementById('stat-approv').querySelector('.n').textContent = '3';
+  document.getElementById('stat-wait').querySelector('.n').textContent  = '2';
+  document.getElementById('stat-done').querySelector('.n').textContent  = '2';
+  document.getElementById('stat-all').querySelector('.n').textContent   = '12';
+  // Reset s4 sections
+  var nf9body = document.getElementById('nf9');
+  if(nf9body){
+    // Restore irb box
+    var irbEl = document.getElementById('irb-s5');
+    if(irbEl) irbEl.style.display = 'block';
+    var doneEl = document.getElementById('input-done-s5');
+    if(doneEl){ doneEl.style.display='none'; doneEl.innerHTML=''; }
+    var badge5 = document.getElementById('badge-s5');
+    if(badge5){ badge5.className='badge b-input'; badge5.textContent='⚠ Input required'; }
+  }
+  var nf10 = document.getElementById('nf10');
+  if(nf10){ nf10.innerHTML='Awaiting documentation requested in section 9 before proceeding with the final valuation.'; nf10.classList.remove('open'); nf10.style.fontStyle='italic'; nf10.style.color='var(--muted)'; }
+  var badge6 = document.getElementById('badge-s6');
+  if(badge6){ badge6.className='badge b-prog'; badge6.textContent='● Awaiting input'; }
+  var appBtn = document.getElementById('approve-btn');
+  if(appBtn){ appBtn.disabled=true; appBtn.style.opacity='0.5'; appBtn.style.cursor='not-allowed'; appBtn.textContent='✓ Approve & Close'; appBtn.onclick=null; }
+  // Clear filters
+  clearFilters();
+  // Close options menu
+  toggleOptionsMenu();
+  // Navigate to dashboard
+  go('s1');
+  // Brief flash confirmation
+  var strip = document.getElementById('active-filter-strip');
+  if(strip){
+    strip.style.display='flex';
+    strip.style.background='#EAF3DE';
+    strip.style.borderColor='#C0DD97';
+    strip.querySelector('#filter-strip-text').textContent = '✓ Demo reset to initial state';
+    strip.querySelector('#btn-strip-clear').style.display='none';
+    setTimeout(function(){ strip.style.display='none'; strip.style.background=''; strip.style.borderColor=''; strip.querySelector('#btn-strip-clear').style.display=''; }, 2500);
+  }
+}
+
+// ── CLIENT PROFILE TABS ──
+document.addEventListener('click', function(e){
+  var tab = e.target.closest ? e.target.closest('.client-tab') : null;
+  if(!tab) return;
+  var tabId = tab.dataset.tab;
+  if(!tabId) return;
+  // Deactivate all tabs
+  document.querySelectorAll('.client-tab').forEach(function(t){
+    t.classList.remove('active');
+    t.style.color = 'var(--muted)';
+    t.style.borderBottom = 'none';
+  });
+  // Activate clicked tab
+  tab.classList.add('active');
+  tab.style.color = 'var(--red)';
+  tab.style.borderBottom = '2px solid var(--red)';
+  // Hide all panels, show target
+  document.querySelectorAll('.client-panel').forEach(function(p){ p.style.display='none'; });
+  var panel = document.getElementById(tabId);
+  if(panel) panel.style.display='block';
+  e.stopPropagation();
+});
+
+// Account filter (active/all)
+var accFilter = document.getElementById('acc-filter');
+if(accFilter) accFilter.addEventListener('change', function(){
+  var showAll = this.value === 'all';
+  document.querySelectorAll('#accounts-tbody tr[data-acc-status="closed"]').forEach(function(r){
+    r.style.display = showAll ? '' : 'none';
+  });
+});
+
+// Wire options menu
+var btnReset = document.getElementById('btn-demo-reset');
+if(btnReset) btnReset.addEventListener('click', resetDemo);
+window.go              = go;
+window.goNav           = goNav;
+window.startAgents     = startAgents;
+window.toggleNP        = toggleNP;
+window.toggleNF        = toggleNF;
+window.acceptInput     = acceptInput;
+window.skipInput       = skipInput;
+window.toggleAgent     = toggleAgent;
+window.toggleSuperAgent = toggleSuperAgent;
+window.filterStat      = filterStat;
+window.applyFilters    = applyFilters;
+window.clearFilters    = clearFilters;
+window.updateCharts    = updateCharts;
+window.resetRepFilters = resetRepFilters;
+window.toggleOptionsMenu = toggleOptionsMenu;
+window.resetDemo       = resetDemo;
+window.initAgentCharts = initAgentCharts;
+window._dispatch       = _dispatch;
+
+// Wire s4 input action buttons
+var btnContact = document.getElementById('btn-contact-client');
+if(btnContact) btnContact.addEventListener('click', acceptInput);
+var btnSkip = document.getElementById('btn-skip-docs');
+if(btnSkip) btnSkip.addEventListener('click', skipInput);
+
+
+
+
+}); // end DOMContentLoaded
+</script>
+
+</body>
+</html>
