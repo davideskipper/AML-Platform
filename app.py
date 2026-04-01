@@ -59,24 +59,24 @@ st.markdown(f"""
 # ── Constants ─────────────────────────────────────────────────────
 MAIN_SECTIONS = [
     {"key": "registry",         "number": "01", "icon": "🏛",
-     "label": "Registry",       "full_label": "Registry & Corporate Structure",
+     "label": "Corp. Structure", "full_label": "Corporate Structure Analysis",
      "desc": "Struttura societaria, catena proprietaria, governance, organi amministrativi, anomalie."},
     {"key": "ubo_pep",          "number": "02", "icon": "👤",
      "label": "UBO / PEP",      "full_label": "UBO / PEP Screening",
      "desc": "Titolari effettivi, screening PEP, catena di controllo, D.Lgs. 231/2007."},
     {"key": "reputational",     "number": "03", "icon": "📰",
-     "label": "Reputazionale",  "full_label": "Reputational Analysis",
+     "label": "Negative News",  "full_label": "Negative News Screening",
      "desc": "Adverse media, precedenti giudiziari, reati presupposto AML, misure cautelari."},
     {"key": "economic_profile", "number": "04", "icon": "📊",
-     "label": "Profilo Eco.",   "full_label": "Economic Profile",
+     "label": "Economic Profile","full_label": "Economic Profile Analysis",
      "desc": "Bilancio, coerenza economica, indicatori UIF 2023, incongruenze patrimoniali."},
     {"key": "transaction",      "number": "05", "icon": "💳",
-     "label": "Transazioni",    "full_label": "Transaction & Geographic Risk",
+     "label": "Transactional",  "full_label": "Transactional Analysis",
      "desc": "Movimenti bancari, pattern sospetti (strutturazione, layering), rischio geografico FATF."},
 ]
 FINAL_SECTION = {
     "key": "final_valuation", "number": "06", "icon": "⚡",
-    "label": "Final Val.",    "full_label": "Final Valuation — Customer Risk Rating",
+    "label": "Final Valuation", "full_label": "Final Valuation & Proposal",
     "desc": "Matrice di rischio, Customer Risk Rating e raccomandazione operativa.",
 }
 ALL_SECTIONS = MAIN_SECTIONS + [FINAL_SECTION]
@@ -411,18 +411,14 @@ def render_section_config():
                 extracted = extract_text_from_file(f)
                 texts.append(f"=== {f.name} ===\n{extracted}")
                 names.append(f.name)
-                # Save Excel/CSV as transaction file
                 if ext in (".xlsx", ".xls", ".csv"):
                     excel_file = (f.name, ext, f)
-            # Store combined docs accessible to all agents
             st.session_state.all_docs      = "\n\n".join(texts)
             st.session_state.all_doc_names = names
-            # Also populate per-section docs for left panel tracker
             for sec in MAIN_SECTIONS:
                 if sec["key"] != "transaction":
                     st.session_state.section_docs[sec["key"]]      = st.session_state.all_docs
                     st.session_state.section_doc_names[sec["key"]] = names
-            # Handle Excel for transaction
             if excel_file:
                 fname, ext, fobj = excel_file
                 fobj.seek(0)
@@ -433,8 +429,8 @@ def render_section_config():
                 st.session_state.section_doc_names["transaction"] = [fname]
             total_chars = len(st.session_state.all_docs)
             st.success(f"✓ {len(names)} file caricati · {total_chars:,} caratteri estratti")
-            st.rerun()
 
+        # ── Navigation buttons — always visible ───────────────────
         st.markdown("---")
         cb, cf = st.columns([1, 3])
         with cb:
