@@ -212,12 +212,22 @@ if not st.session_state.initialized:
         ),
     }
     with st.spinner("Avvio Super Agent..."):
-        resp = client.messages.create(
-            model="claude-opus-4-6",
-            max_tokens=1000,
-            system=SYSTEM_PROMPT,
-            messages=[bootstrap],
-        )
+        try:
+            resp = client.messages.create(
+                model="claude-opus-4-6",
+                max_tokens=1000,
+                system=SYSTEM_PROMPT,
+                messages=[bootstrap],
+            )
+        except anthropic.BadRequestError as e:
+            st.error(f"**BadRequestError:** {e.message}\n\nStatus: {e.status_code}\n\nBody: {e.body}")
+            st.stop()
+        except anthropic.AuthenticationError as e:
+            st.error(f"**AuthenticationError:** API key non valida. {e.message}")
+            st.stop()
+        except Exception as e:
+            st.error(f"**Errore:** {type(e).__name__}: {e}")
+            st.stop()
     st.session_state.messages = [
         bootstrap,
         {"role": "assistant", "content": resp.content},
