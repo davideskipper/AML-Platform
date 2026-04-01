@@ -216,7 +216,6 @@ if not st.session_state.initialized:
             model="claude-opus-4-6",
             max_tokens=1000,
             system=SYSTEM_PROMPT,
-            tools=TOOLS,
             messages=[bootstrap],
         )
     st.session_state.messages = [
