@@ -55,6 +55,13 @@ OUTPUT: Restituisci esclusivamente un oggetto JSON valido con questa struttura:
   "flags": [
     { "tipo": "", "descrizione": "", "rischio": "LOW|MEDIUM|HIGH", "riferimentoNormativo": "" }
   ],
+  "principaliEvidenze": [
+    {
+      "evidenza": "Descrizione sintetica dell'elemento di attenzione o anomalia rilevata",
+      "normativa": "Riferimento normativo specifico (es. Art.20 D.Lgs.231/2007, UIF Indic.n.42/2023, FATF Rec.10)",
+      "livello": "ATTENZIONE|ANOMALIA|CRITICO"
+    }
+  ],
   "rischioComplessivo": "LOW|MEDIUM|HIGH|CRITICAL",
   "narrativa": "Paragrafo discorsivo di 4-6 righe destinato al compliance officer. Descrivi il profilo societario, evidenzia gli elementi di attenzione principali e spiega il razionale del rischio assegnato. Tono formale, linguaggio tecnico AML.",
   "note": ""

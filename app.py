@@ -11,7 +11,7 @@ import anthropic
 from kyc_platform.models import SessionState
 from kyc_platform import (
     registry_agent, ubo_pep_agent, reputational_agent,
-    economic_profile_agent, risk_countries_agent,
+    economic_profile_agent,
     transaction_agent, final_valuation_agent,
 )
 
@@ -42,10 +42,10 @@ st.markdown(f"""
   .stSelectbox > div > div {{
     background:#f9f9f9 !important; color:#1a1a1a !important; border:1px solid #d8d8d8 !important; }}
   .stButton > button {{
-    background:{RED} !important; color:#fff !important;
+    background:#1a1a1a !important; color:#fff !important;
     border:none !important; border-radius:3px !important;
     font-weight:600 !important; letter-spacing:0.4px !important; }}
-  .stButton > button:hover {{ background:#aa0000 !important; }}
+  .stButton > button:hover {{ background:#333 !important; }}
   .stProgress > div > div > div {{ background:{RED} !important; }}
   details summary {{ color:#444 !important; }}
   details {{ background:#f9f9f9 !important; border:1px solid #e0e0e0 !important; }}
@@ -86,22 +86,16 @@ MAIN_SECTIONS = [
      "desc": "Analisi del profilo economico-finanziario e verifica di coerenza AML. "
              "Esame di bilancio, ricavi, marginalità, struttura patrimoniale e rilevazione "
              "di incongruenze rispetto al settore e al profilo atteso (rif. UIF 2023)."},
-    {"key": "risk_countries",   "number": "05", "icon": "🌍",
-     "label": "Risk Countries",
-     "full_label": "Risk Countries",
-     "desc": "Mappatura dell'esposizione geografica e classificazione del rischio paese. "
-             "Analisi di residenze, paesi di operatività, flussi finanziari esteri "
-             "rispetto a FATF, liste UE, sanzioni OFAC/UN e Corruption Perception Index."},
-    {"key": "transaction",      "number": "06", "icon": "💳",
+    {"key": "transaction",      "number": "05", "icon": "💳",
      "label": "Transazioni",
-     "full_label": "Transaction Analysis",
-     "desc": "Analisi AML dei movimenti bancari. Rilevazione di pattern sospetti: "
-             "strutturazione, layering, pass-through, operazioni circolari, "
-             "transazioni verso paesi ad alto rischio. Verifica coerenza con profilo atteso."},
+     "full_label": "Transaction & Geographic Risk Analysis",
+     "desc": "Analisi AML dei movimenti bancari e rischio geografico delle controparti. "
+             "Rilevazione pattern sospetti (strutturazione, layering, pass-through), "
+             "classificazione FATF/sanzioni dei paesi coinvolti nei flussi."},
 ]
 
 FINAL_SECTION = {
-    "key": "final_valuation", "number": "07", "icon": "⚡",
+    "key": "final_valuation", "number": "06", "icon": "⚡",
     "label": "Final Valuation",
     "full_label": "Final Valuation — Customer Risk Rating",
     "desc": "Sintesi di tutte le sezioni analizzate. Produce il Customer Risk Rating finale "
@@ -120,8 +114,6 @@ REQUIRED_DOCS = {
                          "Lista persone chiave + nazionalità"],
     "economic_profile": ["Bilancio (ultimi 3 anni)", "Conto economico",
                          "Nota integrativa", "Dichiarazioni fiscali / rating"],
-    "risk_countries":   ["Organigramma internazionale", "Contratti con controparti estere",
-                         "Lista paesi di operatività"],
     "transaction":      ["File Excel/CSV movimenti bancari",
                          "Colonne: data, controparte, IBAN, importo, causale"],
     "final_valuation":  [],
@@ -284,9 +276,6 @@ def run_section(key, client, on_token=None):
         elif key == "economic_profile":
             result = economic_profile_agent.run(client, company, country, manual_ctx,
                                                 show_output=False, on_token=on_token, use_web_search=use_web)
-        elif key == "risk_countries":
-            result = risk_countries_agent.run(client, company, country, "", manual_ctx,
-                                              show_output=False, on_token=on_token, use_web_search=use_web)
         elif key == "transaction":
             path = st.session_state.excel_path or ""
             if not path:
@@ -407,75 +396,99 @@ def render_setup():
 
 # ── SECTION NAVIGATOR (top horizontal) ───────────────────────────
 def render_section_nav():
-    cols = st.columns(len(MAIN_SECTIONS) + 1)   # 6 main + 1 final valuation
-    active = st.session_state.active_section
+    active    = st.session_state.active_section
     done_main, _ = main_progress()
 
+    # Full-width pill bar
+    n_cols = len(MAIN_SECTIONS) + 1
+    cols   = st.columns(n_cols)
+
     for i, sec in enumerate(MAIN_SECTIONS):
-        key    = sec["key"]
-        status = sec_status(key)
+        key       = sec["key"]
+        status    = sec_status(key)
         is_active = active == key
 
-        if status == "completed":
-            parsed = parse_json_result(get_content(key))
-            risk   = parsed.get("rischioComplessivo", "") if parsed else ""
-            rc     = get_risk_color(risk)
-            dot_html = (f'<span style="color:{rc};font-size:0.9rem;">●</span>'
-                        if risk else '<span style="color:#22aa55;font-size:0.9rem;">✓</span>')
-        else:
-            dot_html = '<span style="color:#ccc;font-size:0.9rem;">○</span>'
+        parsed = parse_json_result(get_content(key)) if status == "completed" else None
+        risk   = parsed.get("rischioComplessivo", "") if parsed else ""
+        rc     = get_risk_color(risk)
 
-        border_bottom = f"3px solid {RED}" if is_active else "3px solid transparent"
-        bg  = "#fff5f5" if is_active else "#fff"
-        fw  = "700" if is_active else "500"
-        tc  = "#1a1a1a" if is_active else "#666"
+        if status == "completed" and risk:
+            status_html = f'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:{rc};margin-right:5px;vertical-align:middle;"></span>'
+            label_color = "#1a1a1a"
+        elif status == "completed":
+            status_html = '<span style="color:#22aa55;font-size:0.8rem;margin-right:4px;">✓</span>'
+            label_color = "#1a1a1a"
+        else:
+            status_html = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e0e0e0;margin-right:5px;vertical-align:middle;"></span>'
+            label_color = "#999"
+
+        if is_active:
+            card_style = (f"background:#fff;border:1.5px solid {RED};"
+                          f"border-radius:8px;padding:8px 4px 6px;box-shadow:0 2px 8px rgba(204,0,0,0.12);")
+            num_color  = RED
+            fw         = "700"
+        else:
+            card_style = "background:#f7f7f7;border:1.5px solid #ebebeb;border-radius:8px;padding:8px 4px 6px;"
+            num_color  = "#bbb"
+            fw         = "500"
 
         with cols[i]:
             st.markdown(
-                f'<div style="text-align:center;padding:7px 2px;border-bottom:{border_bottom};'
-                f'background:{bg};border-radius:4px 4px 0 0;cursor:pointer;">'
-                f'{dot_html}'
-                f'<div style="font-size:0.62rem;color:#bbb;margin-top:2px;">{sec["number"]}</div>'
-                f'<div style="font-size:0.72rem;font-weight:{fw};color:{tc};'
-                f'line-height:1.2;margin-top:1px;">{sec["label"]}</div>'
-                f'</div>',
+                f'<div style="{card_style}text-align:center;margin:0 2px;">'
+                f'<div style="font-size:0.58rem;font-weight:700;color:{num_color};'
+                f'letter-spacing:1px;margin-bottom:3px;">{sec["number"]}</div>'
+                f'<div style="font-size:0.78rem;font-weight:{fw};color:{label_color};'
+                f'line-height:1.25;margin-bottom:4px;">{sec["icon"]}&nbsp;{sec["label"]}</div>'
+                f'<div>{status_html}'
+                + (f'<span style="font-size:0.6rem;font-weight:700;color:{rc};">{risk}</span>' if risk and status == "completed" else
+                   '<span style="font-size:0.6rem;color:#ccc;">—</span>')
+                + '</div></div>',
                 unsafe_allow_html=True)
-            if st.button("", key=f"nav_{key}", use_container_width=True,
-                         help=sec["full_label"]):
+            if st.button("‎", key=f"nav_{key}", use_container_width=True, help=sec["full_label"]):
                 st.session_state.active_section = key
                 st.rerun()
 
-    # Final valuation tab
-    fv_key   = "final_valuation"
+    # Final Valuation pill
+    fv_key    = "final_valuation"
     fv_status = sec_status(fv_key)
     is_active = active == fv_key
     all_done  = done_main == len(MAIN_SECTIONS)
 
-    if fv_status == "completed":
-        parsed = parse_json_result(get_content(fv_key))
-        crr    = parsed.get("customerRiskRating", "") if parsed else ""
-        rc     = get_risk_color(crr)
-        dot_html = f'<span style="color:{rc};font-size:0.9rem;">●</span>'
-    elif all_done:
-        dot_html = '<span style="color:' + RED + ';font-size:0.9rem;">⚡</span>'
-    else:
-        dot_html = '<span style="color:#e0e0e0;font-size:0.9rem;">⚡</span>'
+    parsed = parse_json_result(get_content(fv_key)) if fv_status == "completed" else None
+    crr    = parsed.get("customerRiskRating", "") if parsed else ""
+    rc_fv  = get_risk_color(crr)
 
-    border_bottom = f"3px solid {RED}" if is_active else "3px solid transparent"
-    bg  = "#fff5f5" if is_active else ("#fffaf0" if all_done else "#fafafa")
-    tc  = "#1a1a1a" if is_active else (RED if all_done else "#ccc")
+    if fv_status == "completed" and crr:
+        status_html = f'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:{rc_fv};margin-right:5px;vertical-align:middle;"></span>'
+        sub_label   = f'<span style="font-size:0.6rem;font-weight:700;color:{rc_fv};">{crr}</span>'
+    elif all_done:
+        status_html = f'<span style="color:{RED};font-size:0.75rem;margin-right:4px;">⚡</span>'
+        sub_label   = f'<span style="font-size:0.6rem;color:{RED};">Pronta</span>'
+    else:
+        status_html = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e0e0e0;margin-right:5px;vertical-align:middle;"></span>'
+        sub_label   = '<span style="font-size:0.6rem;color:#ccc;">Locked</span>'
+
+    if is_active:
+        card_style = (f"background:#fff;border:1.5px solid {RED};"
+                      f"border-radius:8px;padding:8px 4px 6px;box-shadow:0 2px 8px rgba(204,0,0,0.12);")
+        num_color  = RED; fw = "700"; label_color = "#1a1a1a"
+    elif all_done or fv_status == "completed":
+        card_style = f"background:#fffaf5;border:1.5px solid #ffd0a0;border-radius:8px;padding:8px 4px 6px;"
+        num_color  = "#f97316"; fw = "600"; label_color = "#1a1a1a"
+    else:
+        card_style = "background:#f7f7f7;border:1.5px solid #ebebeb;border-radius:8px;padding:8px 4px 6px;opacity:0.5;"
+        num_color  = "#ccc"; fw = "400"; label_color = "#ccc"
 
     with cols[-1]:
         st.markdown(
-            f'<div style="text-align:center;padding:7px 2px;border-bottom:{border_bottom};'
-            f'background:{bg};border-radius:4px 4px 0 0;">'
-            f'{dot_html}'
-            f'<div style="font-size:0.62rem;color:#bbb;margin-top:2px;">07</div>'
-            f'<div style="font-size:0.72rem;font-weight:700;color:{tc};'
-            f'line-height:1.2;margin-top:1px;">Final Valuation</div>'
-            f'</div>',
+            f'<div style="{card_style}text-align:center;margin:0 2px;">'
+            f'<div style="font-size:0.58rem;font-weight:700;color:{num_color};letter-spacing:1px;margin-bottom:3px;">'
+            + FINAL_SECTION["number"] +
+            f'</div><div style="font-size:0.78rem;font-weight:{fw};color:{label_color};line-height:1.25;margin-bottom:4px;">'
+            f'⚡&nbsp;Final Val.</div>'
+            f'<div>{status_html}{sub_label}</div></div>',
             unsafe_allow_html=True)
-        if st.button("", key="nav_final_valuation", use_container_width=True,
+        if st.button("‎", key="nav_final_valuation", use_container_width=True,
                      help="Final Valuation — Customer Risk Rating",
                      disabled=not (all_done or fv_status == "completed")):
             st.session_state.active_section = fv_key
@@ -584,46 +597,114 @@ def render_json_result(parsed: dict):
     narrativa = (parsed.get("narrativa") or parsed.get("narrativaCompleta")
                  or parsed.get("sintesiEsecutiva", ""))
     flags     = parsed.get("flags", [])
+    evidenze  = parsed.get("principaliEvidenze", [])
 
+    # ── Risk badge ────────────────────────────────────────────────
     if risk:
         rc = get_risk_color(risk)
+        raccomandazione = parsed.get("raccomandazione", "")
+        racc_str = ""
+        if isinstance(raccomandazione, dict):
+            acc = raccomandazione.get("accettazione", "")
+            adv = raccomandazione.get("livelloAdeguataVerifica", "")
+            if acc:
+                racc_str = f" &nbsp;·&nbsp; Accettazione: <b>{acc}</b>"
+            if adv:
+                racc_str += f" &nbsp;·&nbsp; Verifica: <b>{adv}</b>"
+        elif isinstance(raccomandazione, str) and raccomandazione:
+            racc_str = f" &nbsp;·&nbsp; {raccomandazione}"
         st.markdown(
-            '<div style="margin-bottom:10px;">'
-            '<span style="background:' + rc + ';color:#fff;font-size:0.75rem;'
-            'font-weight:700;padding:4px 14px;border-radius:12px;">RISCHIO: ' + risk + '</span>'
-            '</div>', unsafe_allow_html=True)
+            '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">'
+            '<span style="background:' + rc + ';color:#fff;font-size:0.8rem;font-weight:700;'
+            'padding:5px 16px;border-radius:20px;letter-spacing:0.5px;">⬤ ' + risk + '</span>'
+            + (f'<span style="font-size:0.78rem;color:#666;">{racc_str}</span>' if racc_str else '')
+            + '</div>', unsafe_allow_html=True)
 
-    # Final valuation: show risk matrix
+    # ── Final valuation: risk matrix ──────────────────────────────
     mx = parsed.get("matriceRischio")
     if mx:
+        st.markdown(
+            '<div style="font-size:0.62rem;font-weight:700;letter-spacing:1.5px;'
+            'color:#666;margin-bottom:8px;">MATRICE DI RISCHIO</div>',
+            unsafe_allow_html=True)
+        labels = [
+            ("identitaStruttura", "Identità / Struttura"),
+            ("reputazionale",     "Reputazionale"),
+            ("economico",         "Economico"),
+            ("transazionale",     "Transazionale"),
+            ("geografico",        "Geografico"),
+        ]
         cols = st.columns(5)
-        labels = {"identitaStruttura":"Identità/Struttura","reputazionale":"Reputazionale",
-                  "economico":"Economico","geografico":"Geografico","transazionale":"Transazionale"}
-        for i, (dim, lbl) in enumerate(labels.items()):
-            val = mx.get(dim, {})
-            score = val.get("score", "-") if isinstance(val, dict) else "-"
-            sc = int(score) if str(score).isdigit() else 0
-            bar_color = (RED if sc >= 4 else "#f59e0b" if sc == 3 else "#22aa55")
+        for i, (dim, lbl) in enumerate(labels):
+            val   = mx.get(dim, {})
+            score = val.get("score", 0) if isinstance(val, dict) else 0
+            sc    = int(score) if str(score).isdigit() else 0
+            bar_c = RED if sc >= 4 else "#f59e0b" if sc == 3 else "#22aa55"
+            motiv = val.get("motivazione", "") if isinstance(val, dict) else ""
             with cols[i]:
                 st.markdown(
-                    '<div style="text-align:center;background:#f8f8f8;border-radius:4px;padding:8px 4px;">'
-                    '<div style="font-size:0.62rem;color:#888;">' + lbl + '</div>'
-                    '<div style="font-size:1.5rem;font-weight:700;color:' + bar_color + ';">'
-                    + str(score) + '<span style="font-size:0.65rem;color:#ccc;">/5</span></div>'
-                    '</div>', unsafe_allow_html=True)
+                    '<div style="text-align:center;background:#f8f8f8;border-radius:6px;'
+                    'padding:10px 4px;border:1px solid #eee;" title="' + motiv + '">'
+                    '<div style="font-size:0.6rem;color:#888;margin-bottom:4px;">' + lbl + '</div>'
+                    '<div style="font-size:1.6rem;font-weight:900;color:' + bar_c + ';line-height:1;">'
+                    + str(sc) + '</div>'
+                    '<div style="font-size:0.55rem;color:#ccc;">/5</div>'
+                    # mini bar
+                    '<div style="margin:5px 8px 0;height:3px;border-radius:2px;background:#eee;">'
+                    '<div style="width:' + str(sc * 20) + '%;height:100%;background:' + bar_c + ';border-radius:2px;"></div>'
+                    '</div></div>', unsafe_allow_html=True)
         st.markdown("")
 
+    # ── Narrativa / sintesi discorsiva ────────────────────────────
     if narrativa:
         st.markdown(
+            '<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.5px;'
+            'color:#444;margin:10px 0 6px;">SINTESI</div>',
+            unsafe_allow_html=True)
+        st.markdown(
             '<div style="background:#f8f8f8;border-left:3px solid ' + RED + ';'
-            'padding:12px 16px;border-radius:3px;font-size:0.85rem;line-height:1.65;margin-bottom:10px;">'
+            'padding:14px 18px;border-radius:0 6px 6px 0;font-size:0.86rem;'
+            'line-height:1.7;color:#1a1a1a;margin-bottom:14px;">'
             + narrativa.replace("\n", "<br>") + '</div>',
             unsafe_allow_html=True)
 
+    # ── Principali evidenze con normativa ─────────────────────────
+    if evidenze:
+        st.markdown(
+            '<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.5px;'
+            'color:#444;margin:8px 0 6px;">PRINCIPALI EVIDENZE DI ATTENZIONE</div>',
+            unsafe_allow_html=True)
+        level_styles = {
+            "CRITICO":    ("background:#fef2f2;border-left:3px solid #ef4444;", "#ef4444", "●"),
+            "ANOMALIA":   ("background:#fffbeb;border-left:3px solid #f59e0b;", "#f59e0b", "▲"),
+            "ATTENZIONE": ("background:#f0f9ff;border-left:3px solid #0ea5e9;", "#0ea5e9", "◆"),
+        }
+        for ev in evidenze:
+            livello  = (ev.get("livello") or "ATTENZIONE").upper()
+            evid_txt = ev.get("evidenza", "")
+            norm_txt = ev.get("normativa", "")
+            sty, col, ico = level_styles.get(livello, level_styles["ATTENZIONE"])
+            st.markdown(
+                '<div style="' + sty + 'border-radius:0 6px 6px 0;padding:8px 12px;'
+                'margin-bottom:5px;">'
+                '<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
+                '<span style="font-size:0.78rem;color:#1a1a1a;">'
+                '<span style="color:' + col + ';margin-right:5px;">' + ico + '</span>'
+                + evid_txt + '</span>'
+                '<span style="font-size:0.65rem;font-weight:600;color:' + col + ';'
+                'white-space:nowrap;margin-left:10px;padding:1px 7px;border-radius:10px;'
+                'border:1px solid ' + col + ';">' + livello + '</span>'
+                '</div>'
+                + (f'<div style="font-size:0.68rem;color:#888;margin-top:3px;margin-left:16px;">'
+                   f'📎 {norm_txt}</div>' if norm_txt else '')
+                + '</div>', unsafe_allow_html=True)
+        st.markdown("")
+
+    # ── Flag AML ──────────────────────────────────────────────────
     if flags:
         st.markdown(
-            '<div style="font-size:0.62rem;font-weight:700;letter-spacing:1px;'
-            'color:' + RED + ';margin:8px 0 5px;">FLAG RILEVATI</div>',
+            '<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.5px;'
+            'color:#444;margin:8px 0 6px;">FLAG AML</div>',
             unsafe_allow_html=True)
         for f in flags:
             frc  = get_risk_color(f.get("rischio", ""))
@@ -631,12 +712,13 @@ def render_json_result(parsed: dict):
             desc = f.get("descrizione", "")
             norm = f.get("riferimentoNormativo", "") or f.get("indicatoreUIF", "")
             st.markdown(
-                '<div style="background:#fff;border:1px solid #eee;border-left:3px solid ' + frc + ';'
-                'border-radius:3px;padding:6px 10px;margin-bottom:4px;font-size:0.78rem;">'
-                '<b>' + tipo + '</b>'
-                + (' — ' + desc if desc else '')
-                + ('<span style="color:#bbb;font-size:0.7rem;margin-left:8px;">' + norm + '</span>' if norm else '')
+                '<div style="background:#fff;border:1px solid #f0f0f0;border-left:3px solid '
+                + frc + ';border-radius:0 4px 4px 0;padding:6px 10px;margin-bottom:4px;">'
+                '<span style="font-size:0.78rem;font-weight:600;color:#1a1a1a;">' + tipo + '</span>'
+                + (f'<span style="font-size:0.76rem;color:#555;"> — {desc}</span>' if desc else '')
+                + (f'<span style="font-size:0.68rem;color:#bbb;margin-left:8px;">📎 {norm}</span>' if norm else '')
                 + '</div>', unsafe_allow_html=True)
+        st.markdown("")
 
     with st.expander("📋 Dati strutturati completi (JSON)", expanded=False):
         st.json(parsed)

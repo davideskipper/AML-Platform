@@ -62,6 +62,13 @@ OUTPUT: Restituisci esclusivamente un oggetto JSON valido con questa struttura:
     { "tipo": "", "descrizione": "", "rischio": "LOW|MEDIUM|HIGH", "riferimentoNormativo": "" }
   ],
   "raccomandazione": "STANDARD|ENHANCED_DUE_DILIGENCE|RIFIUTO",
+  "principaliEvidenze": [
+    {
+      "evidenza": "Descrizione sintetica dell'elemento di attenzione o anomalia rilevata",
+      "normativa": "Riferimento normativo specifico (es. Art.20 D.Lgs.231/2007, UIF Indic.n.42/2023, FATF Rec.10)",
+      "livello": "ATTENZIONE|ANOMALIA|CRITICO"
+    }
+  ],
   "rischioComplessivo": "LOW|MEDIUM|HIGH|CRITICAL",
   "narrativa": "Paragrafo discorsivo di 4-6 righe. Descrivi la struttura di controllo identificata, il profilo delle persone fisiche rilevanti, l'eventuale status PEP e il razionale della raccomandazione. Tono formale, linguaggio tecnico AML.",
   "note": ""
