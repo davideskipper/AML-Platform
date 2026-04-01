@@ -157,6 +157,8 @@ DEFAULTS = {
     "excel_path":    None,
     "excel_name":    None,
     "running_agent": None,
+    "knowledge_base":     "",
+    "kb_doc_names":       [],
     "sa_messages":   [],
     "sa_initialized":False,
 }
@@ -277,15 +279,18 @@ def run_section(key, client, on_token=None):
     # Build context from uploaded docs + manual notes
     docs_text  = st.session_state.section_docs.get(key, "")
     notes_text = st.session_state.section_notes.get(key, "")
-    manual_ctx = ""
-    if docs_text:
-        manual_ctx += f"DOCUMENTI FORNITI:\n\n{docs_text}"
-        if notes_text:
-            manual_ctx += f"\n\nNOTE ANALISTA:\n{notes_text}"
-    elif notes_text:
-        manual_ctx = notes_text
+    kb_text    = st.session_state.knowledge_base
 
-    # Disable web search when documents are provided (except reputational, handled inside agent)
+    parts = []
+    if kb_text:
+        parts.append(f"BASE DOCUMENTALE DI RIFERIMENTO (NORMATIVA):\n\n{kb_text}")
+    if docs_text:
+        parts.append(f"DOCUMENTI DEL CLIENTE:\n\n{docs_text}")
+    if notes_text:
+        parts.append(f"NOTE ANALISTA:\n{notes_text}")
+    manual_ctx = "\n\n---\n\n".join(parts)
+
+    # Disable web search when client documents are provided
     use_web = not bool(docs_text)
 
     sec = next(s for s in SECTIONS if s["key"] == key)
@@ -402,6 +407,40 @@ def render_setup():
             case_id = st.text_input("Case ID", placeholder="es. AML-2026-0341")
         with c4:
             analyst = st.text_input("Analista", placeholder="es. M. Rossi")
+
+        st.markdown("---")
+        st.markdown("#### 📚 Knowledge Base Normativa (opzionale)")
+        st.markdown(
+            '<div style="font-size:0.8rem;color:#888;margin-bottom:8px;">'
+            'Carica i documenti normativi di riferimento che tutti gli agenti useranno come base '
+            'di conoscenza: FATF guidelines, circolari UIF, D.Lgs. 231/2007, liste sanzioni, '
+            'policy AML interne, indicatori di anomalia, ecc.'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        kb_files = st.file_uploader(
+            "Documenti Knowledge Base",
+            type=["pdf", "docx", "txt", "md", "csv"],
+            accept_multiple_files=True,
+            key="kb_upload",
+            label_visibility="collapsed",
+        )
+        if kb_files:
+            texts, names = [], []
+            for f in kb_files:
+                extracted = extract_text_from_file(f)
+                texts.append(f"=== {f.name} ===\n{extracted}")
+                names.append(f.name)
+            st.session_state.knowledge_base  = "\n\n".join(texts)
+            st.session_state.kb_doc_names    = names
+            total_chars = len(st.session_state.knowledge_base)
+            st.success(
+                f"✓ {len(texts)} documento/i caricato/i · "
+                f"{total_chars:,} caratteri · "
+                "disponibili per tutti gli agenti"
+            )
+        elif st.session_state.kb_doc_names:
+            st.info("📚 KB caricata: " + ", ".join(st.session_state.kb_doc_names))
 
         st.markdown("---")
         if st.button("Continua →  Configura Sezioni", use_container_width=True):
@@ -884,6 +923,18 @@ def render_right():
     )
 
     st.progress(done / total, text=f"Progresso: {done}/{total}")
+
+    # Knowledge Base indicator
+    if st.session_state.kb_doc_names:
+        kb_count = len(st.session_state.kb_doc_names)
+        kb_chars = len(st.session_state.knowledge_base)
+        st.markdown(
+            '<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:3px;'
+            'padding:7px 10px;margin:6px 0;font-size:0.75rem;">'
+            '<span style="font-weight:700;color:#0369a1;">📚 KB Normativa:</span> '
+            + str(kb_count) + ' doc · ' + f'{kb_chars:,}' + ' caratteri</div>',
+            unsafe_allow_html=True,
+        )
 
     # Final Valuation score if available
     fv_content = get_content("final_valuation")
