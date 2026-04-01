@@ -69,7 +69,7 @@ OUTPUT: Restituisci esclusivamente un oggetto JSON valido con questa struttura:
     }
   ],
   "rischioComplessivo": "LOW|MEDIUM|HIGH|CRITICAL",
-  "narrativa": "Paragrafo discorsivo di 4-6 righe. Descrivi il profilo economico-finanziario del soggetto, commenta i principali indicatori, evidenzia le incoerenze rilevate e spiega come queste si traducono in rischio AML. Tono formale, linguaggio tecnico.",
+  "narrativa": "Testo discorsivo di 10-14 righe. Descrivi il profilo economico-finanziario del soggetto, commenta i principali indicatori, evidenzia le incoerenze rilevate e spiega come queste si traducono in rischio AML. Tono formale, linguaggio tecnico.",
   "note": ""
 }"""
 

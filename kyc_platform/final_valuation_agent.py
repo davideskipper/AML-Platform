@@ -78,7 +78,7 @@ OUTPUT: Restituisci esclusivamente un oggetto JSON valido:
     "sezioniAnalizzate": [],
     "agentiEseguiti": 0
   },
-  "narrativaCompleta": "Report narrativo di 12-15 righe per il fascicolo cliente e le ispezioni di vigilanza. Struttura: (1) presentazione del soggetto analizzato, (2) sintesi per ciascuna dimensione di rischio con i principali elementi emersi, (3) razionale del Customer Risk Rating, (4) conclusione con raccomandazione operativa e condizioni. Tono formale, linguaggio tecnico AML, adatto a ispezioni Banca d'Italia."
+  "narrativaCompleta": "Testo discorsivo di 14-18 righe per il fascicolo cliente e le ispezioni di vigilanza. Struttura: (1) presentazione del soggetto analizzato, (2) sintesi per ciascuna dimensione di rischio con i principali elementi emersi, (3) razionale del Customer Risk Rating, (4) conclusione con raccomandazione operativa e condizioni. Tono formale, linguaggio tecnico AML, adatto a ispezioni Banca d'Italia."
 }"""
 
 

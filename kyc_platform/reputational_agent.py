@@ -74,7 +74,7 @@ OUTPUT: Restituisci esclusivamente un oggetto JSON valido con questa struttura:
     }
   ],
   "rischioComplessivo": "LOW|MEDIUM|HIGH|CRITICAL",
-  "narrativa": "Paragrafo discorsivo di 4-6 righe. Descrivi il profilo reputazionale del soggetto, gli eventi negativi più rilevanti, la loro attualità e il loro peso ai fini AML. Spiega il razionale della raccomandazione. Tono formale, linguaggio tecnico AML.",
+  "narrativa": "Testo discorsivo di 10-14 righe. Descrivi il profilo reputazionale del soggetto, gli eventi negativi più rilevanti, la loro attualità e il loro peso ai fini AML. Spiega il razionale della raccomandazione. Tono formale, linguaggio tecnico AML.",
   "note": ""
 }"""
 

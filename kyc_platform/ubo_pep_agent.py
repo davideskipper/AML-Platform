@@ -70,7 +70,7 @@ OUTPUT: Restituisci esclusivamente un oggetto JSON valido con questa struttura:
     }
   ],
   "rischioComplessivo": "LOW|MEDIUM|HIGH|CRITICAL",
-  "narrativa": "Paragrafo discorsivo di 4-6 righe. Descrivi la struttura di controllo identificata, il profilo delle persone fisiche rilevanti, l'eventuale status PEP e il razionale della raccomandazione. Tono formale, linguaggio tecnico AML.",
+  "narrativa": "Testo discorsivo di 10-14 righe. Descrivi la struttura di controllo identificata, il profilo delle persone fisiche rilevanti, l'eventuale status PEP e il razionale della raccomandazione. Tono formale, linguaggio tecnico AML.",
   "note": ""
 }"""
 

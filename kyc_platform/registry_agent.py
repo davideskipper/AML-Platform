@@ -63,7 +63,7 @@ OUTPUT: Restituisci esclusivamente un oggetto JSON valido con questa struttura:
     }
   ],
   "rischioComplessivo": "LOW|MEDIUM|HIGH|CRITICAL",
-  "narrativa": "Paragrafo discorsivo di 4-6 righe destinato al compliance officer. Descrivi il profilo societario, evidenzia gli elementi di attenzione principali e spiega il razionale del rischio assegnato. Tono formale, linguaggio tecnico AML.",
+  "narrativa": "Testo discorsivo di 10-14 righe destinato al compliance officer. Descrivi il profilo societario, evidenzia gli elementi di attenzione principali e spiega il razionale del rischio assegnato. Tono formale, linguaggio tecnico AML.",
   "note": ""
 }"""
 
