@@ -239,32 +239,36 @@ def run_section(key, client):
 # ── Header ────────────────────────────────────────────────────────
 def render_header():
     state = st.session_state.kyc_state
-    case_info = ""
-    if st.session_state.step == "analysis" and state.case.company_name:
-        done, total = progress()
-        case_info = f"""
-          <span style="color:#555;">|</span>
-          <span style="color:#aaa; font-size:0.85rem;">{state.case.company_name}</span>
-          <span style="color:#555; font-size:0.8rem; margin-left:8px;">{state.case.case_id}</span>
-          <span style="background:{RED}; color:white; font-size:0.7rem; padding:2px 8px;
-                       border-radius:10px; margin-left:12px;">{done}/{total}</span>
-        """
-    st.markdown(f"""
-    <div style="display:flex; align-items:center; justify-content:space-between;
-                padding:10px 0 14px; border-bottom:2px solid {RED}; margin-bottom:18px;">
-      <div style="display:flex; align-items:center; gap:14px;">
-        <div style="font-size:1rem; font-weight:900; letter-spacing:3px; color:#fff;">
-          BAIN &amp; COMPANY
-        </div>
-        <div style="width:1px; height:20px; background:#333;"></div>
-        <div style="font-size:0.82rem; color:#888; letter-spacing:0.5px;">
-          AML IntelliGent Platform &nbsp;·&nbsp; KYC / CDD Module
-        </div>
-        {case_info}
-      </div>
-      <div style="font-size:0.7rem; color:#444;">Claude Opus 4.6</div>
-    </div>
-    """, unsafe_allow_html=True)
+    # Build header using columns to avoid nested f-string HTML issues
+    h_left, h_right = st.columns([5, 1])
+    with h_left:
+        brand = "**BAIN &amp; COMPANY** &nbsp;|&nbsp; AML IntelliGent Platform · KYC / CDD Module"
+        if st.session_state.step == "analysis" and state.case.company_name:
+            done, total = progress()
+            badge = f'<span style="background:{RED};color:white;font-size:0.7rem;padding:2px 8px;border-radius:10px;margin-left:10px;">{done}/{total}</span>'
+            st.markdown(
+                f'<div style="padding:8px 0 12px;border-bottom:2px solid {RED};margin-bottom:16px;">'
+                f'<span style="font-size:1rem;font-weight:900;letter-spacing:3px;color:#fff;">BAIN &amp; COMPANY</span>'
+                f'<span style="color:#444;margin:0 12px;">|</span>'
+                f'<span style="font-size:0.82rem;color:#888;">AML IntelliGent Platform · KYC / CDD Module</span>'
+                f'<span style="color:#555;margin:0 10px;">|</span>'
+                f'<span style="color:#aaa;font-size:0.85rem;">{state.case.company_name}</span>'
+                f'<span style="color:#555;font-size:0.78rem;margin-left:8px;">{state.case.case_id}</span>'
+                f'{badge}</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                f'<div style="padding:8px 0 12px;border-bottom:2px solid {RED};margin-bottom:16px;">'
+                f'<span style="font-size:1rem;font-weight:900;letter-spacing:3px;color:#fff;">BAIN &amp; COMPANY</span>'
+                f'<span style="color:#444;margin:0 12px;">|</span>'
+                f'<span style="font-size:0.82rem;color:#888;">AML IntelliGent Platform · KYC / CDD Module</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+    with h_right:
+        st.markdown('<div style="text-align:right;padding-top:8px;font-size:0.7rem;color:#444;">Claude Opus 4.6</div>',
+                    unsafe_allow_html=True)
 
 # ── SETUP SCREEN ──────────────────────────────────────────────────
 def render_setup():
