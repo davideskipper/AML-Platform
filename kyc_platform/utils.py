@@ -25,6 +25,7 @@ def run_agent(
     use_web_search: bool = True,
     show_output: bool = True,
     on_token=None,
+    max_search_uses: int = None,
 ) -> str:
     """
     Run a single agent call with optional web search, streaming output.
@@ -40,9 +41,12 @@ def run_agent(
 
     tools = []
     if use_web_search:
+        web_search_tool = {"type": "web_search_20260209", "name": "web_search"}
+        if max_search_uses is not None:
+            web_search_tool["max_uses"] = max_search_uses
         tools = [
-            {"type": "web_search_20260209", "name": "web_search"},
-            {"type": "web_fetch_20260209",  "name": "web_fetch"},
+            web_search_tool,
+            {"type": "web_fetch_20260209", "name": "web_fetch"},
         ]
 
     messages = [{"role": "user", "content": user_message}]

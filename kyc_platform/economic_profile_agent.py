@@ -1,55 +1,70 @@
 """
 Economic Profile Agent
 ======================
-Analyzes the company's financial profile: balance sheet, profitability,
-revenue trends, and consistency between declared financials and actual
-business activity. Flags unexplained wealth or financial anomalies.
+Analyzes financial documents (bilancio, conto economico, dichiarazione redditi)
+and evaluates economic consistency for AML purposes.
+Returns structured JSON with financial indicators and flags.
 """
 
 import anthropic
 from .utils import run_agent
 
-SYSTEM_PROMPT = """You are the Economic Profile Agent of an AML/KYC compliance platform.
+SYSTEM_PROMPT = """Sei un AML Economic Profile Analysis Agent specializzato nell'analisi di bilancio
+e nella valutazione della coerenza economica ai fini AML.
+Analizza i documenti finanziari forniti (bilancio, conto economico, dichiarazione redditi).
 
-Your task is to analyze the financial profile and economic substance of a company.
+ANALISI BILANCIO — persone giuridiche:
+- Verifica coerenza tra fatturato dichiarato e settore/dimensione aziendale
+- Analizza struttura patrimoniale: equity vs debito, composizione immobilizzazioni
+- Identifica variazioni anomale anno su anno superiori al 30% senza giustificazione evidente
+- Verifica marginalità: EBITDA/ricavi coerente con benchmark di settore ATECO
+- Analizza flussi di cassa operativi vs finanziari vs investimento
+- Identifica crediti/debiti verso parti correlate o soggetti esteri sproporzionati
+- Verifica presenza di attività o passività difficilmente giustificabili
+- Analizza composizione e concentrazione dei ricavi (dipendenza da pochi clienti?)
+- Verifica adeguatezza della struttura organizzativa rispetto ai ricavi (dipendenti, cespiti)
 
-Retrieve and analyze:
+ANALISI DICHIARAZIONE REDDITI — persone fisiche:
+- Verifica coerenza tra reddito dichiarato e tenore di vita/patrimonio noto
+- Identifica variazioni significative tra anni fiscali consecutivi
+- Segnala redditi da fonti difficilmente verificabili o atipiche
+- Verifica coerenza con attività professionale dichiarata
 
-1. **Financial statements** (latest 3 years where available)
-   - Total assets, equity, liabilities
-   - Revenue / turnover
-   - EBITDA / net profit
-   - Cash and equivalents
-   - Debt structure
+INDICATORI DI ANOMALIA (rif. UIF Provvedimento 12 maggio 2023):
+- Fatturato elevato con margini operativi anomalmente bassi o negativi
+- Ricavi non supportati da struttura aziendale (pochi dipendenti, asset minimi)
+- Operazioni infragruppo di importo sproporzionato rispetto al business
+- Finanziamenti soci reiterati non proporzionati al capitale sociale
+- Immobilizzazioni finanziarie in paesi a fiscalità privilegiata (OCSE lista)
+- Crediti inesigibili o svalutazioni eccessive non giustificate
+- Ciclo commerciale incoerente con il settore (incassi troppo rapidi o lenti)
+- Debiti tributari e previdenziali significativi
 
-2. **Profitability & trends**
-   - Revenue growth YoY
-   - Profit margins
-   - Unusual spikes or drops in revenue/profit
-
-3. **Business activity consistency**
-   - Does the declared business activity justify the financial size and flows?
-   - Are revenues consistent with the sector and market position?
-   - Any large unexplained transactions in the accounts?
-
-4. **Financial health indicators**
-   - Solvency ratios
-   - Liquidity ratios
-   - Any signs of financial distress (accumulated losses, going concern)
-
-5. **Source of wealth / funds** (for key shareholders or capital injections)
-   - Can declared wealth be explained by legitimate business activity?
-   - Any large unexplained capital inflows?
-
-6. **Tax domicile and fiscal compliance**
-   - Any publicly known tax disputes or investigations
-   - Use of low-tax jurisdictions without clear business rationale
-
-Use web search to find annual reports, XBRL filings, Cerved/CRIF data references,
-stock exchange disclosures, press releases, or news about financial results.
-
-Respond in the same language as the user's request.
-"""
+OUTPUT: Restituisci esclusivamente un oggetto JSON valido con questa struttura:
+{
+  "indicatoriFinanziari": {
+    "fatturato": "",
+    "ebitda": "",
+    "marginePct": "",
+    "patrimonioNetto": "",
+    "posizioneFinanziariaNetta": "",
+    "periodoDiRiferimento": ""
+  },
+  "scorecard": {
+    "revenue":      { "rating": "GREEN|YELLOW|RED", "motivazione": "" },
+    "profitability": { "rating": "GREEN|YELLOW|RED", "motivazione": "" },
+    "assetQuality": { "rating": "GREEN|YELLOW|RED", "motivazione": "" },
+    "consistency":  { "rating": "GREEN|YELLOW|RED", "motivazione": "" }
+  },
+  "stimaCapacitaEconomica": "",
+  "flags": [
+    { "tipo": "", "descrizione": "", "rischio": "LOW|MEDIUM|HIGH", "indicatoreUIF": "" }
+  ],
+  "raccomandazione": "CONSISTENT|INCONSISTENCIES_FOUND|HIGH_RISK",
+  "rischioComplessivo": "LOW|MEDIUM|HIGH|CRITICAL",
+  "narrativa": "Paragrafo discorsivo di 4-6 righe. Descrivi il profilo economico-finanziario del soggetto, commenta i principali indicatori, evidenzia le incoerenze rilevate e spiega come queste si traducono in rischio AML. Tono formale, linguaggio tecnico.",
+  "note": ""
+}"""
 
 
 def run(
@@ -59,17 +74,16 @@ def run(
     manual_context: str = "",
     show_output: bool = True,
     on_token=None,
+    use_web_search=None,
 ) -> str:
-    """Run the Economic Profile Agent. Returns findings as text."""
+    """Run the Economic Profile Agent. Returns JSON findings as text."""
     user_msg = (
-        f"Analyze the economic profile and financial statements of:\n\n"
-        f"Company: {company_name}\n"
-        f"Country: {country}\n"
+        f"Analizza il profilo economico e i documenti finanziari di:\n\n"
+        f"Azienda: {company_name}\n"
+        f"Paese: {country}\n"
     )
     if manual_context:
-        user_msg += (
-            f"\nFinancial documents / data provided by the analyst:\n{manual_context}"
-        )
+        user_msg += f"\nDocumenti finanziari forniti dall'analista:\n{manual_context}"
 
     return run_agent(
         client=client,
@@ -77,7 +91,7 @@ def run(
         user_message=user_msg,
         header=f"Economic Profile Agent — {company_name}",
         max_tokens=6000,
-        use_web_search=True,
+        use_web_search=False if use_web_search is None else use_web_search,
         show_output=show_output,
         on_token=on_token,
     )

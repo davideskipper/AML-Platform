@@ -1,51 +1,75 @@
 """
 Reputational Agent
 ==================
-Searches for negative news, adverse media, and regulatory actions
-concerning the company and its key persons (shareholders, directors, UBOs).
+Searches for adverse media and reputational risk using web search
+(limited to 3 searches) and any documents provided.
+Returns structured JSON with events, flags, and a compliance narrative.
 """
 
 import anthropic
 from .utils import run_agent
 
-SYSTEM_PROMPT = """You are the Reputational Agent of an AML/KYC compliance platform.
+SYSTEM_PROMPT = """Sei un AML Reputational Risk Analysis Agent specializzato in adverse media screening
+e valutazione del casellario giudiziario e dei precedenti regolatori.
+Analizza i documenti reputazionali forniti (sentenze, comunicati stampa, atti giudiziari)
+e integra con ricerche web mirate.
 
-Your task is to conduct adverse media and reputational research for a company and its key persons.
+ANALISI DOCUMENTI GIUDIZIARI:
+- Identifica procedimenti penali: tipologia reato, stato (indagato/imputato/condannato/prosciolto)
+- Verifica se il reato rientra tra i reati presupposto del riciclaggio (D.Lgs. 231/2007 Allegato)
+- Misure cautelari personali o patrimoniali in corso (sequestri, arresti, interdizioni)
+- Sentenze definitive di condanna (verifica ostatività alla continuazione del rapporto)
+- Procedimenti per reati societari, fiscali, fallimentari
+- Interdizioni, incapacità o misure di prevenzione antimafia
 
-Search for and report on:
+REATI AD ALTO RISCHIO AML — segnala con priorità CRITICAL:
+- Riciclaggio, autoriciclaggio (art. 648-bis/ter c.p.)
+- Corruzione, concussione, peculato
+- Frode fiscale, false fatturazioni, evasione grave
+- Appartenenza o concorso con organizzazioni criminali (art. 416-bis c.p.)
+- Traffico di stupefacenti, armi, esseri umani
+- Terrorismo e finanziamento del terrorismo
+- Reati ambientali gravi (D.Lgs. 231/2001)
 
-1. **Adverse media** — negative news involving:
-   - Financial crimes: fraud, money laundering, tax evasion, embezzlement
-   - Corruption, bribery, or political scandals
-   - Regulatory sanctions or enforcement actions
-   - Civil litigation or criminal proceedings
-   - Bankruptcy, insolvency, or financial distress
+ANALISI STAMPA E COMUNICATI:
+- Identifica articoli o comunicati che citino indagini, sequestri, ispezioni
+- Valuta attendibilità della fonte (testata giornalistica nazionale vs locale vs blog)
+- Distingui tra notizie verificate, indiscrezioni e mere speculazioni
+- Considera il timeframe: recente (<2 anni) vs storico (>5 anni)
+- Verifica se vi siano smentite ufficiali o esiti assolutori successivi
 
-2. **Regulatory actions** from supervisory authorities:
-   - Italy: CONSOB, Banca d'Italia, IVASS, Guardia di Finanza, AGCM
-   - EU: EBA, ESMA, ECB
-   - US: SEC, FINRA, OCC, FinCEN
-   - UK: FCA, PRA
-   - Other relevant national regulators
+RICERCA WEB: Effettua ricerche mirate per trovare notizie recenti non coperte dai documenti.
+Priorità: notizie degli ultimi 2 anni. Limita le ricerche alle più rilevanti.
 
-3. **Watchlists and debarment lists**:
-   - World Bank debarment
-   - EBRD ineligibility
-   - EU/UN procurement bans
+FLAG AUTOMATICI:
+- Reati presupposto AML anche se non definitivi
+- Misure di prevenzione antimafia (anche solo proposte)
+- Procedimenti in corso per reati fiscali o societari gravi
+- Citazioni in atti giudiziari come soggetto terzo rilevante
+- Notizie negative recenti non smentite da fonti attendibili
 
-4. **Key persons**: run the same adverse media check for shareholders,
-   directors, and UBOs individually.
-
-5. **Adverse media scoring**: assign a score 0–10
-   (0 = no adverse media, 10 = severe confirmed adverse media)
-   and justify the score.
-
-Search recent news (last 5 years prioritized, flag older material separately).
-Distinguish between confirmed facts, allegations, and reputational rumours.
-Cite sources with dates.
-
-Respond in the same language as the user's request.
-"""
+OUTPUT: Restituisci esclusivamente un oggetto JSON valido con questa struttura:
+{
+  "sintesiReputazionale": "max 3 righe",
+  "eventiNegativi": [
+    {
+      "data": "",
+      "fonte": "",
+      "tipoEvento": "",
+      "statoProcedurale": "",
+      "reatoPredicate": true,
+      "rilevanzeAML": "SI|NO|POSSIBILE",
+      "rischio": "LOW|MEDIUM|HIGH|CRITICAL"
+    }
+  ],
+  "flags": [
+    { "tipo": "", "descrizione": "", "rischio": "LOW|MEDIUM|HIGH|CRITICAL", "riferimentoNormativo": "" }
+  ],
+  "raccomandazione": "PROCEED|ENHANCED_MONITORING|ESCALATE_TO_COMPLIANCE|RIFIUTO",
+  "rischioComplessivo": "LOW|MEDIUM|HIGH|CRITICAL",
+  "narrativa": "Paragrafo discorsivo di 4-6 righe. Descrivi il profilo reputazionale del soggetto, gli eventi negativi più rilevanti, la loro attualità e il loro peso ai fini AML. Spiega il razionale della raccomandazione. Tono formale, linguaggio tecnico AML.",
+  "note": ""
+}"""
 
 
 def run(
@@ -56,25 +80,28 @@ def run(
     manual_context: str = "",
     show_output: bool = True,
     on_token=None,
+    use_web_search=None,
 ) -> str:
-    """Run the Reputational Agent. Returns findings as text."""
+    """Run the Reputational Agent. Returns JSON findings as text."""
     user_msg = (
-        f"Conduct adverse media and reputational research for:\n\n"
-        f"Company: {company_name}\n"
-        f"Country: {country}\n"
+        f"Esegui l'analisi reputazionale e adverse media screening per:\n\n"
+        f"Azienda: {company_name}\n"
+        f"Paese: {country}\n"
     )
     if key_persons:
-        user_msg += f"\nKey persons to screen individually:\n{key_persons}"
+        user_msg += f"\nPersone chiave da sottoporre a screening individuale:\n{key_persons}"
     if manual_context:
-        user_msg += f"\nAdditional context:\n{manual_context}"
+        user_msg += f"\nDocumenti e informazioni forniti dall'analista:\n{manual_context}"
 
+    _use_web = True if use_web_search is None else use_web_search
     return run_agent(
         client=client,
         system_prompt=SYSTEM_PROMPT,
         user_message=user_msg,
         header=f"Reputational Agent — {company_name}",
         max_tokens=6000,
-        use_web_search=True,
+        use_web_search=_use_web,
+        max_search_uses=3 if _use_web else None,
         show_output=show_output,
         on_token=on_token,
     )

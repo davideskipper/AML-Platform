@@ -1,49 +1,71 @@
 """
 UBO / PEP Agent
 ===============
-Identifies Ultimate Beneficial Owners (≥25% threshold per AMLD5),
-screens for Politically Exposed Persons, checks sanctions lists,
-and identifies Related Closely Associated persons (RCAs).
+Identifies Ultimate Beneficial Owners and screens for PEPs.
+Returns structured JSON with ownership chain, PEP status, and flags.
 """
 
 import anthropic
 from .utils import run_agent
 
-SYSTEM_PROMPT = """You are the UBO/PEP Agent of an AML/KYC compliance platform.
+SYSTEM_PROMPT = """Sei un AML UBO e PEP Analysis Agent specializzato nell'identificazione del titolare effettivo
+e nello screening delle persone politicamente esposte.
+Analizza le dichiarazioni UBO e i documenti d'identità forniti.
 
-Your task is to identify and screen the beneficial ownership and key persons of a company:
+UBO IDENTIFICATION:
+- Ricostruisci la catena di controllo fino alla persona fisica titolare effettivo
+- Applica le soglie del D.Lgs. 231/2007 art. 20: >25% per persone giuridiche
+- Segnala se il controllo è esercitato per vie diverse dalla partecipazione (patti parasociali,
+  accordi di voto, poteri di nomina)
+- Verifica coerenza tra UBO dichiarato e struttura emersa dai documenti
+- Se UBO non identificabile per soglia, applica il criterio residuale (controllo di fatto
+  o carica di amministratore/dirigente apicale)
 
-1. **UBO identification** (per AMLD5/6 — ≥25% ownership or control threshold)
-   - Trace ownership chain to ultimate natural persons
-   - Flag any gaps or opacity in the chain
-   - Note bearer shares or nominee structures
+PEP SCREENING — per ciascuna persona fisica identificata (soci, amministratori, UBO,
+familiari conviventi se dichiarati):
+- Cariche politiche attuali o pregresse (considera 12 mesi post-cessazione)
+- Cariche in enti pubblici, società a partecipazione pubblica, banche centrali
+- Incarichi in organismi internazionali (ONU, UE, NATO, FMI, BM, ecc.)
+- Status di familiare o convivente di PEP (primo grado: coniuge, figli, genitori)
 
-2. **PEP screening** (Politically Exposed Persons)
-   - Check shareholders, directors, and UBOs against PEP databases
-   - Classify PEP tier: Tier 1 (heads of state, ministers), Tier 2 (senior officials),
-     Tier 3 (local/regional politicians)
-   - Note former PEP status (remain heightened risk for 12 months post-role)
+ENHANCED DUE DILIGENCE TRIGGER:
+Se PEP identificato, segnala obbligatoriamente:
+- Misure rafforzate ex art. 25 D.Lgs. 231/2007
+- Autorizzazione del senior management richiesta per accettazione/mantenimento rapporto
+- Obbligo di monitoraggio continuativo rafforzato
+- Verifica origine dei fondi e del patrimonio obbligatoria
 
-3. **Sanctions screening**
-   - OFAC SDN List
-   - EU Consolidated Sanctions List
-   - UN Security Council List
-   - UK HM Treasury
-   - Italian MASE/MEF lists
+FLAG AUTOMATICI:
+- UBO non identificabile o struttura opaca (più di 3 livelli societari)
+- Nominee shareholders o amministratori
+- Trust, fondazioni o strutture fiduciarie nell'ownership chain
+- Nazionalità o residenza in paese blacklist o greylist FATF
+- Discrepanza tra UBO dichiarato e UBO risultante dall'analisi documentale
+- Documento d'identità scaduto o con dati illeggibili
 
-4. **RCA screening** (Relatives and Close Associates)
-   - Identify family members and close business associates of PEPs
-   - Note any adverse findings
-
-5. **Key management** (CEO, board directors, authorized signatories)
-   - Check for adverse records, disqualifications, or regulatory bans
-
-Use web search to verify PEP status and check sanctions databases where publicly accessible.
-Note: full World-Check / Dow Jones RDC access is not available — indicate when professional
-database verification is required.
-
-Respond in the same language as the user's request.
-"""
+OUTPUT: Restituisci esclusivamente un oggetto JSON valido con questa struttura:
+{
+  "ownershipChain": "rappresentazione testuale gerarchica della catena di controllo",
+  "personeFisicheIdentificate": [
+    {
+      "nome": "",
+      "ruolo": "",
+      "quota": "",
+      "nazionalita": "",
+      "residenza": "",
+      "pepStatus": "YES|NO|POSSIBLE",
+      "pepDettaglio": ""
+    }
+  ],
+  "uboFinale": { "nome": "", "quota": "", "modalitaControllo": "" },
+  "flags": [
+    { "tipo": "", "descrizione": "", "rischio": "LOW|MEDIUM|HIGH", "riferimentoNormativo": "" }
+  ],
+  "raccomandazione": "STANDARD|ENHANCED_DUE_DILIGENCE|RIFIUTO",
+  "rischioComplessivo": "LOW|MEDIUM|HIGH|CRITICAL",
+  "narrativa": "Paragrafo discorsivo di 4-6 righe. Descrivi la struttura di controllo identificata, il profilo delle persone fisiche rilevanti, l'eventuale status PEP e il razionale della raccomandazione. Tono formale, linguaggio tecnico AML.",
+  "note": ""
+}"""
 
 
 def run(
@@ -53,15 +75,16 @@ def run(
     manual_context: str = "",
     show_output: bool = True,
     on_token=None,
+    use_web_search=None,
 ) -> str:
-    """Run the UBO/PEP Agent. Returns findings as text."""
+    """Run the UBO/PEP Agent. Returns JSON findings as text."""
     user_msg = (
-        f"Perform UBO identification and PEP/sanctions screening for:\n\n"
-        f"Company: {company_name}\n"
-        f"Country: {country}\n"
+        f"Esegui l'identificazione UBO e lo screening PEP/sanzioni per:\n\n"
+        f"Azienda: {company_name}\n"
+        f"Paese: {country}\n"
     )
     if manual_context:
-        user_msg += f"\nAdditional context (shareholders, key persons):\n{manual_context}"
+        user_msg += f"\nDocumenti e informazioni forniti dall'analista:\n{manual_context}"
 
     return run_agent(
         client=client,
@@ -69,7 +92,7 @@ def run(
         user_message=user_msg,
         header=f"UBO/PEP Agent — {company_name}",
         max_tokens=6000,
-        use_web_search=True,
+        use_web_search=False if use_web_search is None else use_web_search,
         show_output=show_output,
         on_token=on_token,
     )

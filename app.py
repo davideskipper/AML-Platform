@@ -1,23 +1,26 @@
 """
 AML IntelliGent Platform — Streamlit Web Interface
 Bain & Company Style — KYC / CDD Module
+White Theme | Document Upload | Live Streaming | JSON Display
 """
 
+import io
+import json
 import os
 import tempfile
 from datetime import datetime
 import streamlit as st
 import anthropic
 
-from kyc_platform.models import SessionState, CaseContext
-from kyc_platform.super_agent import TOOLS, SYSTEM_PROMPT
+from kyc_platform.models import SessionState
+from kyc_platform.super_agent import TOOLS, SYSTEM_PROMPT as SA_PROMPT
 from kyc_platform import (
     registry_agent, ubo_pep_agent, reputational_agent,
     economic_profile_agent, risk_countries_agent,
     transaction_agent, final_valuation_agent,
 )
 
-# ── Page config ────────────────────────────────────────────────────
+# ── Page config ───────────────────────────────────────────────────
 st.set_page_config(
     page_title="AML IntelliGent | Bain & Company",
     page_icon="🔍",
@@ -27,131 +30,135 @@ st.set_page_config(
 
 RED = "#CC0000"
 
+# ── CSS — White Bain Theme ────────────────────────────────────────
 st.markdown(f"""
 <style>
-  /* ── Base ── */
-  .stApp, [data-testid="stAppViewContainer"] {{ background-color: #141414; color: #e0e0e0; }}
-  [data-testid="stHeader"] {{ background-color: #0a0a0a; border-bottom: 2px solid {RED}; }}
+  .stApp, [data-testid="stAppViewContainer"] {{
+    background-color: #ffffff; color: #1a1a1a;
+  }}
+  [data-testid="stHeader"] {{
+    background-color: #ffffff; border-bottom: 2px solid {RED};
+  }}
   section[data-testid="stSidebar"] {{ display: none !important; }}
   [data-testid="collapsedControl"] {{ display: none !important; }}
-
-  /* ── Typography ── */
-  h1, h2, h3, h4 {{ color: #ffffff !important; }}
-  label, p {{ color: #cccccc !important; }}
-
-  /* ── Inputs ── */
+  h1, h2, h3, h4 {{ color: #1a1a1a !important; }}
+  label, p {{ color: #333333 !important; }}
   .stTextInput input, .stNumberInput input {{
-    background-color: #1e1e1e !important; color: #e0e0e0 !important;
-    border: 1px solid #3a3a3a !important; border-radius: 3px !important;
+    background-color: #f9f9f9 !important; color: #1a1a1a !important;
+    border: 1px solid #d8d8d8 !important; border-radius: 3px !important;
   }}
   .stTextArea textarea {{
-    background-color: #1e1e1e !important; color: #e0e0e0 !important;
-    border: 1px solid #3a3a3a !important; border-radius: 3px !important;
+    background-color: #f9f9f9 !important; color: #1a1a1a !important;
+    border: 1px solid #d8d8d8 !important; border-radius: 3px !important;
     font-size: 0.83rem !important;
   }}
   .stSelectbox > div > div {{
-    background-color: #1e1e1e !important; color: #e0e0e0 !important;
-    border: 1px solid #3a3a3a !important;
+    background-color: #f9f9f9 !important; color: #1a1a1a !important;
+    border: 1px solid #d8d8d8 !important;
   }}
-
-  /* ── Buttons → Bain red ── */
   .stButton > button {{
-    background-color: {RED} !important; color: #fff !important;
+    background-color: {RED} !important; color: #ffffff !important;
     border: none !important; border-radius: 3px !important;
     font-weight: 600 !important; letter-spacing: 0.4px !important;
   }}
   .stButton > button:hover {{ background-color: #aa0000 !important; }}
-
-  /* ── Progress ── */
   .stProgress > div > div > div {{ background-color: {RED} !important; }}
-
-  /* ── Metric ── */
   [data-testid="metric-container"] {{
-    background-color: #1e1e1e; border: 1px solid #2a2a2a; border-radius: 4px; padding: 10px 14px;
+    background-color: #f5f5f5; border: 1px solid #e0e0e0;
+    border-radius: 4px; padding: 10px 14px;
   }}
-
-  /* ── Chat ── */
-  [data-testid="stChatMessage"] {{ background-color: #1e1e1e !important; }}
+  [data-testid="stChatMessage"] {{ background-color: #f5f5f5 !important; }}
   [data-testid="stChatInput"] textarea {{
-    background-color: #1e1e1e !important; color: #e0e0e0 !important;
-    border: 1px solid #3a3a3a !important;
+    background-color: #f9f9f9 !important; color: #1a1a1a !important;
+    border: 1px solid #d8d8d8 !important;
   }}
-
-  /* ── Expander ── */
-  details summary {{ color: #aaa !important; }}
-  details {{ background-color: #1a1a1a !important; border: 1px solid #2a2a2a !important; }}
-
-  /* ── Divider ── */
-  hr {{ border-color: #2a2a2a !important; margin: 0.6rem 0 !important; }}
-
-  /* ── Scrollbar ── */
+  details summary {{ color: #444 !important; }}
+  details {{ background-color: #f9f9f9 !important; border: 1px solid #e0e0e0 !important; }}
+  hr {{ border-color: #eeeeee !important; margin: 0.6rem 0 !important; }}
   ::-webkit-scrollbar {{ width: 5px; height: 5px; }}
-  ::-webkit-scrollbar-track {{ background: #141414; }}
-  ::-webkit-scrollbar-thumb {{ background: #3a3a3a; border-radius: 3px; }}
-
-  /* ── File uploader ── */
+  ::-webkit-scrollbar-track {{ background: #f5f5f5; }}
+  ::-webkit-scrollbar-thumb {{ background: #cccccc; border-radius: 3px; }}
   [data-testid="stFileUploader"] {{
-    background-color: #1e1e1e !important; border: 1px dashed #3a3a3a !important; border-radius: 4px;
+    background-color: #f9f9f9 !important;
+    border: 1px dashed #cccccc !important; border-radius: 4px;
   }}
+  .stRadio label {{ color: #333 !important; }}
 </style>
 """, unsafe_allow_html=True)
 
-# ── Section definitions ────────────────────────────────────────────
+# ── Constants ─────────────────────────────────────────────────────
 SECTIONS = [
     {"key": "registry",         "number": "01", "icon": "🏛",
      "label": "Registry & Corporate Structure",
-     "type": "agent",
      "desc": "Struttura societaria, catena proprietaria, modifiche recenti"},
     {"key": "ubo_pep",          "number": "02", "icon": "👤",
      "label": "UBO / PEP Screening",
-     "type": "agent",
-     "desc": "Beneficial owners, PEP, sanzioni OFAC / EU / UN"},
+     "desc": "Titolari effettivi, PEP, sanzioni OFAC / EU / UN"},
     {"key": "reputational",     "number": "03", "icon": "📰",
      "label": "Reputational Analysis",
-     "type": "agent",
-     "desc": "Adverse media, CONSOB, Banca d'Italia, watchlist"},
+     "desc": "Adverse media, precedenti giudiziari, watchlist — web search limitata (max 3)"},
     {"key": "economic_profile", "number": "04", "icon": "📊",
      "label": "Economic Profile",
-     "type": "agent",
      "desc": "Bilancio, EBITDA, coerenza profilo economico"},
     {"key": "risk_countries",   "number": "05", "icon": "🌍",
      "label": "Risk Countries",
-     "type": "agent",
      "desc": "Esposizione FATF, sanzioni, Corruption Perception Index"},
     {"key": "transaction",      "number": "06", "icon": "💳",
      "label": "Transaction Analysis",
-     "type": "manual",
-     "desc": "Analisi AML transazioni — richiede file Excel / CSV"},
+     "desc": "Analisi AML movimenti bancari — richiede file Excel / CSV"},
     {"key": "final_valuation",  "number": "07", "icon": "⚡",
      "label": "Final Valuation",
-     "type": "super",
-     "desc": "Parere finale — risk score, raccomandazione, piano d'azione"},
+     "desc": "Customer Risk Rating finale — sintetizza tutti gli agenti"},
 ]
 
-TOOL_TO_SECTION = {
-    "run_registry_agent":        "registry",
-    "run_ubo_pep_agent":         "ubo_pep",
-    "run_reputational_agent":    "reputational",
-    "run_economic_profile_agent":"economic_profile",
-    "run_risk_countries_agent":  "risk_countries",
-    "run_transaction_agent":     "transaction",
-    "run_final_valuation":       "final_valuation",
+SECTION_DOC_HINTS = {
+    "registry":         "Visura camerale, atto costitutivo, statuto, organigramma societario",
+    "ubo_pep":          "Dichiarazione UBO, documenti d'identità soci/amministratori, estratto Registro UBO",
+    "reputational":     "Sentenze, atti giudiziari, comunicati stampa, lista persone chiave con ruolo e nazionalità",
+    "economic_profile": "Bilancio, conto economico, nota integrativa (ultimi 3 anni), dichiarazioni fiscali, rating",
+    "risk_countries":   "Organigramma internazionale, contratti esteri, lista paesi di operatività e controparti",
+    "transaction":      "File Excel/CSV: data, controparte, IBAN, importo, valuta, causale (movimenti bancari)",
+    "final_valuation":  None,
 }
 
-# ── Session state ──────────────────────────────────────────────────
+TOOL_TO_SECTION = {
+    "run_registry_agent":         "registry",
+    "run_ubo_pep_agent":          "ubo_pep",
+    "run_reputational_agent":     "reputational",
+    "run_economic_profile_agent": "economic_profile",
+    "run_risk_countries_agent":   "risk_countries",
+    "run_transaction_agent":      "transaction",
+    "run_final_valuation":        "final_valuation",
+}
+
+RISK_COLORS = {
+    "LOW":      "#22aa55",
+    "MEDIUM":   "#f59e0b",
+    "HIGH":     "#ef4444",
+    "CRITICAL": "#7c3aed",
+    "BASSO":    "#22aa55",
+    "MEDIO":    "#f59e0b",
+    "MEDIO-ALTO": "#f97316",
+    "ALTO":     "#ef4444",
+    "CRITICO":  "#7c3aed",
+}
+
+# ── Session state ─────────────────────────────────────────────────
 DEFAULTS = {
-    "step": "setup",
-    "kyc_state": None,
-    "active_section": "registry",
-    "edited_content": {},
-    "agent_log": [],
-    "manual_inputs": {},
-    "excel_path": None,
-    "excel_name": None,
+    "step":          "setup",
+    "kyc_state":     None,
+    "active_section":"registry",
+    "edited_content":{},
+    "agent_log":     [],
+    "section_modes": {},
+    "section_docs":  {},
+    "section_doc_names": {},
+    "section_notes": {},
+    "excel_path":    None,
+    "excel_name":    None,
     "running_agent": None,
-    "sa_messages": [],
-    "sa_initialized": False,
-    "api_key": "",
+    "sa_messages":   [],
+    "sa_initialized":False,
 }
 for k, v in DEFAULTS.items():
     if k not in st.session_state:
@@ -159,12 +166,24 @@ for k, v in DEFAULTS.items():
 if st.session_state.kyc_state is None:
     st.session_state.kyc_state = SessionState()
 
+# Init section modes defaults
+for sec in SECTIONS:
+    if sec["key"] not in st.session_state.section_modes:
+        if sec["key"] == "final_valuation":
+            st.session_state.section_modes[sec["key"]] = "super"
+        else:
+            st.session_state.section_modes[sec["key"]] = "agent"
+
+
 # ── Helpers ───────────────────────────────────────────────────────
-def api_key():
-    return st.session_state.api_key or os.environ.get("ANTHROPIC_API_KEY", "")
+def get_api_key():
+    return (
+        os.environ.get("ANTHROPIC_API_KEY", "")
+        or st.secrets.get("ANTHROPIC_API_KEY", "")
+    )
 
 def get_client():
-    k = api_key()
+    k = get_api_key()
     return anthropic.Anthropic(api_key=k) if k else None
 
 def sec_status(key):
@@ -178,7 +197,8 @@ def get_content(key):
 
 def log(agent, msg, level="running"):
     st.session_state.agent_log.append(
-        {"ts": datetime.now().strftime("%H:%M:%S"), "agent": agent, "msg": msg, "level": level}
+        {"ts": datetime.now().strftime("%H:%M:%S"),
+         "agent": agent, "msg": msg, "level": level}
     )
 
 def progress():
@@ -197,36 +217,117 @@ def text_from(content):
         )
     return ""
 
-def run_section(key, client):
-    """Execute one section's agent."""
-    state = st.session_state.kyc_state
+def extract_text_from_file(uploaded_file) -> str:
+    """Extract text from PDF, DOCX, XLSX, CSV, TXT files."""
+    name = uploaded_file.name
+    ext = os.path.splitext(name)[1].lower()
+    data = uploaded_file.read()
+    try:
+        if ext == ".pdf":
+            import pypdf
+            reader = pypdf.PdfReader(io.BytesIO(data))
+            return "\n\n".join(
+                page.extract_text() or "" for page in reader.pages
+            ).strip()
+        elif ext == ".docx":
+            import docx as docxlib
+            doc = docxlib.Document(io.BytesIO(data))
+            return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+        elif ext in (".xlsx", ".xls"):
+            import pandas as pd
+            dfs = pd.read_excel(io.BytesIO(data), sheet_name=None)
+            lines = []
+            for sheet, df in dfs.items():
+                lines.append(f"[Foglio: {sheet}]")
+                lines.append(df.head(300).to_string(index=False))
+            return "\n\n".join(lines)
+        elif ext == ".csv":
+            import pandas as pd
+            df = pd.read_csv(io.BytesIO(data))
+            return df.head(300).to_string(index=False)
+        elif ext in (".txt", ".md"):
+            return data.decode("utf-8", errors="replace")
+        else:
+            return f"[Formato non supportato: {ext}]"
+    except Exception as e:
+        return f"[Errore lettura {name}: {e}]"
+
+def parse_json_result(text: str) -> dict | None:
+    """Try to extract and parse JSON from agent output."""
+    if not text:
+        return None
+    try:
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        if start >= 0 and end > start:
+            return json.loads(text[start:end])
+    except (json.JSONDecodeError, ValueError):
+        pass
+    return None
+
+def get_risk_color(level: str) -> str:
+    return RISK_COLORS.get(level.upper() if level else "", "#888888")
+
+def run_section(key, client, on_token=None):
+    """Execute one section's agent with document context."""
+    state   = st.session_state.kyc_state
     company = state.case.company_name
     country = state.case.country
-    manual = st.session_state.manual_inputs.get(key, "")
+
+    # Build context from uploaded docs + manual notes
+    docs_text  = st.session_state.section_docs.get(key, "")
+    notes_text = st.session_state.section_notes.get(key, "")
+    manual_ctx = ""
+    if docs_text:
+        manual_ctx += f"DOCUMENTI FORNITI:\n\n{docs_text}"
+        if notes_text:
+            manual_ctx += f"\n\nNOTE ANALISTA:\n{notes_text}"
+    elif notes_text:
+        manual_ctx = notes_text
+
+    # Disable web search when documents are provided (except reputational, handled inside agent)
+    use_web = not bool(docs_text)
+
     sec = next(s for s in SECTIONS if s["key"] == key)
     st.session_state.running_agent = key
-    log(sec["label"], "Avvio...")
+    mode = "documenti" if docs_text else "web search" if use_web else "dati forniti"
+    log(sec["label"], f"Avvio analisi ({mode})...")
+
     try:
         if key == "registry":
-            result = registry_agent.run(client, company, country, manual, show_output=False)
+            result = registry_agent.run(
+                client, company, country, manual_ctx,
+                show_output=False, on_token=on_token, use_web_search=use_web)
         elif key == "ubo_pep":
-            result = ubo_pep_agent.run(client, company, country, manual, show_output=False)
+            result = ubo_pep_agent.run(
+                client, company, country, manual_ctx,
+                show_output=False, on_token=on_token, use_web_search=use_web)
         elif key == "reputational":
-            result = reputational_agent.run(client, company, country, "", manual, show_output=False)
+            result = reputational_agent.run(
+                client, company, country, "", manual_ctx,
+                show_output=False, on_token=on_token, use_web_search=use_web)
         elif key == "economic_profile":
-            result = economic_profile_agent.run(client, company, country, manual, show_output=False)
+            result = economic_profile_agent.run(
+                client, company, country, manual_ctx,
+                show_output=False, on_token=on_token, use_web_search=use_web)
         elif key == "risk_countries":
-            result = risk_countries_agent.run(client, company, country, "", manual, show_output=False)
+            result = risk_countries_agent.run(
+                client, company, country, "", manual_ctx,
+                show_output=False, on_token=on_token, use_web_search=use_web)
         elif key == "transaction":
             path = st.session_state.excel_path or ""
             if not path:
-                raise ValueError("Nessun file Excel caricato — usa il pulsante Upload.")
-            result = transaction_agent.run(client, path, company, manual, show_output=False)
+                raise ValueError("Nessun file Excel/CSV caricato — carica il file nella sezione configurazione.")
+            result = transaction_agent.run(
+                client, path, company, manual_ctx,
+                show_output=False, on_token=on_token)
         elif key == "final_valuation":
             result = final_valuation_agent.run(
-                client, company, state.results, manual, show_output=False)
+                client, company, state.results, manual_ctx,
+                show_output=False, on_token=on_token)
         else:
             raise ValueError(f"Sezione sconosciuta: {key}")
+
         state.add_result(key, result)
         st.session_state.edited_content[key] = result
         log(sec["label"], "Completato ✓", "done")
@@ -236,62 +337,60 @@ def run_section(key, client):
     finally:
         st.session_state.running_agent = None
 
+
 # ── Header ────────────────────────────────────────────────────────
 def render_header():
     state = st.session_state.kyc_state
-    # Build header using columns to avoid nested f-string HTML issues
     h_left, h_right = st.columns([5, 1])
     with h_left:
-        brand = "**BAIN &amp; COMPANY** &nbsp;|&nbsp; AML IntelliGent Platform · KYC / CDD Module"
         if st.session_state.step == "analysis" and state.case.company_name:
             done, total = progress()
-            badge = f'<span style="background:{RED};color:white;font-size:0.7rem;padding:2px 8px;border-radius:10px;margin-left:10px;">{done}/{total}</span>'
+            badge_color = "#22aa55" if done == total else RED
             st.markdown(
-                f'<div style="padding:8px 0 12px;border-bottom:2px solid {RED};margin-bottom:16px;">'
-                f'<span style="font-size:1rem;font-weight:900;letter-spacing:3px;color:#fff;">BAIN &amp; COMPANY</span>'
-                f'<span style="color:#444;margin:0 12px;">|</span>'
-                f'<span style="font-size:0.82rem;color:#888;">AML IntelliGent Platform · KYC / CDD Module</span>'
-                f'<span style="color:#555;margin:0 10px;">|</span>'
-                f'<span style="color:#aaa;font-size:0.85rem;">{state.case.company_name}</span>'
-                f'<span style="color:#555;font-size:0.78rem;margin-left:8px;">{state.case.case_id}</span>'
-                f'{badge}</div>',
+                '<div style="padding:8px 0 12px;border-bottom:2px solid ' + RED + ';margin-bottom:16px;">'
+                '<span style="font-size:1rem;font-weight:900;letter-spacing:3px;color:#1a1a1a;">BAIN &amp; COMPANY</span>'
+                '<span style="color:#bbb;margin:0 12px;">|</span>'
+                '<span style="font-size:0.82rem;color:#666;">AML IntelliGent Platform · KYC / CDD Module</span>'
+                '<span style="color:#ddd;margin:0 10px;">|</span>'
+                '<span style="color:#1a1a1a;font-size:0.9rem;font-weight:600;">' + state.case.company_name + '</span>'
+                '<span style="color:#aaa;font-size:0.78rem;margin-left:8px;">' + state.case.case_id + '</span>'
+                '<span style="background:' + badge_color + ';color:white;font-size:0.68rem;'
+                'padding:2px 8px;border-radius:10px;margin-left:10px;">' + str(done) + '/' + str(total) + '</span>'
+                '</div>',
                 unsafe_allow_html=True,
             )
         else:
             st.markdown(
-                f'<div style="padding:8px 0 12px;border-bottom:2px solid {RED};margin-bottom:16px;">'
-                f'<span style="font-size:1rem;font-weight:900;letter-spacing:3px;color:#fff;">BAIN &amp; COMPANY</span>'
-                f'<span style="color:#444;margin:0 12px;">|</span>'
-                f'<span style="font-size:0.82rem;color:#888;">AML IntelliGent Platform · KYC / CDD Module</span>'
-                f'</div>',
+                '<div style="padding:8px 0 12px;border-bottom:2px solid ' + RED + ';margin-bottom:16px;">'
+                '<span style="font-size:1rem;font-weight:900;letter-spacing:3px;color:#1a1a1a;">BAIN &amp; COMPANY</span>'
+                '<span style="color:#bbb;margin:0 12px;">|</span>'
+                '<span style="font-size:0.82rem;color:#666;">AML IntelliGent Platform · KYC / CDD Module</span>'
+                '</div>',
                 unsafe_allow_html=True,
             )
     with h_right:
-        st.markdown('<div style="text-align:right;padding-top:8px;font-size:0.7rem;color:#444;">Claude Opus 4.6</div>',
-                    unsafe_allow_html=True)
+        st.markdown(
+            '<div style="text-align:right;padding-top:8px;font-size:0.7rem;color:#aaa;">claude-opus-4-6</div>',
+            unsafe_allow_html=True,
+        )
 
-# ── SETUP SCREEN ──────────────────────────────────────────────────
+# ── STEP 1: SETUP ─────────────────────────────────────────────────
 def render_setup():
     render_header()
     _, col, _ = st.columns([1, 2, 1])
     with col:
-        st.markdown("""
-        <div style="text-align:center; padding:24px 0 20px;">
-          <div style="font-size:1.8rem; font-weight:700; color:#fff;">New KYC / CDD Case</div>
-          <div style="color:#666; margin-top:6px; font-size:0.9rem;">
-            Inserisci i dati del cliente per avviare l'analisi
-          </div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(
+            '<div style="text-align:center;padding:24px 0 20px;">'
+            '<div style="font-size:1.8rem;font-weight:700;color:#1a1a1a;">Nuovo Caso KYC / CDD</div>'
+            '<div style="color:#888;margin-top:6px;font-size:0.9rem;">'
+            'Inserisci i dati del cliente per avviare l\'analisi</div></div>',
+            unsafe_allow_html=True,
+        )
 
-        key_val = st.text_input("Anthropic API Key", type="password",
-                                value=api_key(), placeholder="sk-ant-...")
-        if key_val:
-            st.session_state.api_key = key_val
+        if not get_api_key():
+            st.error("API Key Anthropic non trovata. Aggiungila nei Secrets di Streamlit Cloud: ANTHROPIC_API_KEY")
 
-        st.markdown("---")
         st.markdown("#### Informazioni Cliente")
-
         company = st.text_input("Ragione Sociale *", placeholder="es. Meridian Capital S.r.l.")
         c1, c2 = st.columns(2)
         with c1:
@@ -300,194 +399,471 @@ def render_setup():
             sector = st.text_input("Settore", placeholder="es. Wealth Management")
         c3, c4 = st.columns(2)
         with c3:
-            case_id = st.text_input("Case ID", placeholder="es. AV-2026-0341")
+            case_id = st.text_input("Case ID", placeholder="es. AML-2026-0341")
         with c4:
-            review = st.selectbox("Tipo di Review", [
-                "Customer Due Diligence (CDD)",
-                "Enhanced Due Diligence (EDD)",
-                "Know Your Customer (KYC)",
-                "Periodic Review",
-            ])
+            analyst = st.text_input("Analista", placeholder="es. M. Rossi")
 
         st.markdown("---")
-        if st.button("▶  Avvia Analisi", use_container_width=True):
+        if st.button("Continua →  Configura Sezioni", use_container_width=True):
             if not company.strip() or not country.strip():
                 st.error("Ragione Sociale e Paese sono obbligatori.")
-            elif not api_key():
-                st.error("Inserisci la Anthropic API Key.")
+            elif not get_api_key():
+                st.error("Configura ANTHROPIC_API_KEY nei Secrets prima di procedere.")
             else:
                 s = st.session_state.kyc_state
                 s.case.company_name = company.strip()
-                s.case.country = country.strip()
-                s.case.sector = sector.strip()
-                s.case.case_id = case_id.strip() or f"KYC-{datetime.now().strftime('%Y%m%d-%H%M')}"
+                s.case.country      = country.strip()
+                s.case.sector       = sector.strip()
+                s.case.case_id      = case_id.strip() or f"AML-{datetime.now().strftime('%Y%m%d-%H%M')}"
                 log("Sistema", f"Caso aperto: {company} ({country})", "super")
+                st.session_state.step = "section_config"
+                st.rerun()
+
+
+# ── STEP 2: SECTION CONFIG ────────────────────────────────────────
+def render_section_config():
+    render_header()
+    state = st.session_state.kyc_state
+
+    _, col, _ = st.columns([0.3, 3, 0.3])
+    with col:
+        st.markdown(
+            '<div style="padding:8px 0 4px;">'
+            '<div style="font-size:1.3rem;font-weight:700;color:#1a1a1a;">Configura Sezioni di Analisi</div>'
+            '<div style="color:#888;font-size:0.85rem;margin-top:4px;">'
+            'Per ogni sezione: scegli la modalità, carica i documenti e aggiungi note. '
+            'Caricare documenti disabilita la ricerca web (risparmio token).</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown("---")
+
+        for sec in SECTIONS:
+            key  = sec["key"]
+            hint = SECTION_DOC_HINTS.get(key)
+
+            # Card container
+            st.markdown(
+                '<div style="background:#f8f8f8;border:1px solid #e8e8e8;'
+                'border-left:3px solid ' + RED + ';border-radius:4px;'
+                'padding:14px 18px;margin-bottom:12px;">'
+                '<span style="font-size:1.1rem;">' + sec["icon"] + '</span>'
+                '<span style="color:' + RED + ';font-size:0.7rem;font-weight:700;'
+                'margin-left:8px;">' + sec["number"] + '</span>'
+                '<span style="font-size:0.95rem;font-weight:600;color:#1a1a1a;'
+                'margin-left:8px;">' + sec["label"] + '</span>'
+                '<div style="color:#888;font-size:0.78rem;margin-top:3px;margin-left:28px;">'
+                + sec["desc"] + '</div></div>',
+                unsafe_allow_html=True,
+            )
+
+            if key == "final_valuation":
+                st.markdown(
+                    '<div style="margin-left:28px;margin-bottom:12px;'
+                    'font-size:0.82rem;color:#888;">'
+                    '⚡ Modalità fissa: sintetizza automaticamente i risultati degli altri agenti.</div>',
+                    unsafe_allow_html=True,
+                )
+                # Optional notes for final valuation
+                notes = st.text_area(
+                    "Note aggiuntive (opzionale)",
+                    value=st.session_state.section_notes.get(key, ""),
+                    height=60,
+                    key=f"cfg_notes_{key}",
+                    placeholder="Istruzioni particolari per la valutazione finale...",
+                )
+                st.session_state.section_notes[key] = notes
+                st.markdown("---")
+                continue
+
+            # Mode toggle
+            col_mode, col_info = st.columns([2, 3])
+            with col_mode:
+                current_mode = st.session_state.section_modes.get(key, "agent")
+                mode_idx = 0 if current_mode == "agent" else 1
+                mode = st.radio(
+                    "Modalità",
+                    ["🤖  Agente", "✍️  Manuale"],
+                    index=mode_idx,
+                    key=f"cfg_mode_{key}",
+                    horizontal=True,
+                )
+                st.session_state.section_modes[key] = "agent" if "Agente" in mode else "manual"
+
+            with col_info:
+                if st.session_state.section_modes[key] == "agent":
+                    already_loaded = st.session_state.section_doc_names.get(key, [])
+                    if already_loaded:
+                        st.success("✓ " + ", ".join(already_loaded))
+                    else:
+                        st.caption("Carica documenti o l'agente userà web search (solo Reputational)")
+                else:
+                    st.info("✍️ Inserisci i risultati manualmente nella pagina di analisi")
+
+            # Document upload (only for agent mode, or always show for convenience)
+            if hint and st.session_state.section_modes[key] == "agent":
+                st.markdown(
+                    '<div style="font-size:0.75rem;color:#666;margin:6px 0 4px;">'
+                    '📎 <b>Documenti suggeriti:</b> ' + hint + '</div>',
+                    unsafe_allow_html=True,
+                )
+
+                # Special handling for transaction: need Excel
+                if key == "transaction":
+                    uploaded = st.file_uploader(
+                        f"Carica file transazioni (Excel / CSV) *",
+                        type=["xlsx", "xls", "csv"],
+                        key=f"cfg_upload_{key}",
+                        label_visibility="collapsed",
+                    )
+                    if uploaded:
+                        suffix = os.path.splitext(uploaded.name)[1]
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
+                            f.write(uploaded.read())
+                            st.session_state.excel_path = f.name
+                            st.session_state.excel_name = uploaded.name
+                        st.session_state.section_doc_names[key] = [uploaded.name]
+                        st.success(f"✓ {uploaded.name}")
+                    elif st.session_state.excel_name:
+                        st.caption(f"📄 File caricato: {st.session_state.excel_name}")
+                else:
+                    uploaded_files = st.file_uploader(
+                        f"Carica documenti per {sec['label']}",
+                        type=["pdf", "docx", "xlsx", "xls", "csv", "txt", "md"],
+                        accept_multiple_files=True,
+                        key=f"cfg_upload_{key}",
+                        label_visibility="collapsed",
+                    )
+                    if uploaded_files:
+                        texts = []
+                        names = []
+                        for f in uploaded_files:
+                            extracted = extract_text_from_file(f)
+                            texts.append(f"=== {f.name} ===\n{extracted}")
+                            names.append(f.name)
+                        st.session_state.section_docs[key]      = "\n\n".join(texts)
+                        st.session_state.section_doc_names[key] = names
+                        total_chars = sum(len(t) for t in texts)
+                        st.success(f"✓ {len(texts)} file caricati ({total_chars:,} caratteri estratti)")
+                    elif st.session_state.section_doc_names.get(key):
+                        st.caption("📄 " + ", ".join(st.session_state.section_doc_names[key]))
+
+            # Manual notes
+            notes = st.text_area(
+                "Note aggiuntive (opzionale)",
+                value=st.session_state.section_notes.get(key, ""),
+                height=60,
+                key=f"cfg_notes_{key}",
+                placeholder="Aggiungi contesto, istruzioni o dati supplementari per questo agente...",
+            )
+            st.session_state.section_notes[key] = notes
+            st.markdown("---")
+
+        # Summary
+        agent_count  = sum(1 for s in SECTIONS if st.session_state.section_modes.get(s["key"]) == "agent")
+        manual_count = sum(1 for s in SECTIONS if st.session_state.section_modes.get(s["key"]) == "manual")
+        docs_count   = sum(1 for s in SECTIONS if st.session_state.section_docs.get(s["key"]) or
+                          (s["key"] == "transaction" and st.session_state.excel_path))
+
+        st.markdown(
+            '<div style="background:#fff5f5;border:1px solid #fecaca;border-radius:4px;'
+            'padding:12px 16px;margin-bottom:16px;">'
+            '<b>Riepilogo configurazione:</b> '
+            + str(agent_count) + ' sezioni con agente · '
+            + str(manual_count) + ' manuali · '
+            + str(docs_count) + ' con documenti caricati'
+            + '</div>',
+            unsafe_allow_html=True,
+        )
+
+        col_back, col_fwd = st.columns([1, 3])
+        with col_back:
+            if st.button("← Indietro", use_container_width=True, key="cfg_back"):
+                st.session_state.step = "setup"
+                st.rerun()
+        with col_fwd:
+            if st.button("▶  Avvia Analisi", use_container_width=True, key="cfg_start"):
                 st.session_state.step = "analysis"
                 st.rerun()
 
+
 # ── LEFT PANEL ────────────────────────────────────────────────────
 def render_left():
-    st.markdown(f"""
-    <div style="font-size:0.65rem; letter-spacing:2px; color:{RED};
-                font-weight:700; margin-bottom:10px;">SEZIONI ANALISI</div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        '<div style="font-size:0.65rem;letter-spacing:2px;color:' + RED + ';'
+        'font-weight:700;margin-bottom:10px;">SEZIONI ANALISI</div>',
+        unsafe_allow_html=True,
+    )
 
     for sec in SECTIONS:
-        key   = sec["key"]
-        status = sec_status(key)
-        active = st.session_state.active_section == key
+        key     = sec["key"]
+        status  = sec_status(key)
+        active  = st.session_state.active_section == key
         running = st.session_state.running_agent == key
+        mode    = st.session_state.section_modes.get(key, "agent")
+
+        # Parse JSON to get risk level
+        content = get_content(key)
+        parsed  = parse_json_result(content)
+        risk_level = parsed.get("rischioComplessivo") if parsed else None
 
         if running:
-            icon, color = "⏳", "#ffaa44"
+            icon, color = "⏳", "#f59e0b"
         elif status == "completed":
-            icon, color = "✅", "#00cc55"
-        elif sec["type"] == "manual":
-            icon, color = "📋", "#4499ff"
-        elif sec["type"] == "super":
+            rc = get_risk_color(risk_level) if risk_level else "#22aa55"
+            icon, color = "●", rc
+        elif mode == "manual":
+            icon, color = "✍", "#6b7280"
+        elif mode == "super":
             icon, color = "⚡", RED
         else:
-            icon, color = "○", "#555"
+            icon, color = "○", "#cccccc"
 
-        border = RED if active else ("#00cc55" if status == "completed" else "#2a2a2a")
-        bg     = "#222" if active else "#1a1a1a"
-        lbl_c  = "#fff" if active else "#bbb"
+        border = RED if active else ("#e8e8e8" if status != "completed" else get_risk_color(risk_level or ""))
+        bg     = "#fff5f5" if active else ("#f8f8f8" if status == "completed" else "#ffffff")
+        lbl_c  = "#1a1a1a" if active else ("#333" if status == "completed" else "#888")
 
-        st.markdown(f"""
-        <div style="padding:8px 10px; margin:3px 0; border-radius:3px;
-                    border-left:3px solid {border}; background:{bg};">
-          <span style="color:{color}; margin-right:6px;">{icon}</span>
-          <span style="color:#555; font-size:0.68rem; margin-right:6px;">{sec['number']}</span>
-          <span style="font-size:0.78rem; color:{lbl_c};">{sec['label']}</span>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(
+            '<div style="padding:8px 10px;margin:2px 0;border-radius:3px;'
+            'border-left:3px solid ' + border + ';background:' + bg + ';">'
+            '<span style="color:' + color + ';margin-right:6px;font-size:0.75rem;">' + icon + '</span>'
+            '<span style="color:#bbb;font-size:0.65rem;margin-right:6px;">' + sec["number"] + '</span>'
+            '<span style="font-size:0.78rem;color:' + lbl_c + ';">' + sec["label"] + '</span>'
+            + (('<br><span style="font-size:0.62rem;color:' + get_risk_color(risk_level) + ';margin-left:22px;">'
+                + risk_level + '</span>') if risk_level and status == "completed" else "")
+            + '</div>',
+            unsafe_allow_html=True,
+        )
 
-        if st.button("→", key=f"nav_{key}", help=sec["desc"],
-                     use_container_width=True):
+        if st.button("→", key=f"nav_{key}", help=sec["desc"], use_container_width=True):
             st.session_state.active_section = key
             st.rerun()
 
     done, total = progress()
     st.markdown("---")
-    st.progress(done / total, text=f"{done} / {total} completate")
+    st.progress(done / total, text=f"{done} / {total} sezioni completate")
+
+    if st.button("⚙ Riconfigura", key="reconfig", use_container_width=True):
+        st.session_state.step = "section_config"
+        st.rerun()
+
 
 # ── CENTER PANEL ──────────────────────────────────────────────────
-def render_center():
-    client = get_client()
-    state  = st.session_state.kyc_state
-    key    = st.session_state.active_section
-    sec    = next(s for s in SECTIONS if s["key"] == key)
-    status = sec_status(key)
-    content = get_content(key)
+def render_json_result(key: str, parsed: dict):
+    """Display structured JSON result from an agent."""
+    risk = parsed.get("rischioComplessivo", "")
+    narrativa = parsed.get("narrativa") or parsed.get("narrativaCompleta") or parsed.get("sintesiEsecutiva", "")
+    flags = parsed.get("flags", [])
 
-    # Header
+    # Risk badge
+    if risk:
+        rc = get_risk_color(risk)
+        st.markdown(
+            '<span style="background:' + rc + ';color:white;font-size:0.75rem;'
+            'font-weight:700;padding:3px 12px;border-radius:12px;">'
+            'RISCHIO: ' + risk + '</span>',
+            unsafe_allow_html=True,
+        )
+        st.markdown("")
+
+    # Narrative
+    if narrativa:
+        st.markdown(
+            '<div style="background:#f8f8f8;border-left:3px solid ' + RED + ';'
+            'padding:12px 16px;border-radius:3px;font-size:0.88rem;line-height:1.6;">'
+            + narrativa.replace("\n", "<br>") + '</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown("")
+
+    # Flags
+    if flags:
+        st.markdown(
+            '<div style="font-size:0.65rem;letter-spacing:1px;font-weight:700;'
+            'color:' + RED + ';margin-bottom:6px;">FLAG RILEVATI</div>',
+            unsafe_allow_html=True,
+        )
+        for f in flags:
+            frc = get_risk_color(f.get("rischio", ""))
+            tipo = f.get("tipo", "")
+            desc = f.get("descrizione", "")
+            norm = f.get("riferimentoNormativo", "") or f.get("indicatoreUIF", "")
+            st.markdown(
+                '<div style="background:#fff;border:1px solid #e8e8e8;'
+                'border-left:3px solid ' + frc + ';border-radius:3px;'
+                'padding:7px 10px;margin-bottom:5px;font-size:0.8rem;">'
+                '<span style="font-weight:600;">' + tipo + '</span>'
+                + (' — ' + desc if desc else '')
+                + ('<span style="color:#aaa;font-size:0.72rem;margin-left:8px;">' + norm + '</span>' if norm else '')
+                + '</div>',
+                unsafe_allow_html=True,
+            )
+        st.markdown("")
+
+    # Section-specific structured data
+    with st.expander("📋 Dati strutturati (JSON completo)", expanded=False):
+        st.json(parsed)
+
+
+def render_center():
+    client  = get_client()
+    state   = st.session_state.kyc_state
+    key     = st.session_state.active_section
+    sec     = next(s for s in SECTIONS if s["key"] == key)
+    mode    = st.session_state.section_modes.get(key, "agent")
+    status  = sec_status(key)
+    content = get_content(key)
+    parsed  = parse_json_result(content)
+
+    # Section header
     c_title, c_badge = st.columns([3, 1])
     with c_title:
-        st.markdown(f"""
-        <div>
-          <span style="color:{RED}; font-size:0.72rem; font-weight:700;
-                       letter-spacing:1px;">{sec['number']}</span>
-          <span style="font-size:1.2rem; font-weight:700; color:#fff;
-                       margin-left:10px;">{sec['icon']} {sec['label']}</span>
-        </div>
-        <div style="color:#666; font-size:0.8rem; margin-top:3px;">{sec['desc']}</div>
-        """, unsafe_allow_html=True)
+        st.markdown(
+            '<div><span style="color:' + RED + ';font-size:0.72rem;font-weight:700;'
+            'letter-spacing:1px;">' + sec["number"] + '</span>'
+            '<span style="font-size:1.1rem;font-weight:700;color:#1a1a1a;margin-left:10px;">'
+            + sec["icon"] + " " + sec["label"] + '</span></div>'
+            '<div style="color:#888;font-size:0.78rem;margin-top:3px;">' + sec["desc"] + '</div>',
+            unsafe_allow_html=True,
+        )
     with c_badge:
         if status == "completed":
-            st.success("✓ Completata")
-        elif sec["type"] == "manual":
-            st.info("📋 Input manuale")
-        elif sec["type"] == "super":
+            risk = (parsed.get("rischioComplessivo") if parsed else None)
+            if risk:
+                rc = get_risk_color(risk)
+                st.markdown(
+                    '<div style="text-align:right;padding-top:6px;">'
+                    '<span style="background:' + rc + ';color:white;font-size:0.72rem;'
+                    'font-weight:700;padding:3px 10px;border-radius:10px;">' + risk + '</span></div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.success("✓ Completata")
+        elif mode == "manual":
+            st.info("✍ Manuale")
+        elif mode == "super":
             st.warning("⚡ Super Agent")
         else:
             st.caption("○ Da eseguire")
 
     st.markdown("---")
 
-    # Manual context
-    if key != "final_valuation":
-        with st.expander("📝 Contesto manuale (opzionale)"):
-            manual = st.text_area(
-                "note",
-                value=st.session_state.manual_inputs.get(key, ""),
-                height=90,
-                key=f"manual_{key}",
-                label_visibility="collapsed",
-                placeholder="Inserisci dati aggiuntivi, documenti o note per l'agente...",
-            )
-            st.session_state.manual_inputs[key] = manual
+    # ── MANUAL MODE ──────────────────────────────────────────────
+    if mode == "manual":
+        st.markdown(
+            '<div style="font-size:0.78rem;color:#666;margin-bottom:8px;">'
+            '✍️ Sezione in modalità manuale — inserisci direttamente i risultati dell\'analisi.</div>',
+            unsafe_allow_html=True,
+        )
+        edited = st.text_area(
+            "Risultati",
+            value=content,
+            height=450,
+            key=f"manual_edit_{key}",
+            label_visibility="collapsed",
+            placeholder="Inserisci qui i risultati dell'analisi manuale...",
+        )
+        if st.button("💾 Salva risultati", key=f"save_manual_{key}"):
+            st.session_state.edited_content[key] = edited
+            state.add_result(key, edited)
+            st.success("Salvato ✓")
+            st.rerun()
+        return
 
-    # File upload for transaction
-    if key == "transaction":
-        st.markdown("#### 📁 File Transazioni")
-        uploaded = st.file_uploader("Excel / CSV", type=["xlsx", "xls", "csv"],
-                                    key="tx_upload", label_visibility="collapsed")
-        if uploaded:
-            suffix = os.path.splitext(uploaded.name)[1]
-            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
-                f.write(uploaded.read())
-                st.session_state.excel_path = f.name
-                st.session_state.excel_name = uploaded.name
-            st.success(f"✓ {uploaded.name}")
-        elif st.session_state.excel_name:
-            st.info(f"📄 {st.session_state.excel_name}")
+    # ── AGENT / SUPER MODE ────────────────────────────────────────
+    # Show loaded docs info
+    doc_names = st.session_state.section_doc_names.get(key, [])
+    if key == "transaction" and st.session_state.excel_name:
+        doc_names = [st.session_state.excel_name]
+
+    if doc_names:
+        st.markdown(
+            '<div style="font-size:0.75rem;color:#22aa55;margin-bottom:8px;">'
+            '📎 Documenti: ' + " · ".join(doc_names) + '</div>',
+            unsafe_allow_html=True,
+        )
+    elif key != "final_valuation":
+        web_note = " (max 3 ricerche)" if key == "reputational" else " — nessun documento caricato"
+        st.markdown(
+            '<div style="font-size:0.75rem;color:#f59e0b;margin-bottom:8px;">'
+            '⚠️ Web search abilitata' + web_note + '</div>',
+            unsafe_allow_html=True,
+        )
 
     # Action buttons
-    b1, b2, _ = st.columns([1, 1, 3])
     label_map = {
-        "agent":  "▶ Esegui Agente",
-        "manual": "▶ Analizza File",
-        "super":  "⚡ Genera Valutazione Finale",
+        "agent": "▶  Esegui Agente",
+        "super": "⚡  Genera Valutazione Finale",
     }
+    b1, b2, _ = st.columns([1, 1, 2])
     with b1:
-        if st.button(label_map[sec["type"]], key=f"run_{key}",
-                     use_container_width=True):
-            if not client:
-                st.error("API Key non configurata.")
-            else:
-                try:
-                    with st.spinner(f"{sec['label']} in esecuzione..."):
-                        run_section(key, client)
-                except Exception as e:
-                    st.error(str(e))
-                st.rerun()
+        run_btn = st.button(label_map.get(mode, "▶ Esegui"),
+                            key=f"run_{key}", use_container_width=True)
     with b2:
+        rerun_btn = False
         if status == "completed":
-            if st.button("🔄 Ri-esegui", key=f"rerun_{key}", use_container_width=True):
-                if client:
-                    try:
-                        with st.spinner("Ri-esecuzione..."):
-                            run_section(key, client)
-                    except Exception as e:
-                        st.error(str(e))
-                    st.rerun()
+            rerun_btn = st.button("🔄 Ri-esegui", key=f"rerun_{key}", use_container_width=True)
+
+    # Execute agent with live streaming
+    if (run_btn or rerun_btn) and client:
+        st.markdown(
+            '<div style="font-size:0.8rem;font-weight:600;color:' + RED + ';margin:8px 0;">'
+            '⏳ Agente in elaborazione...</div>',
+            unsafe_allow_html=True,
+        )
+        stream_area = st.empty()
+        buf = {"text": ""}
+
+        def on_token(chunk):
+            buf["text"] += chunk
+            display = buf["text"][-4000:] if len(buf["text"]) > 4000 else buf["text"]
+            stream_area.markdown(
+                '<div style="font-family:monospace;font-size:0.75rem;'
+                'white-space:pre-wrap;background:#f5f5f5;border:1px solid #e8e8e8;'
+                'border-radius:4px;padding:12px;max-height:400px;overflow-y:auto;">'
+                + display.replace("<", "&lt;").replace(">", "&gt;")
+                + '</div>',
+                unsafe_allow_html=True,
+            )
+
+        try:
+            run_section(key, client, on_token=on_token)
+        except Exception as e:
+            st.error(str(e))
+        st.rerun()
+    elif (run_btn or rerun_btn) and not client:
+        st.error("API Key Anthropic non configurata nei Secrets.")
 
     st.markdown("---")
 
-    # Content area
+    # ── RESULT DISPLAY ────────────────────────────────────────────
     if content:
-        st.markdown(f"""
-        <div style="font-size:0.65rem; letter-spacing:1px; color:{RED};
-                    font-weight:700; margin-bottom:6px;">RISULTATO — MODIFICABILE</div>
-        """, unsafe_allow_html=True)
-        edited = st.text_area("result", value=content, height=460,
-                              key=f"edit_{key}", label_visibility="collapsed")
-        if edited != content:
-            st.session_state.edited_content[key] = edited
-            state.add_result(key, edited)
+        if parsed:
+            render_json_result(key, parsed)
+        else:
+            st.markdown(
+                '<div style="font-size:0.65rem;letter-spacing:1px;color:' + RED + ';'
+                'font-weight:700;margin-bottom:6px;">RISULTATO</div>',
+                unsafe_allow_html=True,
+            )
+            # Editable text fallback
+            edited = st.text_area("result", value=content, height=400,
+                                  key=f"edit_{key}", label_visibility="collapsed")
+            if edited != content:
+                st.session_state.edited_content[key] = edited
+                state.add_result(key, edited)
     else:
-        type_desc = {"agent": "automatica via web search",
-                     "manual": "richiede upload file Excel/CSV",
-                     "super": "sintesi di tutte le sezioni"}
-        st.markdown(f"""
-        <div style="text-align:center; padding:70px 0; color:#333;">
-          <div style="font-size:3rem;">{sec['icon']}</div>
-          <div style="color:#555; margin-top:12px;">Sezione non eseguita</div>
-          <div style="color:#3a3a3a; font-size:0.78rem; margin-top:6px;">
-            Analisi {type_desc.get(sec['type'], '')}
-          </div>
-        </div>
-        """, unsafe_allow_html=True)
+        type_desc = {"agent": "carica documenti o usa web search",
+                     "super": "sintetizza tutti gli agenti completati"}
+        st.markdown(
+            '<div style="text-align:center;padding:60px 0;color:#ccc;">'
+            '<div style="font-size:3rem;">' + sec["icon"] + '</div>'
+            '<div style="color:#aaa;margin-top:12px;">Sezione non ancora eseguita</div>'
+            '<div style="color:#ccc;font-size:0.78rem;margin-top:6px;">'
+            + type_desc.get(mode, "") + '</div></div>',
+            unsafe_allow_html=True,
+        )
+
 
 # ── RIGHT PANEL ───────────────────────────────────────────────────
 def render_right():
@@ -496,92 +872,106 @@ def render_right():
     done, total = progress()
 
     # Case card
-    st.markdown(f"""
-    <div style="background:#1a1a1a; border-left:3px solid {RED}; border-radius:3px;
-                padding:10px 12px; margin-bottom:12px;">
-      <div style="font-size:0.65rem; color:{RED}; font-weight:700; letter-spacing:1px;">CLIENTE</div>
-      <div style="font-weight:700; color:#fff; font-size:0.95rem;">{state.case.company_name}</div>
-      <div style="color:#888; font-size:0.8rem;">{state.case.country}
-        {f'&nbsp;·&nbsp;<span style="color:#555;">{state.case.case_id}</span>'
-         if state.case.case_id else ''}
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        '<div style="background:#f8f8f8;border-left:3px solid ' + RED + ';'
+        'border-radius:3px;padding:10px 12px;margin-bottom:12px;">'
+        '<div style="font-size:0.65rem;color:' + RED + ';font-weight:700;letter-spacing:1px;">CLIENTE</div>'
+        '<div style="font-weight:700;color:#1a1a1a;font-size:0.95rem;">' + state.case.company_name + '</div>'
+        '<div style="color:#888;font-size:0.78rem;">' + state.case.country
+        + (' &nbsp;·&nbsp; <span style="color:#aaa;">' + state.case.case_id + '</span>'
+           if state.case.case_id else '') + '</div></div>',
+        unsafe_allow_html=True,
+    )
 
     st.progress(done / total, text=f"Progresso: {done}/{total}")
 
-    # Run all button
+    # Final Valuation score if available
+    fv_content = get_content("final_valuation")
+    fv_parsed  = parse_json_result(fv_content)
+    if fv_parsed:
+        crr = fv_parsed.get("customerRiskRating", "")
+        score = fv_parsed.get("scoreFinale", "")
+        if crr:
+            rc = get_risk_color(crr)
+            st.markdown(
+                '<div style="background:' + rc + '15;border:2px solid ' + rc + ';'
+                'border-radius:4px;padding:10px 14px;margin:8px 0;text-align:center;">'
+                '<div style="font-size:0.65rem;font-weight:700;color:#666;letter-spacing:1px;">CUSTOMER RISK RATING</div>'
+                '<div style="font-size:1.4rem;font-weight:900;color:' + rc + ';">' + crr + '</div>'
+                + ('<div style="font-size:0.75rem;color:#888;">Score: ' + str(score) + '/5</div>' if score else '')
+                + '</div>',
+                unsafe_allow_html=True,
+            )
+
+    # Run all agent sections
     if st.button("▶▶  Esegui Tutti gli Agenti", use_container_width=True, key="run_all"):
         if not client:
             st.error("API Key non configurata.")
         else:
-            auto = [s for s in SECTIONS if s["type"] == "agent"]
-            bar  = st.progress(0, text="Avvio...")
-            for i, sec in enumerate(auto):
-                bar.progress((i) / len(auto), text=f"{sec['label']}...")
+            auto = [s for s in SECTIONS
+                    if st.session_state.section_modes.get(s["key"]) == "agent"
+                    and s["key"] != "final_valuation"]
+            bar = st.progress(0, text="Avvio...")
+            for i, s in enumerate(auto):
+                bar.progress(i / len(auto), text=f"{s['label']}...")
                 try:
-                    run_section(sec["key"], client)
+                    run_section(s["key"], client)
                 except Exception as e:
-                    st.error(f"{sec['label']}: {e}")
+                    st.error(f"{s['label']}: {e}")
             bar.progress(1.0, text="Completato ✓")
             st.rerun()
 
     st.markdown("---")
 
     # Agent log
-    st.markdown(f"""
-    <div style="font-size:0.65rem; letter-spacing:2px; color:{RED};
-                font-weight:700; margin-bottom:6px;">ATTIVITÀ AGENTI</div>
-    """, unsafe_allow_html=True)
-
-    level_colors = {"running": "#66cc66", "done": "#4488ff",
-                    "error": "#ff5555", "super": "#ffaa44"}
-    log_box = st.container(height=200)
+    st.markdown(
+        '<div style="font-size:0.65rem;letter-spacing:2px;color:' + RED + ';'
+        'font-weight:700;margin-bottom:6px;">ATTIVITÀ AGENTI</div>',
+        unsafe_allow_html=True,
+    )
+    level_colors = {"running": "#f59e0b", "done": "#22aa55", "error": "#ef4444", "super": RED}
+    log_box = st.container(height=180)
     with log_box:
         if not st.session_state.agent_log:
             st.caption("Nessuna attività.")
         for entry in reversed(st.session_state.agent_log[-40:]):
             c = level_colors.get(entry["level"], "#888")
             st.markdown(
-                f'<div style="font-size:0.7rem; font-family:monospace; color:{c}; '
-                f'padding:1px 0;">'
-                f'<span style="color:#444;">{entry["ts"]}</span> '
-                f'<b>{entry["agent"]}</b> — {entry["msg"]}</div>',
+                '<div style="font-size:0.68rem;font-family:monospace;color:' + c + ';padding:1px 0;">'
+                '<span style="color:#bbb;">' + entry["ts"] + '</span>'
+                ' <b>' + entry["agent"] + '</b> — ' + entry["msg"] + '</div>',
                 unsafe_allow_html=True,
             )
 
     st.markdown("---")
 
     # Super Agent
-    st.markdown(f"""
-    <div style="font-size:0.65rem; letter-spacing:2px; color:{RED};
-                font-weight:700; margin-bottom:6px;">⚡ SUPER AGENT</div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        '<div style="font-size:0.65rem;letter-spacing:2px;color:' + RED + ';'
+        'font-weight:700;margin-bottom:6px;">⚡ SUPER AGENT</div>',
+        unsafe_allow_html=True,
+    )
 
-    # Init Super Agent intro
     if not st.session_state.sa_initialized and client:
         try:
             bootstrap = {
                 "role": "user",
                 "content": (
                     f"Il caso è aperto per {state.case.company_name} ({state.case.country}). "
-                    "Presentati in 2 righe come Super Agent e indica che sei pronto."
+                    "Presentati brevemente come Super Agent AML e indica che sei pronto."
                 ),
             }
             resp = client.messages.create(
-                model="claude-opus-4-6", max_tokens=200, system=SYSTEM_PROMPT,
+                model="claude-opus-4-6", max_tokens=200, system=SA_PROMPT,
                 messages=[bootstrap],
             )
             intro = text_from(resp.content)
-            st.session_state.sa_messages = [
-                bootstrap, {"role": "assistant", "content": intro}
-            ]
+            st.session_state.sa_messages   = [bootstrap, {"role": "assistant", "content": intro}]
             st.session_state.sa_initialized = True
             log("Super Agent", "Online", "super")
         except Exception as e:
             st.caption(f"Super Agent offline: {e}")
 
-    # Chat display
     chat_box = st.container(height=180)
     with chat_box:
         for msg in st.session_state.sa_messages[-8:]:
@@ -592,9 +982,8 @@ def render_right():
             txt = text_from(content) if isinstance(content, list) else (content or "")
             if txt.strip():
                 with st.chat_message(role, avatar="⚡" if role == "assistant" else "👤"):
-                    st.caption(txt[:280] + ("…" if len(txt) > 280 else ""))
+                    st.caption(txt[:300] + ("…" if len(txt) > 300 else ""))
 
-    # Chat input
     if user_msg := st.chat_input("Chiedi al Super Agent...", key="sa_input"):
         if not client:
             st.error("API Key non configurata.")
@@ -602,12 +991,11 @@ def render_right():
             st.session_state.sa_messages.append({"role": "user", "content": user_msg})
             log("Super Agent", f"← {user_msg[:50]}", "super")
 
-            # Agentic loop
             while True:
                 try:
                     resp = client.messages.create(
                         model="claude-opus-4-6", max_tokens=2000,
-                        thinking={"type": "adaptive"}, system=SYSTEM_PROMPT,
+                        thinking={"type": "adaptive"}, system=SA_PROMPT,
                         tools=TOOLS, messages=st.session_state.sa_messages,
                     )
                 except Exception as e:
@@ -638,20 +1026,18 @@ def render_right():
                             "tool_use_id": block.id,
                             "content": result_txt,
                         })
-                    st.session_state.sa_messages.append(
-                        {"role": "user", "content": tool_results}
-                    )
+                    st.session_state.sa_messages.append({"role": "user", "content": tool_results})
                     continue
                 else:
                     log("Super Agent", "→ risposta inviata", "super")
                     break
-
             st.rerun()
+
 
 # ── ANALYSIS DASHBOARD ────────────────────────────────────────────
 def render_analysis():
     render_header()
-    left, center, right = st.columns([1.2, 3, 2])
+    left, center, right = st.columns([1.2, 3.2, 2])
     with left:
         render_left()
     with center:
@@ -665,8 +1051,11 @@ def render_analysis():
             del st.session_state[k]
         st.rerun()
 
+
 # ── ROUTER ────────────────────────────────────────────────────────
 if st.session_state.step == "setup":
     render_setup()
+elif st.session_state.step == "section_config":
+    render_section_config()
 else:
     render_analysis()

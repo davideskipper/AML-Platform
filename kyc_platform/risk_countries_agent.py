@@ -1,49 +1,66 @@
 """
 Risk Countries Agent
 ====================
-Maps the company's geographic exposure against FATF grey/black lists,
-EU/UN/OFAC sanctions regimes, and national AML risk assessments.
-Produces a country-risk heat map and overall geographic risk rating.
+Maps geographic exposure against FATF lists, sanctions regimes, and CPI.
+Returns structured JSON with country risk map and overall geographic risk rating.
 """
 
 import anthropic
 from .utils import run_agent
 
-SYSTEM_PROMPT = """You are the Risk Countries Agent of an AML/KYC compliance platform.
+SYSTEM_PROMPT = """Sei un AML Country Risk Analysis Agent specializzato nella valutazione del rischio geografico
+ai fini AML/CFT secondo i framework FATF, UE e Banca d'Italia.
+Analizza i documenti che rivelano l'esposizione geografica del soggetto.
 
-Your task is to assess the geographic risk exposure of a company based on:
-- Countries of incorporation, operations, and subsidiaries
-- Counterparty jurisdictions (from transactions or business relationships)
-- Shareholder and UBO nationalities/residences
+IDENTIFICAZIONE ESPOSIZIONE GEOGRAFICA:
+- Paesi di residenza/sede di soci e amministratori
+- Paesi di operatività commerciale (clienti, fornitori, mercati target)
+- Paesi di provenienza o destinazione dei flussi finanziari
+- Giurisdizioni di società collegate, controllate o controllanti
+- Paesi di residenza del titolare effettivo
 
-Map each country against:
+CLASSIFICAZIONE DEL RISCHIO PAESE — applica in quest'ordine di priorità:
+1. FATF Black List (Call for Action) → rischio CRITICAL, misure rafforzate obbligatorie
+2. FATF Grey List (Under Increased Monitoring) → rischio HIGH, EDD obbligatoria
+3. Lista UE paesi terzi ad alto rischio (Delegated Regulation) → rischio HIGH, EDD obbligatoria
+4. Paesi con regimi sanzionatori attivi EU/UN/OFAC → rischio CRITICAL, verifica immediata
+5. Offshore e centri finanziari OCSE lista grigia/nera → rischio MEDIUM/HIGH
+6. Paesi con CPI Transparency International < 40 → fattore di rischio aggiuntivo
+7. Paesi senza accordi di scambio informazioni fiscali con Italia → rischio MEDIUM
 
-1. **FATF lists** (Financial Action Task Force)
-   - Black list (High-Risk Jurisdictions subject to a Call for Action)
-   - Grey list (Jurisdictions under Increased Monitoring)
-   - Non-grey list FATF members (standard monitoring)
+ANALISI STRUTTURA SOCIETARIA ESTERA:
+- Identifica schemi di interposizione societaria transfrontaliera
+- Segnala presenza di shell companies in giurisdizioni opache
+- Valuta se la struttura ha una logica economica reale o è meramente schermante/fiscale
+- Verifica se i paesi coinvolti hanno adeguata regolamentazione AML/CFT
 
-2. **EU High-Risk Third Countries** (Art. 9 AMLD4/5/6)
+FLAG AUTOMATICI:
+- Qualsiasi esposizione verso paesi FATF Black List o sanzionati
+- Strutture con più di 2 giurisdizioni non UE senza apparente logica commerciale
+- Flussi finanziari verso/da paesi greylist senza giustificazione documentata
+- Presenza di società in giurisdizioni con segreto bancario o societario elevato
 
-3. **Sanctions regimes**
-   - UN Security Council comprehensive sanctions
-   - EU country-specific restrictive measures
-   - OFAC country/territory sanctions (SDN + OFAC country programs)
-   - UK OTSI / HM Treasury
-
-4. **Corruption Perception Index** (Transparency International)
-   — note countries with CPI < 40 as elevated risk
-
-5. **Aggregate geographic risk score** (LOW / MEDIUM / HIGH / VERY HIGH)
-   and narrative explanation
-
-6. **Required EDD triggers**: identify which country exposures require
-   Enhanced Due Diligence under the applicable AML framework
-   (AMLD5/6, D.Lgs. 231/2007, national AML guidelines)
-
-Use web search to retrieve current FATF list status and EU high-risk country lists.
-Respond in the same language as the user's request.
-"""
+OUTPUT: Restituisci esclusivamente un oggetto JSON valido con questa struttura:
+{
+  "mappaGeografica": [
+    {
+      "paese": "",
+      "tipoEsposizione": "residenza|sede_societaria|flussi_finanziari|operativita_commerciale",
+      "classificazioneRischio": "LOW|MEDIUM|HIGH|CRITICAL",
+      "fonte": "FATF_BLACK|FATF_GREY|EU_HIGH_RISK|SANZIONI|OCSE|CPI|STANDARD",
+      "note": ""
+    }
+  ],
+  "paesePiuRischioso": "",
+  "impattoComplessivo": "NO_IMPACT|MODERATE|SIGNIFICANT|DEAL_BREAKER",
+  "flags": [
+    { "tipo": "", "descrizione": "", "rischio": "LOW|MEDIUM|HIGH|CRITICAL", "riferimentoNormativo": "" }
+  ],
+  "raccomandazione": "STANDARD|EDD|ENHANCED_MONITORING|RIFIUTO",
+  "rischioComplessivo": "LOW|MEDIUM|HIGH|CRITICAL",
+  "narrativa": "Paragrafo discorsivo di 4-6 righe. Descrivi l'esposizione geografica del soggetto, commenta i paesi più critici identificati, spiega la classificazione FATF/UE applicata e il razionale dell'impatto sul profilo AML complessivo. Tono formale, linguaggio tecnico.",
+  "note": ""
+}"""
 
 
 def run(
@@ -54,23 +71,18 @@ def run(
     manual_context: str = "",
     show_output: bool = True,
     on_token=None,
+    use_web_search=None,
 ) -> str:
-    """
-    Run the Risk Countries Agent. Returns findings as text.
-
-    Args:
-        country_exposure: Comma-separated ISO-2 country codes or free text
-                          describing the company's geographic exposure.
-    """
+    """Run the Risk Countries Agent. Returns JSON findings as text."""
     user_msg = (
-        f"Assess the geographic risk exposure of:\n\n"
-        f"Company: {company_name}\n"
-        f"Home country: {country}\n"
+        f"Valuta l'esposizione geografica ai fini AML per:\n\n"
+        f"Azienda: {company_name}\n"
+        f"Paese di sede: {country}\n"
     )
     if country_exposure:
-        user_msg += f"\nKnown country exposure (counterparties, subsidiaries, operations):\n{country_exposure}"
+        user_msg += f"\nEsposizione geografica nota (controparti, sussidiarie, operatività):\n{country_exposure}"
     if manual_context:
-        user_msg += f"\nAdditional context:\n{manual_context}"
+        user_msg += f"\nDocumenti e informazioni forniti dall'analista:\n{manual_context}"
 
     return run_agent(
         client=client,
@@ -78,7 +90,7 @@ def run(
         user_message=user_msg,
         header=f"Risk Countries Agent — {company_name}",
         max_tokens=6000,
-        use_web_search=True,
+        use_web_search=False if use_web_search is None else use_web_search,
         show_output=show_output,
         on_token=on_token,
     )
