@@ -101,6 +101,7 @@ def run(
     company_name: str = "",
     manual_context: str = "",
     show_output: bool = True,
+    on_token=None,
 ) -> str:
     """
     Run the Transaction Agent on an Excel/CSV file.
@@ -124,4 +125,5 @@ def run(
         max_tokens=8000,
         use_web_search=False,   # analysis is purely data-driven
         show_output=show_output,
+        on_token=on_token,
     )

@@ -84,6 +84,7 @@ def run(
     all_findings: dict,
     manual_context: str = "",
     show_output: bool = True,
+    on_token=None,
 ) -> str:
     """
     Run the Final Valuation Agent.
@@ -115,4 +116,5 @@ def run(
         max_tokens=12000,
         use_web_search=False,   # synthesis only — no new searches
         show_output=show_output,
+        on_token=on_token,
     )

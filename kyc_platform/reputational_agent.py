@@ -55,6 +55,7 @@ def run(
     key_persons: str = "",
     manual_context: str = "",
     show_output: bool = True,
+    on_token=None,
 ) -> str:
     """Run the Reputational Agent. Returns findings as text."""
     user_msg = (
@@ -75,4 +76,5 @@ def run(
         max_tokens=6000,
         use_web_search=True,
         show_output=show_output,
+        on_token=on_token,
     )

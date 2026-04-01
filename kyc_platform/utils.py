@@ -24,6 +24,7 @@ def run_agent(
     max_tokens: int = 8000,
     use_web_search: bool = True,
     show_output: bool = True,
+    on_token=None,
 ) -> str:
     """
     Run a single agent call with optional web search, streaming output.
@@ -57,10 +58,12 @@ def run_agent(
             messages=messages,
         ) as stream:
             for event in stream:
-                if (show_output
-                        and event.type == "content_block_delta"
+                if (event.type == "content_block_delta"
                         and event.delta.type == "text_delta"):
-                    print(event.delta.text, end="", flush=True)
+                    if show_output:
+                        print(event.delta.text, end="", flush=True)
+                    if on_token:
+                        on_token(event.delta.text)
 
             msg = stream.get_final_message()
 
