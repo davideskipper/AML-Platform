@@ -3,6 +3,7 @@ AML IntelliGent Platform — Streamlit Web Interface
 Bain & Company Style — KYC / CDD Module
 """
 
+import base64
 import io, json, os, tempfile
 from datetime import datetime
 import streamlit as st
@@ -251,6 +252,23 @@ def run_section(key, client, on_token=None):
         st.session_state.running_agent = None
 
 
+# ── Logo ─────────────────────────────────────────────────────────
+def _logo_html(height: int = 38) -> str:
+    """Return an <img> tag with the Bain logo as base64, or fallback text."""
+    for fname in ("assets/bain_logo.png", "assets/bain_logo.jpg",
+                  "assets/bain_logo.svg", "assets/bain_logo.webp"):
+        if os.path.exists(fname):
+            ext  = fname.rsplit(".", 1)[-1]
+            mime = "image/svg+xml" if ext == "svg" else f"image/{ext}"
+            with open(fname, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode()
+            return (f'<img src="data:{mime};base64,{b64}" '
+                    f'style="height:{height}px;vertical-align:middle;">')
+    # Fallback — styled text
+    return ('<span style="font-size:0.95rem;font-weight:900;letter-spacing:3px;'
+            f'color:{RED};">BAIN &amp; COMPANY</span>')
+
+
 # ── Header ────────────────────────────────────────────────────────
 def render_header():
     state = st.session_state.kyc_state
@@ -261,8 +279,8 @@ def render_header():
             rc = "#22aa55" if done == total else RED
             st.markdown(
                 '<div style="padding:6px 0 10px;border-bottom:2px solid '+RED+';margin-bottom:10px;">'
-                '<span style="font-size:0.9rem;font-weight:900;letter-spacing:3px;color:#1a1a1a;">BAIN &amp; COMPANY</span>'
-                '<span style="color:#ccc;margin:0 10px;">|</span>'
+                +_logo_html(34)+
+                '<span style="color:#ddd;margin:0 12px;">|</span>'
                 '<span style="font-size:0.78rem;color:#888;">AML IntelliGent Platform · KYC/CDD</span>'
                 '<span style="color:#ddd;margin:0 10px;">|</span>'
                 '<span style="color:#1a1a1a;font-size:0.9rem;font-weight:600;">'+state.case.company_name+'</span>'
@@ -273,8 +291,8 @@ def render_header():
         else:
             st.markdown(
                 '<div style="padding:6px 0 10px;border-bottom:2px solid '+RED+';margin-bottom:10px;">'
-                '<span style="font-size:0.9rem;font-weight:900;letter-spacing:3px;color:#1a1a1a;">BAIN &amp; COMPANY</span>'
-                '<span style="color:#ccc;margin:0 10px;">|</span>'
+                +_logo_html(34)+
+                '<span style="color:#ddd;margin:0 12px;">|</span>'
                 '<span style="font-size:0.78rem;color:#888;">AML IntelliGent Platform · KYC/CDD</span>'
                 '</div>', unsafe_allow_html=True)
     with h_right:
