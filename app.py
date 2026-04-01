@@ -110,6 +110,7 @@ DEFAULTS = {
     "excel_path": None, "excel_name": None,
     "running_agent": None,
     "knowledge_base": "", "kb_doc_names": [],
+    "all_docs": "", "all_doc_names": [],
 }
 for k, v in DEFAULTS.items():
     if k not in st.session_state:
@@ -200,7 +201,9 @@ def run_section(key, client, on_token=None):
     state   = st.session_state.kyc_state
     company = state.case.company_name
     country = state.case.country
-    docs_text  = st.session_state.section_docs.get(key, "")
+    # Use section-specific docs if present, otherwise fall back to the shared pool
+    docs_text  = (st.session_state.section_docs.get(key, "")
+                  or st.session_state.get("all_docs", ""))
     notes_text = st.session_state.section_notes.get(key, "")
     kb_text    = st.session_state.knowledge_base
     parts = []
@@ -342,80 +345,95 @@ def render_section_config():
         st.markdown(
             '<div style="padding:4px 0 14px;">'
             '<div style="font-size:1.25rem;font-weight:700;color:#1a1a1a;">'
-            'Configura Analisi — '+state.case.company_name+'</div>'
+            'Configura Analisi — ' + state.case.company_name + '</div>'
             '<div style="color:#888;font-size:0.82rem;margin-top:3px;">'
-            'Scegli la modalità per ogni sezione e carica i documenti disponibili</div></div>',
+            'Scegli la modalità per ogni sezione, poi carica tutta la documentazione disponibile</div></div>',
             unsafe_allow_html=True)
 
+        # ── Mode selection per section ────────────────────────────
         for sec in MAIN_SECTIONS:
             key  = sec["key"]
             mode = st.session_state.section_modes.get(key, "agent")
-            docs = st.session_state.section_doc_names.get(key, [])
-            if key == "transaction" and st.session_state.excel_name:
-                docs = [st.session_state.excel_name]
+            left_c, right_c = st.columns([3, 1.5])
+            with left_c:
+                st.markdown(
+                    '<div style="display:flex;align-items:center;padding:6px 0;">'
+                    '<span style="color:' + RED + ';font-size:0.62rem;font-weight:700;'
+                    'letter-spacing:1px;width:22px;">' + sec["number"] + '</span>'
+                    '<span style="font-size:0.88rem;font-weight:600;color:#1a1a1a;margin-left:6px;">'
+                    + sec["icon"] + ' ' + sec["full_label"] + '</span>'
+                    '<span style="font-size:0.72rem;color:#bbb;margin-left:10px;">'
+                    + sec["desc"] + '</span></div>',
+                    unsafe_allow_html=True)
+            with right_c:
+                mode_radio = st.radio(
+                    "m", ["🤖  Agente", "✍️  Manuale"],
+                    index=0 if mode == "agent" else 1,
+                    key=f"cfg_{key}", horizontal=True,
+                    label_visibility="collapsed")
+                st.session_state.section_modes[key] = "agent" if "Agente" in mode_radio else "manual"
 
-            # Card
+        # ── Single document upload box ────────────────────────────
+        st.markdown("---")
+        st.markdown(
+            '<div style="font-size:0.82rem;font-weight:600;color:#1a1a1a;margin-bottom:4px;">'
+            '📎 Carica i documenti della controparte</div>'
+            '<div style="font-size:0.75rem;color:#999;margin-bottom:10px;">'
+            'Puoi caricare tutti i file in una volta sola (PDF, Word, Excel, CSV, TXT). '
+            'I file Excel/CSV verranno usati anche per l\'analisi transazionale.</div>',
+            unsafe_allow_html=True)
+
+        # Show already loaded
+        all_names = st.session_state.get("all_doc_names", [])
+        if st.session_state.excel_name and st.session_state.excel_name not in all_names:
+            all_names = all_names + [st.session_state.excel_name]
+        if all_names:
+            tags = "".join(
+                f'<span style="display:inline-block;background:#f0fff4;border:1px solid #bbf7d0;'
+                f'border-radius:12px;padding:2px 10px;font-size:0.7rem;color:#166534;margin:2px;">✅ {n}</span>'
+                for n in all_names)
             st.markdown(
-                '<div style="background:#fafafa;border:1px solid #e8e8e8;border-radius:6px;'
-                'padding:12px 16px;margin-bottom:8px;">'
-                '<div style="display:flex;align-items:center;justify-content:space-between;">'
-                '<div><span style="color:'+RED+';font-size:0.62rem;font-weight:700;letter-spacing:1px;">'+sec["number"]+'</span>'
-                '<span style="font-size:0.9rem;font-weight:600;color:#1a1a1a;margin-left:8px;">'+sec["icon"]+' '+sec["full_label"]+'</span></div>'
-                '</div>'
-                '<div style="color:#999;font-size:0.75rem;margin-top:3px;margin-left:32px;">'+sec["desc"]+'</div>'
-                '</div>', unsafe_allow_html=True)
+                '<div style="margin-bottom:8px;line-height:2;">' + tags + '</div>',
+                unsafe_allow_html=True)
 
-            cfg_left, cfg_right = st.columns([1.2, 2.8])
-            with cfg_left:
-                mode_radio = st.radio("Modalità", ["🤖  Agente", "✍️  Manuale"],
-                                      index=0 if mode == "agent" else 1,
-                                      key=f"cfg_{key}", horizontal=False,
-                                      label_visibility="collapsed")
-                new_mode = "agent" if "Agente" in mode_radio else "manual"
-                st.session_state.section_modes[key] = new_mode
+        uploaded = st.file_uploader(
+            "Documenti",
+            type=["pdf", "docx", "xlsx", "xls", "csv", "txt", "md"],
+            accept_multiple_files=True,
+            key="cfg_all_docs",
+            label_visibility="collapsed")
 
-            with cfg_right:
-                hint = " · ".join(REQUIRED_DOCS.get(key, []))
-                if hint:
-                    st.markdown(f'<div style="font-size:0.7rem;color:#aaa;margin-bottom:4px;">💡 {hint}</div>',
-                                unsafe_allow_html=True)
-                if key == "transaction":
-                    up = st.file_uploader("File transazioni", type=["xlsx","xls","csv"],
-                                         key=f"cfg_up_{key}", label_visibility="collapsed")
-                    if up:
-                        suf = os.path.splitext(up.name)[1]
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=suf) as f:
-                            f.write(up.read())
-                            st.session_state.excel_path = f.name
-                            st.session_state.excel_name = up.name
-                        st.session_state.section_doc_names[key] = [up.name]
-                        st.rerun()
-                    if st.session_state.excel_name:
-                        st.markdown(f'<div style="font-size:0.72rem;color:#22aa55;">✅ {st.session_state.excel_name}</div>',
-                                    unsafe_allow_html=True)
-                else:
-                    up_files = st.file_uploader("Documenti", type=["pdf","docx","xlsx","csv","txt","md"],
-                                                accept_multiple_files=True,
-                                                key=f"cfg_up_{key}", label_visibility="collapsed")
-                    if up_files:
-                        texts, names = [], []
-                        for f in up_files:
-                            texts.append(f"=== {f.name} ===\n{extract_text_from_file(f)}")
-                            names.append(f.name)
-                        st.session_state.section_docs[key] = "\n\n".join(texts)
-                        st.session_state.section_doc_names[key] = names
-                        st.rerun()
-                    if docs:
-                        for d in docs:
-                            st.markdown(f'<div style="font-size:0.72rem;color:#22aa55;">✅ {d}</div>',
-                                        unsafe_allow_html=True)
-
-            notes = st.text_area("Note (opzionale)", value=st.session_state.section_notes.get(key,""),
-                                 height=40, key=f"cfg_notes_{key}",
-                                 placeholder="Note o istruzioni aggiuntive per questa sezione...",
-                                 label_visibility="collapsed")
-            st.session_state.section_notes[key] = notes
-            st.markdown("")
+        if uploaded:
+            texts, names = [], []
+            excel_file = None
+            for f in uploaded:
+                ext = os.path.splitext(f.name)[1].lower()
+                extracted = extract_text_from_file(f)
+                texts.append(f"=== {f.name} ===\n{extracted}")
+                names.append(f.name)
+                # Save Excel/CSV as transaction file
+                if ext in (".xlsx", ".xls", ".csv"):
+                    excel_file = (f.name, ext, f)
+            # Store combined docs accessible to all agents
+            st.session_state.all_docs      = "\n\n".join(texts)
+            st.session_state.all_doc_names = names
+            # Also populate per-section docs for left panel tracker
+            for sec in MAIN_SECTIONS:
+                if sec["key"] != "transaction":
+                    st.session_state.section_docs[sec["key"]]      = st.session_state.all_docs
+                    st.session_state.section_doc_names[sec["key"]] = names
+            # Handle Excel for transaction
+            if excel_file:
+                fname, ext, fobj = excel_file
+                fobj.seek(0)
+                with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+                    tmp.write(fobj.read())
+                    st.session_state.excel_path = tmp.name
+                    st.session_state.excel_name = fname
+                st.session_state.section_doc_names["transaction"] = [fname]
+            total_chars = len(st.session_state.all_docs)
+            st.success(f"✓ {len(names)} file caricati · {total_chars:,} caratteri estratti")
+            st.rerun()
 
         st.markdown("---")
         cb, cf = st.columns([1, 3])
@@ -765,16 +783,28 @@ def render_prose_result(key: str, parsed: dict):
                     '</div></div>', unsafe_allow_html=True)
         st.markdown("")
 
-    # Narrativa principale
+    # Narrativa principale — border color by risk level
     if narrativa:
+        risk_upper = (risk or "").upper()
+        if risk_upper in ("CRITICAL", "CRITICO", "ALTO", "HIGH"):
+            border_c = "#ef4444"; bg_c = "#fff8f8"
+            label_c  = "#ef4444"; label_txt = "ANALISI — CRITICITÀ RILEVATE"
+        elif risk_upper in ("MEDIO-ALTO", "MEDIUM"):
+            border_c = "#f59e0b"; bg_c = "#fffdf5"
+            label_c  = "#f59e0b"; label_txt = "ANALISI — DA APPROFONDIRE"
+        else:
+            border_c = "#22aa55"; bg_c = "#f8fff8"
+            label_c  = "#22aa55"; label_txt = "ANALISI — PROFILO NELLA NORMA"
+
         st.markdown(
-            '<div style="font-size:0.62rem;font-weight:700;letter-spacing:1.5px;color:#555;margin:12px 0 6px;">ANALISI</div>',
+            '<div style="font-size:0.62rem;font-weight:700;letter-spacing:1.5px;'
+            'color:' + label_c + ';margin:12px 0 6px;">' + label_txt + '</div>',
             unsafe_allow_html=True)
         st.markdown(
-            '<div style="background:#f9f9f9;border-left:3px solid '+RED+';'
+            '<div style="background:' + bg_c + ';border-left:4px solid ' + border_c + ';'
             'padding:16px 20px;border-radius:0 6px 6px 0;font-size:0.87rem;'
             'line-height:1.75;color:#1a1a1a;margin-bottom:16px;">'
-            + narrativa.replace("\n","<br>") + '</div>',
+            + narrativa.replace("\n", "<br>") + '</div>',
             unsafe_allow_html=True)
 
     # Principali evidenze
