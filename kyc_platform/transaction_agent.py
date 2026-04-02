@@ -110,11 +110,11 @@ OUTPUT: Restituisci esclusivamente un oggetto JSON valido:
     {
       "evidenza": "Descrizione sintetica dell'anomalia o elemento di attenzione",
       "normativa": "Riferimento normativo specifico (es. UIF Indic. n.42/2023, Art.35 D.Lgs.231/2007, FATF Rec.10)",
-      "livello": "ATTENZIONE|ANOMALIA|CRITICO"
+      "livello": "ATTENZIONE (elemento da monitorare, basso rischio → verde) | ANOMALIA (comportamento sospetto, rischio medio → giallo) | CRITICO (red flag grave, rischio alto → rosso)"
     }
   ],
   "rischioComplessivo": "LOW|MEDIUM|HIGH|CRITICAL",
-  "narrativa": "Paragrafo discorsivo di 5-7 righe per il compliance officer. Descrivi il comportamento transazionale, i pattern anomali rilevati, l'esposizione geografica e il razionale del rischio assegnato. Se presente bozzaMotivazioneSOS accennala. Tono formale, linguaggio tecnico AML.",
+  "narrativa": "Sintesi discorsiva professionale di 10-14 righe per il compliance officer. Struttura: (1) profilo sintetico della controparte, (2) elementi positivi/conformi, (3) anomalie e criticità con richiamo diretto alla normativa applicabile (D.Lgs.231/2007, FATF Recommendations, provvedimenti UIF, Reg. UE 2015/847). Concludi con il razionale del livello di rischio assegnato. Tono formale, linguaggio tecnico AML.",
   "note": ""
 }"""
 
