@@ -41,6 +41,9 @@ INDICATORI DI ANOMALIA (rif. UIF Provvedimento 12 maggio 2023):
 - Debiti tributari e previdenziali significativi
 
 OUTPUT: Restituisci esclusivamente un oggetto JSON valido con questa struttura:
+
+Rispondi ESCLUSIVAMENTE con un oggetto JSON valido. Nessun testo prima o dopo. Nessun markdown, nessun code block. Il tuo output deve iniziare con { e terminare con }.
+
 {
   "indicatoriFinanziari": {
     "fatturato": "",
