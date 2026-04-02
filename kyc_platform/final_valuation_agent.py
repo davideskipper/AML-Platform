@@ -46,6 +46,9 @@ Produci il report finale di rischio AML per il fascicolo cliente.
    - Documenti aggiuntivi da richiedere
 
 OUTPUT: Restituisci esclusivamente un oggetto JSON valido:
+
+Rispondi ESCLUSIVAMENTE con un oggetto JSON valido. Nessun testo prima o dopo. Nessun markdown, nessun code block. Il tuo output deve iniziare con { e terminare con }.
+
 {
   "sintesiEsecutiva": "",
   "matriceRischio": {
