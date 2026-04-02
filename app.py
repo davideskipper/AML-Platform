@@ -198,7 +198,7 @@ def parse_json_result(text: str):
 def get_risk_color(level: str) -> str:
     return RISK_COLORS.get((level or "").upper(), "#888")
 
-def run_section(key, client, on_token=None):
+def run_section(key, client, on_token=None, on_thinking=None):
     state   = st.session_state.kyc_state
     company = state.case.company_name
     country = state.case.country
@@ -222,24 +222,30 @@ def run_section(key, client, on_token=None):
     try:
         if key == "registry":
             result = registry_agent.run(client, company, country, manual_ctx,
-                                        show_output=False, on_token=on_token, use_web_search=use_web)
+                                        show_output=False, on_token=on_token,
+                                        on_thinking=on_thinking, use_web_search=use_web)
         elif key == "ubo_pep":
             result = ubo_pep_agent.run(client, company, country, manual_ctx,
-                                       show_output=False, on_token=on_token, use_web_search=use_web)
+                                       show_output=False, on_token=on_token,
+                                       on_thinking=on_thinking, use_web_search=use_web)
         elif key == "reputational":
             result = reputational_agent.run(client, company, country, "", manual_ctx,
-                                            show_output=False, on_token=on_token, use_web_search=use_web)
+                                            show_output=False, on_token=on_token,
+                                            on_thinking=on_thinking, use_web_search=use_web)
         elif key == "economic_profile":
             result = economic_profile_agent.run(client, company, country, manual_ctx,
-                                                show_output=False, on_token=on_token, use_web_search=use_web)
+                                                show_output=False, on_token=on_token,
+                                                on_thinking=on_thinking, use_web_search=use_web)
         elif key == "transaction":
             path = st.session_state.excel_path or ""
             if not path: raise ValueError("Nessun file Excel/CSV caricato.")
             result = transaction_agent.run(client, path, company, manual_ctx,
-                                           show_output=False, on_token=on_token)
+                                           show_output=False, on_token=on_token,
+                                           on_thinking=on_thinking)
         elif key == "final_valuation":
             result = final_valuation_agent.run(client, company, state.results, manual_ctx,
-                                               show_output=False, on_token=on_token)
+                                               show_output=False, on_token=on_token,
+                                               on_thinking=on_thinking)
         else:
             raise ValueError(f"Sezione sconosciuta: {key}")
         state.add_result(key, result)
@@ -886,24 +892,51 @@ def render_section_content():
 def _run_with_stream(key: str, client):
     if not client:
         st.error("API Key non configurata nei Secrets."); return
-    st.markdown(
-        f'<div style="font-size:0.78rem;font-weight:600;color:{RED};margin:8px 0 4px;">⏳ Elaborazione in corso…</div>',
-        unsafe_allow_html=True)
-    area = st.empty()
-    buf  = {"text": ""}
+
+    status_box = st.empty()
+    stream_box = st.empty()
+    buf = {"text": "", "thinking": "", "phase": "thinking"}
+
+    def _render():
+        parts = []
+        if buf["thinking"] and buf["phase"] == "thinking":
+            th = buf["thinking"][-800:] if len(buf["thinking"]) > 800 else buf["thinking"]
+            parts.append(
+                '<div style="font-size:0.68rem;color:#aaa;font-style:italic;'
+                'margin-bottom:6px;border-left:2px solid #ddd;padding-left:8px;">'
+                '🧠 ' + th.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+                + '</div>')
+        if buf["text"]:
+            disp = buf["text"][-3000:] if len(buf["text"]) > 3000 else buf["text"]
+            parts.append(
+                '<div style="font-family:monospace;font-size:0.7rem;white-space:pre-wrap;">'
+                + disp.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+                + '</div>')
+        if parts:
+            stream_box.markdown(
+                '<div style="background:#f8f8f8;border:1px solid #eee;border-radius:6px;'
+                'padding:10px 14px;max-height:280px;overflow-y:auto;">'
+                + "".join(parts) + '</div>',
+                unsafe_allow_html=True)
+
+    def on_thinking(chunk):
+        buf["thinking"] += chunk
+        buf["phase"] = "thinking"
+        status_box.markdown(
+            f'<div style="font-size:0.75rem;font-weight:600;color:#aaa;margin:6px 0 2px;">'
+            f'🧠 Analisi in corso…</div>', unsafe_allow_html=True)
+        _render()
 
     def on_token(chunk):
         buf["text"] += chunk
-        disp = buf["text"][-3000:] if len(buf["text"]) > 3000 else buf["text"]
-        area.markdown(
-            '<div style="font-family:monospace;font-size:0.7rem;white-space:pre-wrap;'
-            'background:#f5f5f5;border:1px solid #eee;border-radius:4px;'
-            'padding:10px;max-height:260px;overflow-y:auto;">'
-            + disp.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-            + '</div>', unsafe_allow_html=True)
+        buf["phase"] = "writing"
+        status_box.markdown(
+            f'<div style="font-size:0.75rem;font-weight:600;color:{RED};margin:6px 0 2px;">'
+            f'✍️ Redazione…</div>', unsafe_allow_html=True)
+        _render()
 
     try:
-        run_section(key, client, on_token=on_token)
+        run_section(key, client, on_token=on_token, on_thinking=on_thinking)
     except Exception as e:
         st.error(str(e))
     st.rerun()
