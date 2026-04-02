@@ -70,6 +70,9 @@ FLAG GEOGRAFICI:
 - Strutture di pagamento che passano per giurisdizioni opache senza logica commerciale
 
 OUTPUT: Restituisci esclusivamente un oggetto JSON valido:
+
+Rispondi ESCLUSIVAMENTE con un oggetto JSON valido. Nessun testo prima o dopo. Nessun markdown, nessun code block. Il tuo output deve iniziare con { e terminare con }.
+
 {
   "dashboard": {
     "periodoAnalizzato": "",
