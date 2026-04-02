@@ -49,6 +49,9 @@ FLAG AUTOMATICI:
 - Notizie negative recenti non smentite da fonti attendibili
 
 OUTPUT: Restituisci esclusivamente un oggetto JSON valido con questa struttura:
+
+Rispondi ESCLUSIVAMENTE con un oggetto JSON valido. Nessun testo prima o dopo. Nessun markdown, nessun code block. Il tuo output deve iniziare con { e terminare con }.
+
 {
   "sintesiReputazionale": "max 3 righe",
   "eventiNegativi": [
