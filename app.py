@@ -711,9 +711,9 @@ def render_prose_result(key: str, parsed: dict):
             '<div style="font-size:0.62rem;font-weight:700;letter-spacing:1.5px;color:#555;margin:8px 0 8px;">PRINCIPALI EVIDENZE DI ATTENZIONE</div>',
             unsafe_allow_html=True)
         level_styles = {
-            "CRITICO":    ("#fef2f2","#ef4444","●"),
-            "ANOMALIA":   ("#fffbeb","#f59e0b","▲"),
-            "ATTENZIONE": ("#f0f9ff","#0ea5e9","◆"),
+            "CRITICO":    ("#fef2f2", "#dc2626", "🔴"),
+            "ANOMALIA":   ("#fffbeb", "#d97706", "🟡"),
+            "ATTENZIONE": ("#f0fdf4", "#16a34a", "🟢"),
         }
         for ev in evidenze:
             lvl  = (ev.get("livello") or "ATTENZIONE").upper()
