@@ -44,6 +44,9 @@ FLAG AUTOMATICI:
 - Documento d'identità scaduto o con dati illeggibili
 
 OUTPUT: Restituisci esclusivamente un oggetto JSON valido con questa struttura:
+
+Rispondi ESCLUSIVAMENTE con un oggetto JSON valido. Nessun testo prima o dopo. Nessun markdown, nessun code block. Il tuo output deve iniziare con { e terminare con }.
+
 {
   "ownershipChain": "rappresentazione testuale gerarchica della catena di controllo",
   "personeFisicheIdentificate": [
