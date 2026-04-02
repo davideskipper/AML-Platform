@@ -189,31 +189,30 @@ def extract_text_from_file(uploaded_file) -> str:
 
 def parse_json_result(text: str):
     if not text: return None
-    # 1. Try direct parse
-    try:
-        return json.loads(text.strip())
-    except Exception: pass
-    # 2. Strip markdown code fences  ```json ... ``` or ``` ... ```
     import re
-    stripped = re.sub(r"^```(?:json)?\s*", "", text.strip(), flags=re.MULTILINE)
-    stripped = re.sub(r"```\s*$", "", stripped.strip(), flags=re.MULTILINE).strip()
-    try:
-        return json.loads(stripped)
-    except Exception: pass
-    # 3. Extract first {...} block (handles preamble/postamble text)
-    try:
-        s = text.find("{")
-        if s >= 0:
-            # Find matching closing brace
-            depth = 0
-            for i, ch in enumerate(text[s:], s):
-                if ch == "{": depth += 1
-                elif ch == "}":
-                    depth -= 1
-                    if depth == 0:
-                        return json.loads(text[s:i+1])
-    except Exception: pass
-    return None
+    decoder = json.JSONDecoder()
+
+    def _try(s: str):
+        s = s.strip()
+        # Try direct parse
+        try: return json.loads(s)
+        except Exception: pass
+        # Find first '{' and use raw_decode (handles preamble/postamble correctly)
+        idx = s.find("{")
+        while idx != -1:
+            try:
+                obj, _ = decoder.raw_decode(s, idx)
+                if isinstance(obj, dict): return obj
+            except Exception: pass
+            idx = s.find("{", idx + 1)
+        return None
+
+    # Pass 1: raw text
+    result = _try(text)
+    if result: return result
+    # Pass 2: strip markdown code fences
+    stripped = re.sub(r"```(?:json)?\s*", "", text)
+    return _try(stripped)
 
 def get_risk_color(level: str) -> str:
     return RISK_COLORS.get((level or "").upper(), "#888")
