@@ -401,6 +401,115 @@ def _route_uploaded_files(uploaded_files):
 
 # ── SECTION RESULT CARD ───────────────────────────────────────────
 
+def render_prose_result(key: str, parsed: dict):
+    """Displays agent result as professional prose — no raw JSON."""
+    risk      = parsed.get("rischioComplessivo","") or parsed.get("customerRiskRating","")
+    narrativa = (parsed.get("narrativa") or parsed.get("narrativaCompleta")
+                 or parsed.get("sintesiEsecutiva","") or "")
+    evidenze  = parsed.get("principaliEvidenze", [])
+    flags     = parsed.get("flags", [])
+
+    if risk:
+        rc = get_risk_color(risk)
+        racc = parsed.get("raccomandazione","")
+        racc_str = ""
+        if isinstance(racc, dict):
+            acc = racc.get("accettazione","")
+            adv = racc.get("livelloAdeguataVerifica","")
+            freq = racc.get("frequenzaMonitoraggio","")
+            parts_r = [x for x in [acc, adv, freq] if x]
+            if parts_r: racc_str = " &nbsp;·&nbsp; ".join(parts_r)
+        elif isinstance(racc, str) and racc:
+            racc_str = racc
+        st.markdown(
+            '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px;">'
+            '<span style="background:'+rc+';color:#fff;font-size:0.82rem;font-weight:700;'
+            'padding:5px 18px;border-radius:20px;">⬤ RISCHIO: '+risk+'</span>'
+            +(f'<span style="font-size:0.76rem;color:#777;">{racc_str}</span>' if racc_str else '')
+            +'</div>', unsafe_allow_html=True)
+
+    mx = parsed.get("matriceRischio")
+    if mx:
+        labels = [("identitaStruttura","Identità/Struttura"),("reputazionale","Reputazionale"),
+                  ("economico","Economico"),("transazionale","Transazionale"),("geografico","Geografico")]
+        cols = st.columns(5)
+        for i, (dim, lbl) in enumerate(labels):
+            val  = mx.get(dim,{})
+            sc   = int(val.get("score",0)) if isinstance(val,dict) else 0
+            bc   = RED if sc >= 4 else "#f59e0b" if sc == 3 else "#22aa55"
+            motiv = val.get("motivazione","") if isinstance(val,dict) else ""
+            with cols[i]:
+                st.markdown(
+                    '<div style="text-align:center;background:#f8f8f8;border-radius:6px;'
+                    'padding:10px 4px;border:1px solid #eee;" title="'+motiv+'">'
+                    '<div style="font-size:0.58rem;color:#999;margin-bottom:3px;">'+lbl+'</div>'
+                    '<div style="font-size:1.5rem;font-weight:900;color:'+bc+';">'+str(sc)
+                    +'<span style="font-size:0.55rem;color:#ccc;">/5</span></div>'
+                    '<div style="margin:4px 8px 0;height:3px;background:#eee;border-radius:2px;">'
+                    '<div style="width:'+str(sc*20)+'%;height:100%;background:'+bc+';border-radius:2px;"></div>'
+                    '</div></div>', unsafe_allow_html=True)
+        st.markdown("")
+
+    if narrativa:
+        ru = (risk or "").upper()
+        if ru in ("CRITICAL","CRITICO","ALTO","HIGH"):
+            border_c,bg_c,label_c,label_txt = "#ef4444","#fff8f8","#ef4444","ANALISI — CRITICITÀ RILEVATE"
+        elif ru in ("MEDIO-ALTO","MEDIUM"):
+            border_c,bg_c,label_c,label_txt = "#f59e0b","#fffdf5","#f59e0b","ANALISI — DA APPROFONDIRE"
+        else:
+            border_c,bg_c,label_c,label_txt = "#22aa55","#f8fff8","#22aa55","ANALISI — PROFILO NELLA NORMA"
+        st.markdown(
+            '<div style="font-size:0.62rem;font-weight:700;letter-spacing:1.5px;color:'+label_c
+            +';margin:12px 0 6px;">'+label_txt+'</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div style="background:'+bg_c+';border-left:4px solid '+border_c+';'
+            'padding:16px 20px;border-radius:0 6px 6px 0;font-size:0.87rem;'
+            'line-height:1.75;color:#1a1a1a;margin-bottom:16px;">'
+            + narrativa.replace("\n","<br>") + '</div>', unsafe_allow_html=True)
+
+    if evidenze:
+        st.markdown(
+            '<div style="font-size:0.62rem;font-weight:700;letter-spacing:1.5px;color:#555;'
+            'margin:8px 0 8px;">PRINCIPALI EVIDENZE DI ATTENZIONE</div>', unsafe_allow_html=True)
+        level_styles = {
+            "CRITICO":    ("#fef2f2","#dc2626","🔴"),
+            "ANOMALIA":   ("#fffbeb","#d97706","🟡"),
+            "ATTENZIONE": ("#f0fdf4","#16a34a","🟢"),
+        }
+        for ev in evidenze:
+            lvl  = (ev.get("livello") or "ATTENZIONE").upper()
+            etxt = ev.get("evidenza","")
+            ntxt = ev.get("normativa","")
+            bg_e,col_e,ico_e = level_styles.get(lvl, level_styles["ATTENZIONE"])
+            st.markdown(
+                '<div style="background:'+bg_e+';border-left:3px solid '+col_e+';'
+                'border-radius:0 5px 5px 0;padding:8px 12px;margin-bottom:6px;">'
+                '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'
+                '<span style="font-size:0.8rem;color:#1a1a1a;line-height:1.5;">'
+                '<span style="color:'+col_e+';margin-right:5px;">'+ico_e+'</span>'+etxt+'</span>'
+                '<span style="font-size:0.6rem;font-weight:700;color:'+col_e+';white-space:nowrap;'
+                'padding:1px 6px;border-radius:8px;border:1px solid '+col_e+';">'+lvl+'</span></div>'
+                +(f'<div style="font-size:0.68rem;color:#888;margin-top:4px;margin-left:16px;">📎 {ntxt}</div>'
+                  if ntxt else '')
+                +'</div>', unsafe_allow_html=True)
+
+    if flags:
+        st.markdown(
+            '<div style="font-size:0.62rem;font-weight:700;letter-spacing:1.5px;color:#555;'
+            'margin:8px 0 6px;">FLAG AML</div>', unsafe_allow_html=True)
+        for fl in flags:
+            frc  = get_risk_color(fl.get("rischio",""))
+            tipo = fl.get("tipo",""); desc = fl.get("descrizione","")
+            norm = fl.get("riferimentoNormativo","") or fl.get("indicatoreUIF","")
+            st.markdown(
+                '<div style="border-left:3px solid '+frc+';padding:5px 10px;margin-bottom:4px;'
+                'background:#fff;border-radius:0 4px 4px 0;">'
+                '<span style="font-size:0.78rem;font-weight:600;">'+tipo+'</span>'
+                +(f'<span style="font-size:0.76rem;color:#555;"> — {desc}</span>' if desc else '')
+                +(f'<span style="font-size:0.66rem;color:#bbb;margin-left:6px;">📎 {norm}</span>' if norm else '')
+                +'</div>', unsafe_allow_html=True)
+
+
 def _render_section_result(sec: dict, client):
     """Section card: header + assigned docs + run button + result."""
     key     = sec["key"]
@@ -438,14 +547,6 @@ def _render_section_result(sec: dict, client):
             f'border-radius:10px;padding:2px 8px;font-size:0.68rem;color:#166534;margin:2px;">📄 {n}</span>'
             for n in loaded)
         st.markdown(f'<div style="margin-bottom:8px;">{tags}</div>', unsafe_allow_html=True)
-
-    # ── Run button ────────────────────────────────────────────────
-    c1, _ = st.columns([1, 5])
-    with c1:
-        lbl = "▶  Avvia" if status == "empty" else "↺  Ri-esegui"
-        if st.button(lbl, key=f"run_{key}", use_container_width=True):
-            _run_with_stream(key, client)
-            return
 
     # ── Result ────────────────────────────────────────────────────
     if status == "completed" and content:
@@ -568,6 +669,109 @@ def _run_with_stream(key: str, client):
     st.rerun()
 
 
+def _render_exec_bar(current_key: str, remaining_queue: list):
+    """Top bar shown during agent execution: all agents as cells with spinner on active."""
+    done_keys = [s["key"] for s in MAIN_SECTIONS if sec_status(s["key"]) == "completed"]
+    cells = ""
+    for sec in MAIN_SECTIONS:
+        k = sec["key"]
+        if k == current_key:
+            # Active — spinner
+            cells += (
+                f'<div style="flex:1;display:flex;flex-direction:column;align-items:center;'
+                f'gap:5px;background:#2d1a1a;border-radius:8px;padding:12px 6px;margin:0 3px;'
+                f'border:1px solid {RED};">'
+                f'<span class="aml-spin" style="font-size:1rem;color:{RED};">⚙</span>'
+                f'<span style="font-size:1.2rem;">{sec["icon"]}</span>'
+                f'<span style="font-size:0.58rem;color:#ff9999;font-weight:700;text-align:center;'
+                f'line-height:1.3;">{sec["label"]}</span>'
+                f'</div>')
+        elif k in remaining_queue:
+            # Queued
+            cells += (
+                f'<div style="flex:1;display:flex;flex-direction:column;align-items:center;'
+                f'gap:5px;background:#1e1e1e;border-radius:8px;padding:12px 6px;margin:0 3px;'
+                f'border:1px solid #333;">'
+                f'<span style="font-size:1rem;color:#444;">⏳</span>'
+                f'<span style="font-size:1.2rem;opacity:0.35;">{sec["icon"]}</span>'
+                f'<span style="font-size:0.58rem;color:#444;text-align:center;line-height:1.3;">'
+                f'{sec["label"]}</span>'
+                f'</div>')
+        elif k in done_keys:
+            # Done
+            rc = get_risk_color((parse_json_result(get_content(k)) or {}).get("rischioComplessivo",""))
+            cells += (
+                f'<div style="flex:1;display:flex;flex-direction:column;align-items:center;'
+                f'gap:5px;background:#1a2a1a;border-radius:8px;padding:12px 6px;margin:0 3px;'
+                f'border:1px solid #2a5a2a;">'
+                f'<span style="font-size:1rem;color:#22aa55;">✓</span>'
+                f'<span style="font-size:1.2rem;">{sec["icon"]}</span>'
+                f'<span style="font-size:0.58rem;color:#55aa55;text-align:center;line-height:1.3;">'
+                f'{sec["label"]}</span>'
+                f'</div>')
+        else:
+            # Not in run
+            cells += (
+                f'<div style="flex:1;display:flex;flex-direction:column;align-items:center;'
+                f'gap:5px;background:#1a1a1a;border-radius:8px;padding:12px 6px;margin:0 3px;'
+                f'border:1px solid #222;">'
+                f'<span style="font-size:1rem;color:#333;">—</span>'
+                f'<span style="font-size:1.2rem;opacity:0.2;">{sec["icon"]}</span>'
+                f'<span style="font-size:0.58rem;color:#333;text-align:center;line-height:1.3;">'
+                f'{sec["label"]}</span>'
+                f'</div>')
+    st.markdown(
+        f'<div style="background:#111;border-radius:10px;padding:16px 18px;margin-bottom:20px;">'
+        f'<div style="font-size:0.55rem;letter-spacing:2px;color:#555;font-weight:700;margin-bottom:12px;">'
+        f'ESECUZIONE IN CORSO</div>'
+        f'<div style="display:flex;gap:0;">{cells}</div>'
+        f'</div>',
+        unsafe_allow_html=True)
+
+
+def _render_agent_dialog(pending_keys: list):
+    """Modal-style dialog to select which sections to run agents for."""
+    st.markdown(
+        '<div style="background:#fff;border:2px solid '+RED+';border-radius:12px;'
+        'padding:24px 28px;max-width:640px;margin:20px auto;'
+        'box-shadow:0 8px 40px rgba(0,0,0,0.10);">'
+        '<div style="font-size:1.05rem;font-weight:700;color:#1a1a1a;margin-bottom:4px;">'
+        '📋 Seleziona i moduli di analisi</div>'
+        '<div style="font-size:0.78rem;color:#888;margin-bottom:20px;">'
+        'Scegli per quali sezioni attivare l\'agente AI</div>',
+        unsafe_allow_html=True)
+
+    selected = {}
+    for sec in MAIN_SECTIONS:
+        k = sec["key"]
+        if k not in pending_keys:
+            continue
+        docs = st.session_state.section_doc_names.get(k, [])
+        if k == "transaction" and st.session_state.excel_name:
+            docs = [st.session_state.excel_name]
+        doc_str = " · ".join(docs[:2]) + ("…" if len(docs) > 2 else "")
+        label = f"{sec['number']} {sec['icon']} {sec['full_label']}"
+        if doc_str:
+            label += f"  —  {doc_str}"
+        selected[k] = st.checkbox(label, value=True, key=f"dlg_{k}")
+
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown("")
+
+    c1, c2, _ = st.columns([1.2, 1, 2])
+    with c1:
+        if st.button("⚡  Avvia Analisi", key="dlg_start", use_container_width=True):
+            queue = [k for k in pending_keys if selected.get(k, False)]
+            st.session_state["run_queue"]        = queue
+            st.session_state["show_agent_dialog"] = False
+            st.session_state["pending_queue"]     = []
+            st.rerun()
+    with c2:
+        if st.button("✕  Annulla", key="dlg_cancel", use_container_width=True):
+            st.session_state["show_agent_dialog"] = False
+            st.rerun()
+
+
 # ── ANALYSIS PAGE ────────────────────────────────────────────────
 def render_analysis():
     render_header()
@@ -575,20 +779,18 @@ def render_analysis():
     state   = st.session_state.kyc_state
     done, total = main_progress()
 
+    # ── Agent selection dialog ────────────────────────────────────
+    if st.session_state.get("show_agent_dialog"):
+        _render_agent_dialog(st.session_state.get("pending_queue", []))
+        return
+
     # ── Process run queue (one agent at a time, with streaming) ───
     queue = st.session_state.get("run_queue", [])
     if queue:
         next_key = queue[0]
         st.session_state["run_queue"] = queue[1:]
-        sec = next(s for s in ALL_SECTIONS if s["key"] == next_key)
-        remaining = len(queue) - 1
-        st.markdown(
-            f'<div style="background:#fff8f0;border:1px solid #fed7aa;border-radius:6px;'
-            f'padding:10px 16px;margin-bottom:16px;font-size:0.82rem;color:#92400e;">'
-            f'⚙️ Esecuzione: <b>{sec["icon"]} {sec["full_label"]}</b>'
-            + (f' &nbsp;·&nbsp; <span style="color:#aaa">{remaining} in coda</span>' if remaining else '')
-            + '</div>',
-            unsafe_allow_html=True)
+        remaining = queue[1:]
+        _render_exec_bar(next_key, remaining)
         _run_with_stream(next_key, client)
         return
 
@@ -680,7 +882,8 @@ def render_analysis():
                 queue.append(key)
 
             if queue:
-                st.session_state["run_queue"] = queue
+                st.session_state["pending_queue"]     = queue
+                st.session_state["show_agent_dialog"] = True
 
             st.rerun()
 
