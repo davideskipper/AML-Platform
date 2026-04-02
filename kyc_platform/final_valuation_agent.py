@@ -89,6 +89,7 @@ def run(
     manual_context: str = "",
     show_output: bool = True,
     on_token=None,
+    on_thinking=None,
     use_web_search=None,
 ) -> str:
     parsed_findings = {}
@@ -124,4 +125,5 @@ def run(
         use_web_search=False if use_web_search is None else use_web_search,
         show_output=show_output,
         on_token=on_token,
+        on_thinking=on_thinking,
     )
