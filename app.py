@@ -379,10 +379,30 @@ def render_setup():
                 st.session_state.step = "analysis"
                 st.rerun()
 
-# ── ANALYSIS PAGE (single-column) ────────────────────────────────
+# ── FILE ROUTING ─────────────────────────────────────────────────
 
-def _render_section_card(sec: dict, client):
-    """One section card: header + upload + run + result."""
+def _route_uploaded_files(uploaded_files):
+    """Route files to sections based on filename prefix: 01_, 1_, 01-, 1-, etc."""
+    import re
+    routing = {sec["key"]: [] for sec in MAIN_SECTIONS}
+    unmatched = []
+    for f in uploaded_files:
+        name = f.name.lower()
+        matched = False
+        for i, sec in enumerate(MAIN_SECTIONS, 1):
+            if re.match(r'^0?' + str(i) + r'[\s_\-\.]', name):
+                routing[sec["key"]].append(f)
+                matched = True
+                break
+        if not matched:
+            unmatched.append(f)
+    return routing, unmatched
+
+
+# ── SECTION RESULT CARD ───────────────────────────────────────────
+
+def _render_section_result(sec: dict, client):
+    """Section card: header + assigned docs + run button + result."""
     key     = sec["key"]
     status  = sec_status(key)
     content = get_content(key)
@@ -391,13 +411,7 @@ def _render_section_card(sec: dict, client):
     rc      = get_risk_color(risk)
     running = st.session_state.running_agent == key
 
-    # Consume autorun flag set by upload handler
-    should_run = False
-    if st.session_state.get(f"autorun_{key}"):
-        del st.session_state[f"autorun_{key}"]
-        should_run = True
-
-    # ── Section header ────────────────────────────────────────────
+    # ── Header ────────────────────────────────────────────────────
     dot   = "⏳" if running else ("●" if status == "completed" else "○")
     dot_c = "#f59e0b" if running else (rc if status == "completed" else "#d0d0d0")
     bl_c  = "#f59e0b" if running else (rc if status == "completed" else "#eee")
@@ -414,7 +428,7 @@ def _render_section_card(sec: dict, client):
         f'</div>',
         unsafe_allow_html=True)
 
-    # ── Already-loaded file tags ──────────────────────────────────
+    # ── Assigned docs ─────────────────────────────────────────────
     loaded = st.session_state.section_doc_names.get(key, [])
     if key == "transaction" and st.session_state.excel_name:
         loaded = [st.session_state.excel_name]
@@ -425,52 +439,13 @@ def _render_section_card(sec: dict, client):
             for n in loaded)
         st.markdown(f'<div style="margin-bottom:8px;">{tags}</div>', unsafe_allow_html=True)
 
-    # ── File upload ───────────────────────────────────────────────
-    if key == "transaction":
-        upl = st.file_uploader(
-            "Carica Excel/CSV movimenti bancari",
-            type=["xlsx", "xls", "csv"], key=f"upl_{key}")
-        if upl:
-            fid = f"{upl.name}_{upl.size}"
-            if fid != st.session_state.get(f"fileid_{key}"):
-                st.session_state[f"fileid_{key}"] = fid
-                upl.seek(0)
-                ext = os.path.splitext(upl.name)[1].lower()
-                with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
-                    tmp.write(upl.read())
-                    st.session_state.excel_path = tmp.name
-                    st.session_state.excel_name = upl.name
-                st.session_state.section_doc_names[key] = [upl.name]
-                st.session_state[f"autorun_{key}"] = True
-                st.rerun()
-    else:
-        upls = st.file_uploader(
-            f"Carica documenti — {sec['full_label']}",
-            type=["pdf", "docx", "txt", "md", "csv"],
-            accept_multiple_files=True, key=f"upl_{key}")
-        if upls:
-            fid = "_".join(f"{f.name}_{f.size}" for f in upls)
-            if fid != st.session_state.get(f"fileid_{key}"):
-                st.session_state[f"fileid_{key}"] = fid
-                texts, names = [], []
-                for f in upls:
-                    texts.append(f"=== {f.name} ===\n{extract_text_from_file(f)}")
-                    names.append(f.name)
-                st.session_state.section_docs[key] = "\n\n".join(texts)
-                st.session_state.section_doc_names[key] = names
-                st.session_state[f"autorun_{key}"] = True
-                st.rerun()
-
-    # ── Run / config buttons ──────────────────────────────────────
-    c1, c2, _ = st.columns([1, 1, 4])
+    # ── Run button ────────────────────────────────────────────────
+    c1, _ = st.columns([1, 5])
     with c1:
         lbl = "▶  Avvia" if status == "empty" else "↺  Ri-esegui"
-        if st.button(lbl, key=f"run_{key}", use_container_width=True) or should_run:
+        if st.button(lbl, key=f"run_{key}", use_container_width=True):
             _run_with_stream(key, client)
             return
-    with c2:
-        if st.button("⚙", key=f"cfg_{key}", use_container_width=True, help="Setup"):
-            st.session_state.step = "setup"; st.rerun()
 
     # ── Result ────────────────────────────────────────────────────
     if status == "completed" and content:
@@ -484,13 +459,13 @@ def _render_section_card(sec: dict, client):
                 st.session_state.kyc_state.add_result(key, edited)
     elif status == "empty" and not running:
         st.markdown(
-            f'<div style="text-align:center;padding:24px 0;">'
+            f'<div style="text-align:center;padding:20px 0;">'
             f'<div style="font-size:2.5rem;">{sec["icon"]}</div>'
-            f'<div style="font-size:0.82rem;color:#ccc;margin-top:6px;">'
-            f'Carica i documenti oppure avvia l\'agente</div></div>',
+            f'<div style="font-size:0.8rem;color:#ccc;margin-top:6px;">'
+            f'In attesa dei documenti</div></div>',
             unsafe_allow_html=True)
 
-    st.markdown('<hr style="margin:24px 0 20px;border-color:#f0f0f0;">', unsafe_allow_html=True)
+    st.markdown('<hr style="margin:20px 0;border-color:#f0f0f0;">', unsafe_allow_html=True)
 
 
 def _render_final_valuation_card(client):
@@ -600,6 +575,23 @@ def render_analysis():
     state   = st.session_state.kyc_state
     done, total = main_progress()
 
+    # ── Process run queue (one agent at a time, with streaming) ───
+    queue = st.session_state.get("run_queue", [])
+    if queue:
+        next_key = queue[0]
+        st.session_state["run_queue"] = queue[1:]
+        sec = next(s for s in ALL_SECTIONS if s["key"] == next_key)
+        remaining = len(queue) - 1
+        st.markdown(
+            f'<div style="background:#fff8f0;border:1px solid #fed7aa;border-radius:6px;'
+            f'padding:10px 16px;margin-bottom:16px;font-size:0.82rem;color:#92400e;">'
+            f'⚙️ Esecuzione: <b>{sec["icon"]} {sec["full_label"]}</b>'
+            + (f' &nbsp;·&nbsp; <span style="color:#aaa">{remaining} in coda</span>' if remaining else '')
+            + '</div>',
+            unsafe_allow_html=True)
+        _run_with_stream(next_key, client)
+        return
+
     # ── Top bar ───────────────────────────────────────────────────
     fv_parsed = parse_json_result(get_content("final_valuation"))
     crr       = fv_parsed.get("customerRiskRating","") if fv_parsed else ""
@@ -629,13 +621,6 @@ def render_analysis():
             unsafe_allow_html=True)
     with tb_r:
         st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-        if done < total:
-            if st.button("▶▶ Tutti", key="run_all", use_container_width=True,
-                         help="Esegui tutti gli agenti"):
-                for s in MAIN_SECTIONS:
-                    try: run_section(s["key"], client)
-                    except Exception as e: st.error(f"{s['label']}: {e}")
-                st.rerun()
         c1, c2 = st.columns(2)
         with c1:
             if st.button("✕", key="new_case", use_container_width=True, help="Nuovo caso"):
@@ -645,11 +630,92 @@ def render_analysis():
             if st.button("⚙", key="go_setup", use_container_width=True, help="Setup"):
                 st.session_state.step = "setup"; st.rerun()
 
+    # ── Single upload area ────────────────────────────────────────
+    st.markdown(
+        '<div style="background:#f9f9f9;border:1px dashed #ddd;border-radius:8px;'
+        'padding:16px 20px;margin-bottom:20px;">'
+        '<div style="font-size:0.82rem;font-weight:700;color:#1a1a1a;margin-bottom:4px;">'
+        '📎 Carica i documenti della controparte</div>'
+        '<div style="font-size:0.73rem;color:#999;margin-bottom:10px;">'
+        'Nomina i file con il prefisso della sezione: <b>01_</b> Struttura · <b>02_</b> UBO/PEP · '
+        '<b>03_</b> Reputational · <b>04_</b> Economic · <b>05_</b> Transactional</div>',
+        unsafe_allow_html=True)
+
+    upls = st.file_uploader(
+        "Documenti",
+        type=["pdf", "docx", "txt", "md", "csv", "xlsx", "xls"],
+        accept_multiple_files=True,
+        key="main_upload",
+        label_visibility="collapsed")
+
+    if upls:
+        fid = "_".join(f"{f.name}_{f.size}" for f in upls)
+        if fid != st.session_state.get("main_upload_id"):
+            st.session_state["main_upload_id"] = fid
+            routing, unmatched = _route_uploaded_files(upls)
+
+            # Store files per section
+            queue = []
+            for sec in MAIN_SECTIONS:
+                key = sec["key"]
+                files = routing[key]
+                if not files:
+                    continue
+                if key == "transaction":
+                    f = files[0]
+                    f.seek(0)
+                    ext = os.path.splitext(f.name)[1].lower()
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+                        tmp.write(f.read())
+                        st.session_state.excel_path = tmp.name
+                        st.session_state.excel_name = f.name
+                    st.session_state.section_doc_names[key] = [f.name]
+                else:
+                    texts, names = [], []
+                    for f in files:
+                        texts.append(f"=== {f.name} ===\n{extract_text_from_file(f)}")
+                        names.append(f.name)
+                    st.session_state.section_docs[key] = "\n\n".join(texts)
+                    st.session_state.section_doc_names[key] = names
+                queue.append(key)
+
+            if queue:
+                st.session_state["run_queue"] = queue
+
+            st.rerun()
+
+        # Show routing summary
+        routing_done, _ = _route_uploaded_files(upls)
+        rows = ""
+        for f in upls:
+            import re
+            assigned = None
+            for i, sec in enumerate(MAIN_SECTIONS, 1):
+                if re.match(r'^0?' + str(i) + r'[\s_\-\.]', f.name.lower()):
+                    assigned = sec
+                    break
+            if assigned:
+                rows += (f'<div style="font-size:0.72rem;padding:2px 0;">'
+                         f'<span style="color:#166534;">✅</span> '
+                         f'<span style="color:#555;">{f.name}</span>'
+                         f' <span style="color:#aaa;">→</span> '
+                         f'<span style="color:#1a1a1a;font-weight:600;">'
+                         f'{assigned["number"]} {assigned["label"]}</span></div>')
+            else:
+                rows += (f'<div style="font-size:0.72rem;padding:2px 0;">'
+                         f'<span style="color:#d97706;">⚠️</span> '
+                         f'<span style="color:#999;">{f.name}</span>'
+                         f' <span style="color:#d97706;font-size:0.68rem;">— prefisso non riconosciuto</span>'
+                         f'</div>')
+        if rows:
+            st.markdown(f'<div style="margin-top:10px;">{rows}</div>', unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('<hr style="margin:0 0 20px;border-color:#f0f0f0;">', unsafe_allow_html=True)
 
     # ── All 5 sections ────────────────────────────────────────────
     for sec in MAIN_SECTIONS:
-        _render_section_card(sec, client)
+        _render_section_result(sec, client)
 
     # ── Final Valuation ───────────────────────────────────────────
     _render_final_valuation_card(client)
