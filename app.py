@@ -1715,12 +1715,10 @@ def render_final_valuation():
                     f'<div style="margin-bottom:12px;">{chips}</div>',
                     unsafe_allow_html=True)
 
-            run_col, _ = st.columns([1, 2])
-            with run_col:
-                if st.button("Avvia Final Valuation Agent", key="run_super_agent",
-                             use_container_width=True):
-                    _run_with_stream(key, client)
-                    return
+            if st.button("Avvia Final Valuation Agent", key="run_super_agent",
+                         use_container_width=True):
+                _run_with_stream(key, client)
+                return
 
             if parsed:
                 risk     = parsed.get("rischioComplessivo","") or parsed.get("customerRiskRating","")
