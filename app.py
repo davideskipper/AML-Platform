@@ -1749,11 +1749,11 @@ def render_final_valuation():
 
 
 # ── ROUTER ───────────────────────────────────────────────────────
-# Wrap every page in st.empty() so Streamlit fully replaces the component
-# tree on each step transition — prevents ghost widgets from previous pages.
-_page_slot = st.empty()
+# Each step uses a container with a unique key. When the key changes
+# (step transition), React unmounts the old DOM subtree entirely and
+# mounts a fresh one — no ghost widgets from previous pages.
 step = st.session_state.step
-with _page_slot.container():
+with st.container(key=f"page__{step}"):
     if step == "setup":
         render_setup()
     elif step == "upload":
