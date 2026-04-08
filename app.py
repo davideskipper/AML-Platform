@@ -1541,41 +1541,28 @@ def render_analysis():
     done, total = main_progress()
     all_in_queue = st.session_state.get("run_queue", [])
 
-    # Build status pills for each section
+    # Build status pills: 3 states only — grey (pending), spinning (running), black ✓ (done)
     pills = ""
     for s in MAIN_SECTIONS:
-        k = s["key"]
+        k    = s["key"]
         st_s = sec_status(k)
         is_run = (k == queued_key)
-        is_q   = (k in all_in_queue)
-
-        content = get_content(k) if st_s == "completed" else None
-        parsed  = parse_json_result(content) if content else None
-        risk    = (parsed.get("rischioComplessivo","") if parsed else "") or ""
-        rc      = get_risk_color(risk) if risk else TEXT_SEC
 
         if is_run:
-            pb, pf = "rgba(30,35,40,0.08)", "#1E2328"
-            icon_html = '<span class="aml-spin" style="font-size:0.65rem;">⚙</span> '
+            pb, pf, brd = "#fff", "#1E2328", "border:1px solid #1E2328;"
+            icon_html   = '<span class="aml-spin" style="font-size:0.65rem;color:#1E2328;">⚙</span> '
         elif st_s == "completed":
-            pb, pf = "#F0F0F0", "#1E2328"
-            icon_html = f'<span style="color:{rc};">✓</span> '
-        elif is_q:
-            pb, pf = BG, TEXT_SEC
-            icon_html = '<span>…</span> '
+            pb, pf, brd = "#EBEBEB", "#1E2328", "border:1px solid #C8C8C8;"
+            icon_html   = '<span style="color:#1E2328;font-weight:800;">✓</span> '
         else:
-            pb, pf = BG, TEXT_SEC
-            icon_html = '<span style="opacity:0.4;">○</span> '
-
-        risk_dot = (f'<span style="display:inline-block;width:6px;height:6px;'
-                    f'border-radius:50%;background:{rc};margin-left:5px;vertical-align:middle;"></span>'
-                    if (st_s == "completed" and risk) else "")
+            pb, pf, brd = BG, TEXT_SEC, f"border:1px solid {BORDER};"
+            icon_html   = '<span style="opacity:0.45;">○</span> '
 
         pills += (
             f'<span style="background:{pb};color:{pf};font-size:0.72rem;'
             f'font-weight:600;padding:4px 11px;border-radius:20px;'
-            f'border:1px solid {BORDER};white-space:nowrap;">'
-            + icon_html + s["label"] + risk_dot + '</span>')
+            f'{brd}white-space:nowrap;">'
+            + icon_html + s["label"] + '</span>')
 
     top_l, top_r = st.columns([4, 1])
     with top_l:
