@@ -1147,40 +1147,38 @@ def render_analysis():
                 # Phase 2: old page fully cleared — run the agent
                 _run_with_stream(queued_key, client)
                 return
-            else:
-                # Phase 1: skeleton rendered; trigger phase 2 so upload content is gone
-                st.session_state.agent_run_now = True
-                st.rerun()
+            # Phase 1: fall through — let the full render finish first
 
-        # Criticality badge for active section (opens right panel)
-        if parsed_active := parse_json_result(get_content(active_key)):
-            ov_a = st.session_state.crit_overrides.get(active_key, {})
-            n_c = sum(1 for i,ev in enumerate(parsed_active.get("principaliEvidenze",[]))
-                      if (ev.get("livello","") or "").upper().startswith("CRITICO")
-                      and (ov_a.get(i,{}).get("status","") or "").lower() != "chiuso")
-            n_a = sum(1 for i,ev in enumerate(parsed_active.get("principaliEvidenze",[]))
-                      if (ev.get("livello","") or "").upper().startswith("ANOMALIA")
-                      and (ov_a.get(i,{}).get("status","") or "").lower() != "chiuso")
-            if n_c or n_a:
-                bc1, bc2, _ = st.columns([1, 1, 6])
-                with bc1:
-                    if n_c and st.button(f"🔴 {n_c}", key=f"cb_{active_key}"):
-                        st.session_state.crit_panel_section = None if crit_panel_open == active_key else active_key
-                        st.rerun()
-                with bc2:
-                    if n_a and st.button(f"🟡 {n_a}", key=f"ab_{active_key}"):
-                        st.session_state.crit_panel_section = None if crit_panel_open == active_key else active_key
-                        st.rerun()
+        else:
+            # Criticality badge for active section (opens right panel)
+            if parsed_active := parse_json_result(get_content(active_key)):
+                ov_a = st.session_state.crit_overrides.get(active_key, {})
+                n_c = sum(1 for i,ev in enumerate(parsed_active.get("principaliEvidenze",[]))
+                          if (ev.get("livello","") or "").upper().startswith("CRITICO")
+                          and (ov_a.get(i,{}).get("status","") or "").lower() != "chiuso")
+                n_a = sum(1 for i,ev in enumerate(parsed_active.get("principaliEvidenze",[]))
+                          if (ev.get("livello","") or "").upper().startswith("ANOMALIA")
+                          and (ov_a.get(i,{}).get("status","") or "").lower() != "chiuso")
+                if n_c or n_a:
+                    bc1, bc2, _ = st.columns([1, 1, 6])
+                    with bc1:
+                        if n_c and st.button(f"🔴 {n_c}", key=f"cb_{active_key}"):
+                            st.session_state.crit_panel_section = None if crit_panel_open == active_key else active_key
+                            st.rerun()
+                    with bc2:
+                        if n_a and st.button(f"🟡 {n_a}", key=f"ab_{active_key}"):
+                            st.session_state.crit_panel_section = None if crit_panel_open == active_key else active_key
+                            st.rerun()
 
-        _render_section_content(active_key, client)
+            _render_section_content(active_key, client)
 
-        st.markdown('<hr style="margin:20px 0;border-color:#f0f0f0;">', unsafe_allow_html=True)
-        done, total = main_progress()
-        if done == total:
-            if st.button("💾 Salva e Procedi alla Valutazione Finale →",
-                         key="go_final", use_container_width=True):
-                st.session_state.step = "final"
-                st.rerun()
+            st.markdown('<hr style="margin:20px 0;border-color:#f0f0f0;">', unsafe_allow_html=True)
+            done, total = main_progress()
+            if done == total:
+                if st.button("💾 Salva e Procedi alla Valutazione Finale →",
+                             key="go_final", use_container_width=True):
+                    st.session_state.step = "final"
+                    st.rerun()
 
     if col_crit:
         with col_crit:
@@ -1193,6 +1191,12 @@ def render_analysis():
             if st.button("✕ Chiudi", key="close_crit_panel"):
                 st.session_state.crit_panel_section = None
                 st.rerun()
+
+    # Phase 1: full render is now complete — ALL old widgets have been cleared.
+    # Trigger Phase 2 to actually run the agent.
+    if queued_key and not run_now:
+        st.session_state.agent_run_now = True
+        st.rerun()
 
 
 # ── STEP 5: FINAL VALUATION ───────────────────────────────────────
