@@ -120,6 +120,7 @@ DEFAULTS = {
     "agent_log": [],
     "active_section": "registry",
     "run_queue": [],
+    "agent_run_now": False,
     "crit_panel_section": None,
     "crit_overrides": {},
     "knowledge_base": "",
@@ -1086,12 +1087,24 @@ def render_analysis():
     render_header()
     client = get_client()
 
-    # Process run queue — pop next item before rendering
+    # Two-phase agent execution:
+    # Phase 1 (prepare): render the skeleton so old upload content is cleared, then rerun.
+    # Phase 2 (run):     old content is gone — now actually run the agent.
+    run_now   = st.session_state.get("agent_run_now", False)
+    has_queue = bool(st.session_state.get("run_queue"))
+
     queued_key = None
-    if st.session_state.get("run_queue"):
-        queued_key = st.session_state["run_queue"][0]
-        st.session_state["run_queue"] = st.session_state["run_queue"][1:]
-        st.session_state.active_section = queued_key
+    if has_queue:
+        if run_now:
+            # Phase 2: pop and execute
+            queued_key = st.session_state["run_queue"][0]
+            st.session_state["run_queue"] = st.session_state["run_queue"][1:]
+            st.session_state.active_section = queued_key
+            st.session_state.agent_run_now = False
+        else:
+            # Phase 1: just peek — don't pop yet
+            queued_key = st.session_state["run_queue"][0]
+            st.session_state.active_section = queued_key
 
     # ── Global criticality indicator ─────────────────────────────
     # Count active (non-chiuse) CRITICO + ANOMALIA across all done sections
@@ -1148,8 +1161,14 @@ def render_analysis():
                 f'<span class="aml-spin" style="display:inline-block;margin-right:6px;">⚙</span>'
                 f'{sec["icon"]} {sec["full_label"]} — analisi in corso…</div>',
                 unsafe_allow_html=True)
-            _run_with_stream(queued_key, client)
-            return
+            if run_now:
+                # Phase 2: old page fully cleared — run the agent
+                _run_with_stream(queued_key, client)
+                return
+            else:
+                # Phase 1: skeleton rendered; trigger phase 2 so upload content is gone
+                st.session_state.agent_run_now = True
+                st.rerun()
 
         # Criticality badge for active section (opens right panel)
         if parsed_active := parse_json_result(get_content(active_key)):
