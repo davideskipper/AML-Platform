@@ -1270,7 +1270,7 @@ def _render_section_content(key: str, client):
                     f'color:{TEXT_SEC};text-transform:uppercase;margin-bottom:5px;">'
                     f'Sintesi complessiva dell\'analisi</div>'
                     f'<div style="background:#fff;border:1px solid {BORDER};'
-                    f'border-left:4px solid {rc};border-radius:0 8px 8px 0;'
+                    f'border-radius:8px;'
                     f'padding:16px 20px;font-size:0.875rem;'
                     f'line-height:1.85;color:{TEXT};margin-bottom:12px;">'
                     + sintesi.replace("\n","<br>") + '</div>',
@@ -1324,7 +1324,7 @@ def _render_section_content(key: str, client):
                         f'color:{TEXT_SEC};text-transform:uppercase;margin-bottom:5px;">'
                         f'Proposta di azione</div>'
                         f'<div style="background:#F8F9FA;border:1px solid {BORDER};'
-                        f'border-left:4px solid #1E2328;border-radius:0 8px 8px 0;'
+                        f'border-radius:8px;'
                         f'padding:16px 20px;margin-bottom:16px;">'
                         + "".join(_proposta_parts) + '</div>',
                         unsafe_allow_html=True)
