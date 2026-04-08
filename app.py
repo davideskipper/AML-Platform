@@ -551,39 +551,6 @@ def render_prose_result(key: str, parsed: dict):
             + f'</div>',
             unsafe_allow_html=True)
 
-    # ── Risk matrix (final_valuation only) ──────────────────────
-    if key == "final_valuation":
-        mx = parsed.get("matriceRischio")
-        if mx:
-            st.markdown(
-                f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
-                f'color:{TEXT_SEC};margin:4px 0 10px;text-transform:uppercase;">Matrice di Rischio</div>',
-                unsafe_allow_html=True)
-            labels = [("identitaStruttura","Identità / Struttura"),("reputazionale","Reputazionale"),
-                      ("economico","Economico"),("transazionale","Transazionale"),("geografico","Geografico")]
-            cols = st.columns(5)
-            for i, (dim, lbl) in enumerate(labels):
-                val   = mx.get(dim, {})
-                sc    = int(val.get("score", 0)) if isinstance(val, dict) else 0
-                motiv = val.get("motivazione","") if isinstance(val, dict) else ""
-                if sc >= 4: bc, bg = DANGER, "#FEF2F2"
-                elif sc == 3: bc, bg = YELLOW, "#FFFBEB"
-                else: bc, bg = GREEN, "#F0FDF4"
-                bar_w = sc * 20
-                with cols[i]:
-                    st.markdown(
-                        f'<div style="text-align:center;background:{bg};border-radius:8px;'
-                        f'padding:12px 6px;border:1px solid {BORDER};" title="{motiv}">'
-                        f'<div style="font-size:0.6rem;color:{TEXT_SEC};margin-bottom:6px;font-weight:500;">{lbl}</div>'
-                        f'<div style="font-size:1.6rem;font-weight:800;color:{bc};line-height:1;">{sc}'
-                        f'<span style="font-size:0.6rem;color:{TEXT_SEC};font-weight:400;">/5</span></div>'
-                        f'<div style="margin:6px 6px 0;height:4px;background:{BORDER};border-radius:2px;">'
-                        f'<div style="width:{bar_w}%;height:100%;background:{bc};border-radius:2px;'
-                        f'transition:width 0.4s;"></div></div>'
-                        f'</div>',
-                        unsafe_allow_html=True)
-            st.markdown("<div style='margin-bottom:14px;'></div>", unsafe_allow_html=True)
-
     # ── Narrativa ────────────────────────────────────────────────
     if narrativa:
         st.markdown(
@@ -1673,32 +1640,107 @@ def render_final_valuation():
                     f'<div style="margin-bottom:12px;">{chips}</div>',
                     unsafe_allow_html=True)
 
-            if st.button("▶ Avvia Final Valuation Agent", key="run_super_agent", use_container_width=True):
-                _run_with_stream(key, client)
-                return
+            run_col, _ = st.columns([1, 2])
+            with run_col:
+                if st.button("▶ Avvia Final Valuation Agent", key="run_super_agent",
+                             use_container_width=True):
+                    _run_with_stream(key, client)
+                    return
 
             if parsed:
-                render_prose_result(key, parsed)
-
-                st.markdown(f'<div style="height:12px;"></div>', unsafe_allow_html=True)
-                st.markdown(
-                    f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
-                    f'color:{TEXT_SEC};text-transform:uppercase;margin-bottom:8px;">Modifica Narrativa</div>',
-                    unsafe_allow_html=True)
+                risk     = parsed.get("rischioComplessivo","") or parsed.get("customerRiskRating","")
+                rc       = get_risk_color(risk) if risk else BLUE
                 narrativa = (parsed.get("narrativa") or parsed.get("narrativaCompleta")
                              or parsed.get("sintesiEsecutiva","") or "")
-                edited_narrative = st.text_area(
-                    "Narrativa", value=narrativa, height=200,
-                    key="final_agent_edit", label_visibility="collapsed")
-                risk_profile_opts = ["Confermato", "Innalzamento", "Abbassamento", "Modifica"]
-                risk_profile = st.radio("Profilo di rischio", risk_profile_opts,
-                                        horizontal=True, key="final_agent_risk",
-                                        label_visibility="collapsed")
-                if st.button("💾 Salva modifiche", key="final_agent_save"):
-                    new_content = content.replace(narrativa, edited_narrative) if narrativa else content
-                    st.session_state.edited_content[key] = new_content
-                    st.session_state.kyc_state.add_result(key, new_content)
-                    st.success("✓ Modifiche salvate.")
+                flags    = parsed.get("flags", [])
+                racc     = parsed.get("raccomandazione","")
+
+                # Build raccomandazione string
+                racc_str = ""
+                if isinstance(racc, dict):
+                    parts_r = [x for x in [racc.get("accettazione",""),
+                                            racc.get("livelloAdeguataVerifica",""),
+                                            racc.get("frequenzaMonitoraggio","")] if x]
+                    if parts_r: racc_str = " · ".join(parts_r)
+                elif isinstance(racc, str) and racc:
+                    racc_str = racc
+
+                # ── Risk badge + Confirm/Raise selector (same row) ────
+                risk_col, profile_col = st.columns([1.5, 2.5])
+                with risk_col:
+                    st.markdown(
+                        f'<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;'
+                        f'background:#fff;border:1px solid {BORDER};border-left:4px solid {rc};'
+                        f'border-radius:0 8px 8px 0;padding:12px 14px;height:100%;">'
+                        f'<span style="font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
+                        f'color:{TEXT_SEC};text-transform:uppercase;">Rischio Complessivo</span>'
+                        f'{risk_badge(risk)}'
+                        + (f'<div style="width:100%;font-size:0.72rem;color:{TEXT_SEC};margin-top:2px;">'
+                           f'{racc_str}</div>' if racc_str else '')
+                        + f'</div>',
+                        unsafe_allow_html=True)
+
+                with profile_col:
+                    st.markdown(
+                        f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
+                        f'color:{TEXT_SEC};text-transform:uppercase;margin-bottom:6px;">'
+                        f'Decisione Compliance</div>',
+                        unsafe_allow_html=True)
+                    risk_profile_opts = ["✓ Confermato", "▲ Innalzamento", "▼ Abbassamento", "~ Modifica"]
+                    risk_profile = st.radio("Profilo", risk_profile_opts, horizontal=True,
+                                            key="final_agent_risk", label_visibility="collapsed")
+                    save_col, _ = st.columns([1, 1])
+                    with save_col:
+                        if st.button("💾 Conferma decisione", key="final_agent_save",
+                                     use_container_width=True):
+                            annotated = f"[{risk_profile}]\n\n{content}"
+                            st.session_state.edited_content[key] = annotated
+                            st.session_state.kyc_state.add_result(key, annotated)
+                            st.success("✓ Decisione salvata.")
+
+                st.markdown(f'<div style="height:14px;"></div>', unsafe_allow_html=True)
+
+                # ── Motivazioni (narrativa) ───────────────────────────
+                if narrativa:
+                    st.markdown(
+                        f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
+                        f'color:{TEXT_SEC};text-transform:uppercase;margin-bottom:6px;">'
+                        f'Motivazioni del Profilo di Rischio</div>'
+                        f'<div style="background:#fff;border:1px solid {BORDER};'
+                        f'border-left:4px solid {rc};border-radius:0 8px 8px 0;'
+                        f'padding:18px 22px;font-size:0.875rem;line-height:1.85;'
+                        f'color:{TEXT};margin-bottom:18px;">'
+                        + narrativa.replace("\n","<br>") + '</div>',
+                        unsafe_allow_html=True)
+
+                # ── Flag AML ─────────────────────────────────────────
+                if flags:
+                    st.markdown(
+                        f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
+                        f'color:{TEXT_SEC};margin:0 0 8px;text-transform:uppercase;">Flag AML</div>',
+                        unsafe_allow_html=True)
+                    _flag_cfg = {
+                        "CRITICAL": ("#F3E8FF","#7C3AED","#7C3AED"),
+                        "HIGH":     ("#FEE2E2","#B91C1C","#DC2626"),
+                        "MEDIUM":   ("#FFFBEB","#92400E","#D97706"),
+                        "LOW":      ("#F3F4F6","#6B7280","#9CA3AF"),
+                    }
+                    for fl in flags:
+                        rischio = (fl.get("rischio","") or "").upper()
+                        bg_f, fg_f, bd_f = _flag_cfg.get(rischio, ("#F3F4F6","#6B7280","#9CA3AF"))
+                        tipo = fl.get("tipo","")
+                        desc = fl.get("descrizione","")
+                        norm = fl.get("riferimentoNormativo","") or fl.get("indicatoreUIF","")
+                        st.markdown(
+                            f'<div style="display:flex;align-items:flex-start;gap:10px;'
+                            f'background:{bg_f};border:1px solid {BORDER};border-left:3px solid {bd_f};'
+                            f'border-radius:0 6px 6px 0;padding:8px 12px;margin-bottom:5px;">'
+                            f'<div style="flex:1;">'
+                            f'<span style="font-size:0.8rem;font-weight:600;color:{fg_f};">{tipo}</span>'
+                            + (f'<span style="font-size:0.78rem;color:{TEXT_SEC};"> — {desc}</span>' if desc else '')
+                            + (f'<div style="font-size:0.68rem;color:{TEXT_SEC};margin-top:2px;">📎 {norm}</div>' if norm else '')
+                            + f'</div></div>',
+                            unsafe_allow_html=True)
 
         st.markdown(f'<div style="height:16px;"></div>', unsafe_allow_html=True)
         if st.button("← Torna all'analisi", key="back_to_analysis"):
