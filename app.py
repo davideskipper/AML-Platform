@@ -141,19 +141,9 @@ st.markdown(f"""
   @keyframes aml-pulse {{ 0%,100% {{ opacity:1; }} 50% {{ opacity:0.5; }} }}
   .aml-pulse {{ animation: aml-pulse 1.5s ease-in-out infinite !important; }}
 
-  /* ── Sidebar nav: transparent button overlaid on label row ── */
-  /* #aml-sb-marker lives inside stMarkdown; use :has() to target sibling stButtons */
-  [data-testid="stMarkdown"]:has(#aml-sb-marker) ~ [data-testid="stButton"] {{
-    margin-top: -38px !important; position: relative !important; z-index: 5 !important;
-  }}
-  [data-testid="stMarkdown"]:has(#aml-sb-marker) ~ [data-testid="stButton"] > button {{
-    background: transparent !important; border: none !important; box-shadow: none !important;
-    height: 38px !important; min-height: 0 !important; padding: 0 !important;
-    opacity: 0 !important; cursor: pointer !important; width: 100% !important;
-    transform: none !important;
-  }}
-  [data-testid="stMarkdown"]:has(#aml-sb-marker) ~ [data-testid="stButton"] > button:hover {{
-    background: transparent !important; transform: none !important; box-shadow: none !important;
+  /* ── Tabs ── */
+  [data-testid="stTabs"] [data-testid="stTab"] {{
+    font-size: 0.82rem !important; font-weight: 500 !important; padding: 8px 16px !important;
   }}
 </style>
 """, unsafe_allow_html=True)
@@ -1342,17 +1332,64 @@ def render_analysis():
     render_header()
     client = get_client()
 
-    # Pop the next agent from the queue and run it directly.
-    # The step-transition rerun from mode_config already cleared old widgets,
-    # so no extra "skeleton" Phase 1 rerun is needed.
+    # Pop next agent from queue (if any) and run it immediately
     queued_key = None
     if st.session_state.get("run_queue"):
         queued_key = st.session_state["run_queue"][0]
         st.session_state["run_queue"] = st.session_state["run_queue"][1:]
         st.session_state.active_section = queued_key
 
-    # ── Global criticality indicator ─────────────────────────────
-    # Count active (non-chiuse) CRITICO + ANOMALIA across all done sections
+    # ── Utility buttons row ───────────────────────────────────────
+    util_l, util_r = st.columns([6, 1])
+    with util_r:
+        if st.button("✕ Nuovo caso", key="new_case_top", use_container_width=True):
+            for k in list(st.session_state.keys()): del st.session_state[k]
+            st.rerun()
+
+    # ── Queue running mode ────────────────────────────────────────
+    if queued_key:
+        sec = next(s for s in ALL_SECTIONS if s["key"] == queued_key)
+
+        # Progress pills
+        pills = ""
+        for s in MAIN_SECTIONS:
+            is_done = sec_status(s["key"]) == "completed"
+            is_run  = s["key"] == queued_key
+            if is_run:
+                pb, pf = f"rgba(196,30,58,0.1)", ACCENT
+                pl = f"⚙ {s['label']}"
+            elif is_done:
+                pb, pf = "#DCFCE7", GREEN
+                pl = f"✓ {s['label']}"
+            else:
+                pb, pf = BG, TEXT_SEC
+                pl = f"○ {s['label']}"
+            pills += (
+                f'<span style="background:{pb};color:{pf};font-size:0.72rem;font-weight:600;'
+                f'padding:3px 12px;border-radius:20px;border:1px solid {BORDER};">{pl}</span>')
+        st.markdown(
+            f'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">{pills}</div>',
+            unsafe_allow_html=True)
+
+        # Running section card
+        st.markdown(
+            f'<div style="background:#fff;border:1px solid {BORDER};border-left:4px solid {ACCENT};'
+            f'border-radius:0 10px 10px 0;padding:14px 18px;margin-bottom:14px;">'
+            f'<div style="display:flex;align-items:center;gap:10px;">'
+            f'<span class="aml-spin" style="font-size:1rem;color:{ACCENT};">⚙</span>'
+            f'<div><div style="font-size:0.88rem;font-weight:600;color:{TEXT};">'
+            f'{sec["icon"]} {sec["full_label"]}</div>'
+            f'<div style="font-size:0.75rem;color:{TEXT_SEC};">'
+            f'Analisi in corso — l\'operazione può richiedere 1-2 minuti…</div>'
+            f'</div></div></div>',
+            unsafe_allow_html=True)
+
+        _run_with_stream(queued_key, client)
+        return
+
+    # ── Idle mode: section tabs ───────────────────────────────────
+
+    # Global criticality indicators
     total_crit = total_anom = 0
     for sec in MAIN_SECTIONS:
         sk = sec["key"]
@@ -1369,8 +1406,6 @@ def render_analysis():
                 total_crit += 1
             elif lvl.startswith("ANOMALIA"):
                 total_anom += 1
-
-    # Show indicator row (right-aligned above columns)
     ind_parts = []
     if total_crit:
         ind_parts.append(
@@ -1382,88 +1417,28 @@ def render_analysis():
             f'padding:4px 14px;border-radius:20px;border:1px solid #FDE68A;">🟡 {total_anom} attenzioni</span>')
     if ind_parts:
         st.markdown(
-            f'<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;">'
-            + "".join(ind_parts) + '</div>',
+            f'<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:8px;">'
+            + "".join(ind_parts) + '</div>', unsafe_allow_html=True)
+
+    # Section tabs — all 5 sections navigable
+    tab_labels = [f"{s['icon']} {s['label']}" for s in MAIN_SECTIONS]
+    tabs = st.tabs(tab_labels)
+    for tab, sec in zip(tabs, MAIN_SECTIONS):
+        with tab:
+            _render_section_content(sec["key"], client)
+
+    st.markdown(f'<div style="height:16px;"></div>', unsafe_allow_html=True)
+    done, total = main_progress()
+    if done == total:
+        st.markdown(
+            f'<div style="background:#DCFCE7;border:1px solid #86EFAC;border-radius:8px;'
+            f'padding:10px 16px;margin-bottom:12px;font-size:0.82rem;color:#15803D;font-weight:600;">'
+            f'✓ Tutte le sezioni completate — la valutazione finale è disponibile.</div>',
             unsafe_allow_html=True)
-
-    # ── Layout ────────────────────────────────────────────────────
-    crit_panel_open = st.session_state.get("crit_panel_section")
-
-    if crit_panel_open:
-        col_sidebar, col_content, col_crit = st.columns([1.6, 3.5, 2.2])
-    else:
-        col_sidebar, col_content = st.columns([1.6, 5.2])
-        col_crit = None
-
-    with col_sidebar:
-        _render_analysis_sidebar(queued_key=queued_key)
-
-    with col_content:
-        active_key = st.session_state.get("active_section", "registry")
-
-        if queued_key:
-            sec = next(s for s in ALL_SECTIONS if s["key"] == queued_key)
-            st.markdown(
-                f'<div style="background:#fff;border:1px solid {BORDER};border-left:4px solid {ACCENT};'
-                f'border-radius:0 10px 10px 0;padding:14px 18px;margin-bottom:18px;">'
-                f'<div style="display:flex;align-items:center;gap:10px;">'
-                f'<span class="aml-spin" style="font-size:1rem;color:{ACCENT};">⚙</span>'
-                f'<div><div style="font-size:0.88rem;font-weight:600;color:{TEXT};">'
-                f'{sec["icon"]} {sec["full_label"]}</div>'
-                f'<div style="font-size:0.75rem;color:{TEXT_SEC};">Analisi in corso — attendere…</div>'
-                f'</div></div></div>',
-                unsafe_allow_html=True)
-            _run_with_stream(queued_key, client)
-            return
-
-        else:
-            # Criticality badge for active section (opens right panel)
-            if parsed_active := parse_json_result(get_content(active_key)):
-                ov_a = st.session_state.crit_overrides.get(active_key, {})
-                n_c = sum(1 for i,ev in enumerate(parsed_active.get("principaliEvidenze",[]))
-                          if (ev.get("livello","") or "").upper().startswith("CRITICO")
-                          and (ov_a.get(i,{}).get("status","") or "").lower() != "chiuso")
-                n_a = sum(1 for i,ev in enumerate(parsed_active.get("principaliEvidenze",[]))
-                          if (ev.get("livello","") or "").upper().startswith("ANOMALIA")
-                          and (ov_a.get(i,{}).get("status","") or "").lower() != "chiuso")
-                if n_c or n_a:
-                    bc1, bc2, _ = st.columns([1, 1, 6])
-                    with bc1:
-                        if n_c and st.button(f"🔴 {n_c}", key=f"cb_{active_key}"):
-                            st.session_state.crit_panel_section = None if crit_panel_open == active_key else active_key
-                            st.rerun()
-                    with bc2:
-                        if n_a and st.button(f"🟡 {n_a}", key=f"ab_{active_key}"):
-                            st.session_state.crit_panel_section = None if crit_panel_open == active_key else active_key
-                            st.rerun()
-
-            _render_section_content(active_key, client)
-
-            st.markdown(f'<div style="height:16px;"></div>', unsafe_allow_html=True)
-            done, total = main_progress()
-            if done == total:
-                st.markdown(
-                    f'<div style="background:#DCFCE7;border:1px solid #86EFAC;border-radius:8px;'
-                    f'padding:10px 16px;margin-bottom:12px;font-size:0.82rem;color:#15803D;font-weight:600;">'
-                    f'✓ Tutte le sezioni completate — la valutazione finale è disponibile.</div>',
-                    unsafe_allow_html=True)
-                if st.button("Procedi alla Valutazione Finale →",
-                             key="go_final", use_container_width=True):
-                    st.session_state.step = "final"
-                    st.rerun()
-
-    if col_crit:
-        with col_crit:
-            st.markdown(
-                f'<div style="background:#fff;border:1px solid {BORDER};border-radius:10px;padding:16px;">'
-                f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
-                f'color:{TEXT_SEC};text-transform:uppercase;margin-bottom:12px;">Criticità &amp; Attenzioni</div>',
-                unsafe_allow_html=True)
-            _render_crit_panel(crit_panel_open)
-            st.markdown('</div>', unsafe_allow_html=True)
-            if st.button("✕ Chiudi pannello", key="close_crit_panel", use_container_width=True):
-                st.session_state.crit_panel_section = None
-                st.rerun()
+        if st.button("Procedi alla Valutazione Finale →",
+                     key="go_final", use_container_width=True):
+            st.session_state.step = "final"
+            st.rerun()
 
 
 
