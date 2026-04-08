@@ -758,7 +758,7 @@ def render_setup():
                     + " · ".join(f"📄 {n}" for n in st.session_state.kb_doc_names)
                     + '</div>', unsafe_allow_html=True)
 
-        if st.button("Continua → Carica Documenti", use_container_width=True):
+        if st.button("Carica Documenti", use_container_width=True):
             if not country.strip():
                 st.error("Il campo Paese è obbligatorio.")
             elif not analyst.strip():
@@ -894,11 +894,11 @@ def render_upload():
         st.markdown(f'<div style="height:12px;"></div>', unsafe_allow_html=True)
         nav_l, nav_r = st.columns([1, 1])
         with nav_l:
-            if st.button("← Indietro", key="upload_back", use_container_width=True):
+            if st.button("Indietro", key="upload_back", use_container_width=True):
                 st.session_state.step = "setup"
                 st.rerun()
         with nav_r:
-            if st.button("▶ Avvia Analisi", key="upload_next", use_container_width=True):
+            if st.button("Avvia Analisi", key="upload_next", use_container_width=True):
                 _fd_list  = st.session_state.uploaded_files_data
                 _fa       = st.session_state.file_assignments
                 _sec_docs, _sec_names = {}, {}
@@ -992,11 +992,11 @@ def render_mode_config():
 
     with ctrl_col:
         st.markdown(f'<div style="height:48px;"></div>', unsafe_allow_html=True)
-        if st.button("← Indietro", key="mc_back", use_container_width=True):
+        if st.button("Indietro", key="mc_back", use_container_width=True):
             st.session_state.step = "upload"
             st.rerun()
         st.markdown(f'<div style="height:6px;"></div>', unsafe_allow_html=True)
-        if st.button("▶ Avvia Analisi", key="mc_next", use_container_width=True):
+        if st.button("Avvia Analisi", key="mc_next", use_container_width=True):
             files_data   = st.session_state.uploaded_files_data
             file_assigns = st.session_state.file_assignments
             section_docs, section_doc_names = {}, {}
@@ -1159,7 +1159,7 @@ def _render_crit_panel(key: str):
                 unsafe_allow_html=True)
 
             edit_key = f"crit_edit_{key}_{idx}"
-            if st.button("Aggiorna stato ▾", key=f"crit_btn_{key}_{idx}"):
+            if st.button("Aggiorna stato", key=f"crit_btn_{key}_{idx}"):
                 st.session_state[edit_key] = not st.session_state.get(edit_key, False)
                 st.rerun()
 
@@ -1176,7 +1176,7 @@ def _render_crit_panel(key: str):
                                           horizontal=True, key=f"crit_radio_{key}_{idx}")
                     new_motiv  = st.text_input("Motivazione", value=cur_motiv,
                                                key=f"crit_motiv_{key}_{idx}")
-                    if st.form_submit_button("💾 Salva"):
+                    if st.form_submit_button("Salva"):
                         if key not in st.session_state.crit_overrides:
                             st.session_state.crit_overrides[key] = {}
                         st.session_state.crit_overrides[key][idx] = {
@@ -1225,12 +1225,12 @@ def _render_section_content(key: str, client):
                                key=f"manual_ta_{key}", label_visibility="collapsed")
         btn_s, btn_r, _ = st.columns([1, 1, 2])
         with btn_s:
-            if st.button("💾 Salva", key=f"manual_save_{key}", use_container_width=True):
+            if st.button("Salva", key=f"manual_save_{key}", use_container_width=True):
                 st.session_state.edited_content[key] = new_val
                 st.session_state.kyc_state.add_result(key, new_val)
                 st.rerun()
         with btn_r:
-            if st.button("↺ Avvia Agente", key=f"manual_rerun_{key}", use_container_width=True):
+            if st.button("Avvia Agente", key=f"manual_rerun_{key}", use_container_width=True):
                 st.session_state.section_modes[key] = "agent"
                 st.session_state.run_queue = [key]
                 st.rerun()
@@ -1366,19 +1366,19 @@ def _render_section_content(key: str, client):
             st.markdown(f'<div style="margin-top:14px;"></div>', unsafe_allow_html=True)
             btn_rr, btn_ed, _ = st.columns([1, 1, 2])
             with btn_rr:
-                if st.button("↺ Riesegui Agente", key=f"rerun_{key}", use_container_width=True):
+                if st.button("Riesegui Agente", key=f"rerun_{key}", use_container_width=True):
                     st.session_state.section_modes[key] = "agent"
                     st.session_state.run_queue = [key]
                     st.rerun()
             with btn_ed:
                 etk = f"show_edit_{key}"
-                if st.button("✏️ Modifica JSON", key=f"edit_toggle_{key}", use_container_width=True):
+                if st.button("Modifica JSON", key=f"edit_toggle_{key}", use_container_width=True):
                     st.session_state[etk] = not st.session_state.get(etk, False)
                     st.rerun()
             if st.session_state.get(f"show_edit_{key}", False):
                 edited = st.text_area("", value=content, height=300,
                                       key=f"edit_ta_{key}", label_visibility="collapsed")
-                if st.button("💾 Salva", key=f"edit_save_{key}"):
+                if st.button("Salva", key=f"edit_save_{key}"):
                     st.session_state.edited_content[key] = edited
                     st.session_state.kyc_state.add_result(key, edited)
                     st.session_state[f"show_edit_{key}"] = False
@@ -1401,14 +1401,18 @@ def _render_section_content(key: str, client):
             f'<div style="font-size:0.75rem;color:{TEXT_SEC};opacity:0.7;margin-top:4px;">'
             f'{sec["desc"]}</div>'
             f'</div>', unsafe_allow_html=True)
-        btn_a, btn_m = st.columns(2)
+        btn_back, btn_a, btn_m = st.columns(3)
+        with btn_back:
+            if st.button("Indietro", key=f"back_upload_{key}", use_container_width=True):
+                st.session_state.step = "upload"
+                st.rerun()
         with btn_a:
-            if st.button(f"▶ Avvia Agente", key=f"run_{key}", use_container_width=True):
+            if st.button("Avvia Agente", key=f"run_{key}", use_container_width=True):
                 st.session_state.section_modes[key] = "agent"
                 st.session_state.run_queue = [key]
                 st.rerun()
         with btn_m:
-            if st.button(f"✍️ Inserisci Manuale", key=f"manual_start_{key}", use_container_width=True):
+            if st.button("Inserisci Manuale", key=f"manual_start_{key}", use_container_width=True):
                 st.session_state.section_modes[key] = "manual"
                 st.rerun()
 
@@ -1485,7 +1489,7 @@ def _render_right_panel(queued_key=None):
     st.markdown(
         f'<div style="height:1px;background:{BORDER};margin:12px 0 10px;"></div>',
         unsafe_allow_html=True)
-    if st.button("⚡ Valutazione Finale", key="go_final_panel", use_container_width=True):
+    if st.button("Valutazione Finale", key="go_final_panel", use_container_width=True):
         st.session_state.step = "final"
         st.rerun()
 
@@ -1574,7 +1578,7 @@ def render_analysis():
                 f'padding:4px 0 10px;justify-content:flex-end;">' + _badges_html + '</div>',
                 unsafe_allow_html=True)
     with top_r:
-        if st.button("⚡ Valutazione Finale", key="go_final_top", use_container_width=True):
+        if st.button("Valutazione Finale", key="go_final_top", use_container_width=True):
             st.session_state.step = "final"
             st.rerun()
 
@@ -1660,7 +1664,7 @@ def render_final_valuation():
             risk_opts = ["Confermato", "Innalzamento", "Abbassamento", "Modifica"]
             risk_choice = st.radio("Profilo", risk_opts, horizontal=True,
                                    key="final_risk_radio", label_visibility="collapsed")
-            if st.button("💾 Salva Valutazione", key="final_manual_save", use_container_width=True):
+            if st.button("Salva Valutazione", key="final_manual_save", use_container_width=True):
                 narrative_full = f"[{risk_choice}]\n\n{manual_narrative}"
                 st.session_state.edited_content[key] = narrative_full
                 st.session_state.kyc_state.add_result(key, narrative_full)
@@ -1711,7 +1715,7 @@ def render_final_valuation():
 
             run_col, _ = st.columns([1, 2])
             with run_col:
-                if st.button("▶ Avvia Final Valuation Agent", key="run_super_agent",
+                if st.button("Avvia Final Valuation Agent", key="run_super_agent",
                              use_container_width=True):
                     _run_with_stream(key, client)
                     return
@@ -1760,7 +1764,7 @@ def render_final_valuation():
                                             key="final_agent_risk", label_visibility="collapsed")
                     save_col, _ = st.columns([1, 1])
                     with save_col:
-                        if st.button("💾 Conferma decisione", key="final_agent_save",
+                        if st.button("Conferma decisione", key="final_agent_save",
                                      use_container_width=True):
                             annotated = f"[{risk_profile}]\n\n{content}"
                             st.session_state.edited_content[key] = annotated
@@ -1812,7 +1816,7 @@ def render_final_valuation():
                             unsafe_allow_html=True)
 
         st.markdown(f'<div style="height:16px;"></div>', unsafe_allow_html=True)
-        if st.button("← Torna all'analisi", key="back_to_analysis"):
+        if st.button("Torna all'analisi", key="back_to_analysis"):
             st.session_state.step = "analysis"
             st.rerun()
 
