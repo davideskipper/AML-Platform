@@ -1013,17 +1013,14 @@ def render_mode_config():
 
 
 # ── STREAMING helper ──────────────────────────────────────────────
-def _run_with_stream(key: str, client, status_box=None, stream_box=None):
-    """Run agent with live streaming. Accepts pre-created st.empty() placeholders
-    so they can be placed inside any column context before this function is called."""
+def _run_with_stream(key: str, client):
+    """Run agent with live streaming. Must be called inside the desired column context."""
     if not client:
         st.error("API Key non configurata nei Secrets.")
         return
 
-    if status_box is None:
-        status_box = st.empty()
-    if stream_box is None:
-        stream_box = st.empty()
+    status_box = st.empty()
+    stream_box = st.empty()
 
     buf = {"text": "", "thinking": "", "phase": "thinking"}
 
@@ -1484,11 +1481,8 @@ def render_analysis():
     # ── Two-column layout: main content | right panel ─────────────
     main_col, right_col = st.columns([2.8, 1.2])
 
-    # ── Main column ───────────────────────────────────────────────
-    # We must create streaming placeholders INSIDE the column context
-    # so they appear in the left column even when updated from outside.
-    status_box = None
-    stream_box  = None
+    with right_col:
+        _render_right_panel(queued_key)
 
     with main_col:
         # Top-right: "Nuovo caso" button
@@ -1537,9 +1531,8 @@ def render_analysis():
                 f'</div></div></div>',
                 unsafe_allow_html=True)
 
-            # ← Placeholders INSIDE main_col: streaming renders here
-            status_box = st.empty()
-            stream_box  = st.empty()
+            # Run agent — placeholders created inside this column context
+            _run_with_stream(queued_key, client)
 
         else:
             # ── Idle mode: tabs with completed sections ───────────
@@ -1562,16 +1555,6 @@ def render_analysis():
                              key="go_final", use_container_width=True):
                     st.session_state.step = "final"
                     st.rerun()
-
-    # ── Right panel (always visible) ─────────────────────────────
-    with right_col:
-        _render_right_panel(queued_key)
-
-    # ── Run agent after columns are laid out ──────────────────────
-    # The streaming boxes are already slotted inside main_col above.
-    if queued_key:
-        _run_with_stream(queued_key, client,
-                         status_box=status_box, stream_box=stream_box)
 
 
 

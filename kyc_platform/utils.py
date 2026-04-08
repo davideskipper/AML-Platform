@@ -52,10 +52,12 @@ def run_agent(
     final_text = ""
 
     while True:
+        # budget_tokens must be strictly less than max_tokens
+        budget_tokens = min(8000, max_tokens - 1024)
         with client.messages.stream(
             model="claude-sonnet-4-6",
             max_tokens=max_tokens,
-            thinking={"type": "enabled", "budget_tokens": 8000},
+            thinking={"type": "enabled", "budget_tokens": budget_tokens},
             system=system_prompt,
             tools=tools,
             messages=messages,
@@ -106,7 +108,7 @@ def run_standard_agent(
     on_token=None,
     on_thinking=None,
     use_web_search: bool = False,
-    max_tokens: int = 6000,
+    max_tokens: int = 10000,
     header: str = "",
 ) -> str:
     """
