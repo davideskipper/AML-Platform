@@ -440,11 +440,12 @@ def _logo_html(height: int = 38) -> str:
 
 
 # ── Step Navigation Bar ───────────────────────────────────────────
-_STEP_ORDER = ["upload", "analysis", "final"]
+_STEP_ORDER = ["upload", "mode_config", "analysis", "final"]
 _STEP_LABELS = {
-    "upload":   "① Documenti",
-    "analysis": "② Analisi",
-    "final":    "③ Valutazione",
+    "upload":      "① Documenti",
+    "mode_config": "② Modalità",
+    "analysis":    "③ Analisi",
+    "final":       "④ Valutazione",
 }
 
 def render_step_nav(current_step_id: str):
@@ -898,53 +899,14 @@ def render_upload():
                 st.session_state.step = "setup"
                 st.rerun()
         with nav_r:
-            if st.button("▶ Avvia Analisi", key="upload_next", use_container_width=True):
-                # Build section_docs / excel_raw_bytes (same logic as mode_config used to do)
-                _files_data   = st.session_state.uploaded_files_data
-                _file_assigns = st.session_state.file_assignments
-                _sec_docs, _sec_doc_names = {}, {}
-                for _sec in MAIN_SECTIONS:
-                    _sk = _sec["key"]
-                    _asgn = [fd for fd in _files_data if _file_assigns.get(fd["name"]) == _sk]
-                    if not _asgn:
-                        continue
-                    if _sk == "transaction":
-                        _fd  = _asgn[0]
-                        _raw = _fd.get("raw_bytes")
-                        import io as _io
-                        if _raw:
-                            _buf = _io.BytesIO(_raw)
-                        else:
-                            _buf = _io.BytesIO(_fd["content_text"].encode("utf-8", errors="replace"))
-                        _buf.name = _fd["name"]
-                        st.session_state.excel_raw_bytes = _buf
-                        st.session_state.excel_name      = _fd["name"]
-                        _sec_doc_names[_sk] = [_fd["name"]]
-                    else:
-                        _sec_docs[_sk]      = "\n\n".join(
-                            f"=== {fd['name']} ===\n{fd['content_text']}" for fd in _asgn)
-                        _sec_doc_names[_sk] = [fd["name"] for fd in _asgn]
-                st.session_state.section_docs      = _sec_docs
-                st.session_state.section_doc_names = _sec_doc_names
-                # Default every section to agent mode
-                for _sec in MAIN_SECTIONS:
-                    st.session_state.section_modes[_sec["key"]] = "agent"
-                    st.session_state.section_web[_sec["key"]]   = False
-                # Queue all sections
-                st.session_state.run_queue      = [s["key"] for s in MAIN_SECTIONS]
-                st.session_state.active_section = "registry"
-                # Clean up upload state so nothing ghosts
-                st.session_state.uploaded_files_data = []
-                st.session_state.file_assignments    = {}
-                st.session_state.upload_hash         = ""
-                for _k in list(st.session_state.keys()):
-                    if _k.startswith("assign_"):
-                        del st.session_state[_k]
-                st.session_state.step = "transit"
+            if st.button("Continua →", key="upload_next", use_container_width=True):
+                st.session_state.step = "mode_config"
                 st.rerun()
 
 
 # ── STEP 3: MODE CONFIG ───────────────────────────────────────────
+# NOTE: uses NO nested st.columns inside section cards to avoid ghost
+# widget rendering when transitioning to the analysis page.
 def render_mode_config():
     render_header()
     _, col, _ = st.columns([0.5, 5, 0.5])
@@ -955,61 +917,50 @@ def render_mode_config():
             f'Scegli per ogni sezione se usare l\'agente AI o inserire l\'analisi manualmente.</div>',
             unsafe_allow_html=True)
 
-        files_data    = st.session_state.uploaded_files_data
-        file_assigns  = st.session_state.file_assignments
+        files_data   = st.session_state.uploaded_files_data
+        file_assigns = st.session_state.file_assignments
 
         for sec in MAIN_SECTIONS:
             key = sec["key"]
-            # Files assigned to this section
             assigned_files = [fd["name"] for fd in files_data
                               if file_assigns.get(fd["name"]) == key]
 
-            # Card
-            st.markdown(
-                f'<div style="background:#fff;border:1px solid {BORDER};border-radius:10px;'
-                f'padding:14px 18px;margin-bottom:10px;">'
-                f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">'
-                f'<span style="font-size:1.05rem;">{sec["icon"]}</span>'
-                f'<span style="font-size:0.62rem;color:{TEXT_SEC};font-weight:700;letter-spacing:0.5px;">{sec["number"]}</span>'
-                f'<span style="font-size:0.92rem;font-weight:600;color:{TEXT};">{sec["full_label"]}</span>'
-                f'</div>',
-                unsafe_allow_html=True)
+            with st.container(border=True):
+                # Section label (HTML only, no widget columns)
+                file_tags = "".join(
+                    f'<span style="display:inline-block;background:#F0FFF4;border:1px solid #BBF7D0;'
+                    f'border-radius:10px;padding:1px 8px;font-size:0.68rem;color:#166534;margin:1px 2px;">'
+                    f'📄 {n[:30]}</span>'
+                    for n in assigned_files)
+                st.markdown(
+                    f'<div style="display:flex;align-items:center;justify-content:space-between;'
+                    f'flex-wrap:wrap;gap:6px;margin-bottom:8px;">'
+                    f'<div style="display:flex;align-items:center;gap:6px;">'
+                    f'<span style="font-size:1rem;">{sec["icon"]}</span>'
+                    f'<span style="font-size:0.62rem;color:{TEXT_SEC};font-weight:700;">{sec["number"]}</span>'
+                    f'<span style="font-size:0.9rem;font-weight:600;color:{TEXT};">{sec["full_label"]}</span>'
+                    f'</div>'
+                    + (f'<div>{file_tags}</div>' if file_tags else
+                       f'<span style="font-size:0.7rem;color:{TEXT_SEC};">Nessun documento</span>')
+                    + f'</div>',
+                    unsafe_allow_html=True)
 
-            col_mode, col_web, col_files = st.columns([2, 1.5, 2.5])
-
-            with col_mode:
+                # Mode radio (horizontal, no column wrapper)
                 current_mode = st.session_state.section_modes.get(key, "agent")
-                mode_idx = 0 if current_mode == "agent" else 1
                 chosen = st.radio(
                     "Modalità",
                     options=["🤖 Agente", "✍️ Manuale"],
-                    index=mode_idx,
+                    index=0 if current_mode == "agent" else 1,
                     key=f"mode_{key}",
                     horizontal=True,
                     label_visibility="collapsed")
-                new_mode = "agent" if chosen == "🤖 Agente" else "manual"
-                st.session_state.section_modes[key] = new_mode
+                st.session_state.section_modes[key] = "agent" if chosen == "🤖 Agente" else "manual"
 
-            with col_web:
+                # Web search checkbox (only for agent, no column wrapper)
                 if st.session_state.section_modes.get(key) == "agent":
                     web_val = st.session_state.section_web.get(key, False)
                     new_web = st.checkbox("🌐 Web search", value=web_val, key=f"web_{key}")
                     st.session_state.section_web[key] = new_web
-
-            with col_files:
-                if assigned_files:
-                    tags = "".join(
-                        f'<span style="display:inline-block;background:#f0fff4;border:1px solid #bbf7d0;'
-                        f'border-radius:10px;padding:2px 8px;font-size:0.68rem;color:#166534;margin:2px;">'
-                        f'📄 {n[:28]}</span>'
-                        for n in assigned_files)
-                    st.markdown(f'<div style="padding-top:4px;">{tags}</div>', unsafe_allow_html=True)
-                else:
-                    st.markdown(
-                        f'<span style="font-size:0.72rem;color:{TEXT_SEC};">Nessun documento assegnato</span>',
-                        unsafe_allow_html=True)
-
-            st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown(f'<div style="height:12px;"></div>', unsafe_allow_html=True)
         nav_l, nav_r = st.columns([1, 1])
@@ -1019,56 +970,36 @@ def render_mode_config():
                 st.rerun()
         with nav_r:
             if st.button("▶ Avvia Analisi", key="mode_next", use_container_width=True):
-                # Build section_docs and section_doc_names
                 files_data   = st.session_state.uploaded_files_data
                 file_assigns = st.session_state.file_assignments
-                section_docs     = {}
-                section_doc_names = {}
-
+                section_docs, section_doc_names = {}, {}
                 for sec in MAIN_SECTIONS:
-                    skey = sec["key"]
+                    skey     = sec["key"]
                     assigned = [fd for fd in files_data if file_assigns.get(fd["name"]) == skey]
                     if not assigned:
                         continue
                     if skey == "transaction":
                         fd  = assigned[0]
                         raw = fd.get("raw_bytes")
-                        if raw:
-                            # Pass raw bytes directly — no tempfile needed
-                            import io as _io
-                            buf = _io.BytesIO(raw)
-                            buf.name = fd["name"]       # give it a name so _read_excel detects ext
-                            st.session_state.excel_raw_bytes = buf
-                        else:
-                            # Fallback: encode text as UTF-8 BytesIO
-                            import io as _io
-                            buf = _io.BytesIO(fd["content_text"].encode("utf-8", errors="replace"))
-                            buf.name = fd["name"]
-                            st.session_state.excel_raw_bytes = buf
-                        st.session_state.excel_name = fd["name"]
+                        import io as _io
+                        buf = _io.BytesIO(raw) if raw else _io.BytesIO(
+                            fd["content_text"].encode("utf-8", errors="replace"))
+                        buf.name = fd["name"]
+                        st.session_state.excel_raw_bytes = buf
+                        st.session_state.excel_name      = fd["name"]
                         section_doc_names[skey] = [fd["name"]]
                     else:
-                        texts = [f"=== {fd['name']} ===\n{fd['content_text']}" for fd in assigned]
-                        names = [fd["name"] for fd in assigned]
-                        section_docs[skey]      = "\n\n".join(texts)
-                        section_doc_names[skey] = names
-
-                st.session_state.section_docs     = section_docs
+                        section_docs[skey]      = "\n\n".join(
+                            f"=== {fd['name']} ===\n{fd['content_text']}" for fd in assigned)
+                        section_doc_names[skey] = [fd["name"] for fd in assigned]
+                st.session_state.section_docs      = section_docs
                 st.session_state.section_doc_names = section_doc_names
-
-                # Build run_queue — only agent-mode sections that have docs
-                run_queue = [s["key"] for s in MAIN_SECTIONS
-                             if st.session_state.section_modes.get(s["key"]) == "agent"]
-                st.session_state.run_queue = run_queue
+                # Queue only agent-mode sections
+                st.session_state.run_queue      = [
+                    s["key"] for s in MAIN_SECTIONS
+                    if st.session_state.section_modes.get(s["key"]) == "agent"]
                 st.session_state.active_section = "registry"
-                # Use transit step to force a blank DOM frame before analysis,
-                # which clears all stale mode_config widgets from the browser.
-                st.session_state.step = "transit"
-                # Clear upload data so it cannot ghost in the analysis page
-                st.session_state.uploaded_files_data = []
-                st.session_state.file_assignments    = {}
-                st.session_state.upload_hash         = ""
-                # Remove mode_config widget keys to prevent ghost rendering
+                # Clear widget keys and upload state before transit
                 for s in MAIN_SECTIONS:
                     st.session_state.pop(f"mode_{s['key']}", None)
                     st.session_state.pop(f"web_{s['key']}", None)
@@ -1077,6 +1008,10 @@ def render_mode_config():
                         del st.session_state[k]
                 st.session_state.pop("mode_back", None)
                 st.session_state.pop("mode_next", None)
+                st.session_state.uploaded_files_data = []
+                st.session_state.file_assignments    = {}
+                st.session_state.upload_hash         = ""
+                st.session_state.step = "transit"
                 st.rerun()
 
 
@@ -1865,6 +1800,8 @@ elif step == "setup":
     render_setup()
 elif step == "upload":
     render_upload()
+elif step == "mode_config":
+    render_mode_config()
 elif step == "analysis":
     render_analysis()
 elif step == "final":
