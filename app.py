@@ -721,6 +721,10 @@ def render_upload():
                 st.session_state.run_queue     = run_queue
                 st.session_state.active_section = "registry"
                 st.session_state.step           = "analysis"
+                # Clear upload data so it cannot ghost in the analysis page
+                st.session_state.uploaded_files_data = []
+                st.session_state.file_assignments    = {}
+                st.session_state.upload_hash         = ""
                 st.rerun()
 
 
