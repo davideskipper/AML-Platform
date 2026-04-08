@@ -1009,6 +1009,15 @@ def render_mode_config():
                 st.session_state.uploaded_files_data = []
                 st.session_state.file_assignments    = {}
                 st.session_state.upload_hash         = ""
+                # Remove mode_config widget keys to prevent ghost rendering
+                for s in MAIN_SECTIONS:
+                    st.session_state.pop(f"mode_{s['key']}", None)
+                    st.session_state.pop(f"web_{s['key']}", None)
+                for k in list(st.session_state.keys()):
+                    if k.startswith("assign_"):
+                        del st.session_state[k]
+                st.session_state.pop("mode_back", None)
+                st.session_state.pop("mode_next", None)
                 st.rerun()
 
 
@@ -1073,89 +1082,6 @@ def _run_with_stream(key: str, client):
         st.error(str(e))
     st.rerun()
 
-
-# ── Analysis sidebar ──────────────────────────────────────────────
-def _render_analysis_sidebar(queued_key=None):
-    active_key = st.session_state.get("active_section", "registry")
-    state      = st.session_state.kyc_state
-
-    # Dark sidebar header
-    st.markdown(
-        f'<div style="background:{SB_BG};border-radius:10px;padding:16px 14px 10px;margin-bottom:4px;">'
-        f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.5px;'
-        f'color:rgba(255,255,255,0.45);text-transform:uppercase;margin-bottom:2px;">AML IntelliGent</div>'
-        + (f'<div style="font-size:0.85rem;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;'
-           f'text-overflow:ellipsis;">{state.case.company_name}</div>'
-           if state.case.company_name else '')
-        + f'<div style="font-size:0.68rem;color:rgba(255,255,255,0.45);margin-top:2px;">KYC · CDD · AML</div>'
-        f'</div>',
-        unsafe_allow_html=True)
-
-    # Sentinel: CSS uses this to scope the transparent button overlays
-    st.markdown('<div id="aml-sb-marker" style="height:0;overflow:hidden;"></div>',
-                unsafe_allow_html=True)
-
-    for sec in MAIN_SECTIONS:
-        k          = sec["key"]
-        status     = sec_status(k)
-        is_active  = (k == active_key)
-        is_running = (k == queued_key)
-
-        # Status icon + colors
-        if is_running:
-            icon  = '⚙'
-            dot_c = "rgba(255,255,255,0.4)"
-            dot_class = 'class="aml-spin"'
-            lbl_c = "rgba(255,255,255,0.7)"
-            bg    = "rgba(255,255,255,0.06)"
-            brd   = f"border-left:3px solid rgba(255,255,255,0.2);"
-        elif status == "completed":
-            # Get risk for color coding
-            content = get_content(k)
-            parsed_c = parse_json_result(content) if content else None
-            risk_c  = (parsed_c.get("rischioComplessivo","") if parsed_c else "") or ""
-            rc = get_risk_color(risk_c) if risk_c else GREEN
-            icon  = '✓'
-            dot_c = rc
-            dot_class = ''
-            lbl_c = "#fff" if is_active else "rgba(255,255,255,0.75)"
-            bg    = f"rgba(255,255,255,0.10)" if is_active else "rgba(255,255,255,0.04)"
-            brd   = f"border-left:3px solid {ACCENT};" if is_active else f"border-left:3px solid {rc};"
-        else:
-            icon  = '○'
-            dot_c = "rgba(255,255,255,0.25)"
-            dot_class = ''
-            lbl_c = "rgba(255,255,255,0.45)" if not is_active else "rgba(255,255,255,0.85)"
-            bg    = "rgba(255,255,255,0.06)" if is_active else "transparent"
-            brd   = f"border-left:3px solid {ACCENT};" if is_active else "border-left:3px solid transparent;"
-
-        st.markdown(
-            f'<div style="{brd}background:{bg};padding:9px 10px 9px 12px;'
-            f'border-radius:0 6px 6px 0;margin-bottom:2px;cursor:pointer;'
-            f'transition:background 0.15s;">'
-            f'<div style="display:flex;align-items:center;gap:8px;">'
-            f'<span {dot_class} style="color:{dot_c};font-size:0.7rem;width:14px;text-align:center;">{icon}</span>'
-            f'<span style="font-size:0.82rem;font-weight:{"600" if is_active else "400"};color:{lbl_c};">'
-            f'{sec["icon"]} {sec["label"]}</span>'
-            f'</div></div>',
-            unsafe_allow_html=True)
-
-        if st.button(" ", key=f"sb_{k}", use_container_width=True, help=sec["full_label"]):
-            st.session_state.active_section = k
-            st.rerun()
-
-    st.markdown(
-        f'<div style="height:1px;background:rgba(255,255,255,0.08);margin:10px 0;"></div>',
-        unsafe_allow_html=True)
-
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button("✕ Nuovo", key="new_case_sb", use_container_width=True):
-            for k in list(st.session_state.keys()): del st.session_state[k]
-            st.rerun()
-    with c2:
-        if st.button("⚙ Setup", key="go_setup_sb", use_container_width=True):
-            st.session_state.step = "setup"; st.rerun()
 
 
 # ── Criticality panel ─────────────────────────────────────────────
