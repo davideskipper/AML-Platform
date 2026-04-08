@@ -869,6 +869,13 @@ def render_upload():
                     if chosen_key != st.session_state.file_assignments.get(fname):
                         st.session_state.file_assignments[fname] = chosen_key
 
+        if not files_data:
+            st.markdown(
+                f'<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;'
+                f'padding:10px 14px;margin:10px 0;font-size:0.8rem;color:{BLUE};">'
+                f'ℹ️ Nessun documento caricato — gli agenti utilizzeranno la ricerca web.</div>',
+                unsafe_allow_html=True)
+
         st.markdown(f'<div style="height:12px;"></div>', unsafe_allow_html=True)
         nav_l, nav_r = st.columns([1, 1])
         with nav_l:
@@ -876,10 +883,7 @@ def render_upload():
                 st.session_state.step = "setup"
                 st.rerun()
         with nav_r:
-            disabled = len(files_data) == 0
-            if st.button("Continua →", key="upload_next",
-                         use_container_width=True,
-                         disabled=disabled):
+            if st.button("Continua →", key="upload_next", use_container_width=True):
                 st.session_state.step = "mode_config"
                 st.rerun()
 
@@ -1010,36 +1014,40 @@ def render_mode_config():
 
 
 # ── STREAMING helper ──────────────────────────────────────────────
-def _run_with_stream(key: str, client):
+def _run_with_stream(key: str, client, status_box=None, stream_box=None):
+    """Run agent with live streaming. Accepts pre-created st.empty() placeholders
+    so they can be placed inside any column context before this function is called."""
     if not client:
         st.error("API Key non configurata nei Secrets.")
         return
 
-    sec_info  = next(s for s in ALL_SECTIONS if s["key"] == key)
-    status_box = st.empty()
-    stream_box = st.empty()
+    if status_box is None:
+        status_box = st.empty()
+    if stream_box is None:
+        stream_box = st.empty()
+
     buf = {"text": "", "thinking": "", "phase": "thinking"}
 
     def _render():
         parts = []
         if buf["thinking"] and buf["phase"] == "thinking":
-            th = buf["thinking"][-600:] if len(buf["thinking"]) > 600 else buf["thinking"]
+            th = buf["thinking"][-800:] if len(buf["thinking"]) > 800 else buf["thinking"]
             parts.append(
-                f'<div style="font-size:0.68rem;color:{TEXT_SEC};font-style:italic;'
-                f'border-left:2px solid {BORDER};padding-left:10px;margin-bottom:8px;">'
+                f'<div style="font-size:0.68rem;color:rgba(148,163,184,0.9);font-style:italic;'
+                f'border-left:2px solid rgba(255,255,255,0.1);padding-left:10px;margin-bottom:8px;">'
                 + th.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                 + '</div>')
         if buf["text"]:
-            disp = buf["text"][-3000:] if len(buf["text"]) > 3000 else buf["text"]
+            disp = buf["text"][-4000:] if len(buf["text"]) > 4000 else buf["text"]
             parts.append(
                 f'<div style="font-family:\'SFMono-Regular\',Consolas,monospace;'
-                f'font-size:0.72rem;white-space:pre-wrap;color:{TEXT};">'
+                f'font-size:0.73rem;white-space:pre-wrap;color:#E2E8F0;line-height:1.6;">'
                 + disp.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                 + '</div>')
         if parts:
             stream_box.markdown(
                 f'<div style="background:#0F172A;border-radius:8px;'
-                f'padding:14px 16px;max-height:300px;overflow-y:auto;color:#E2E8F0;">'
+                f'padding:16px 18px;max-height:420px;overflow-y:auto;">'
                 + "".join(parts) + '</div>',
                 unsafe_allow_html=True)
 
@@ -1047,9 +1055,9 @@ def _run_with_stream(key: str, client):
         buf["thinking"] += chunk
         buf["phase"] = "thinking"
         status_box.markdown(
-            f'<div style="display:flex;align-items:center;gap:8px;padding:8px 0;">'
-            f'<span class="aml-spin" style="font-size:0.85rem;">⚙</span>'
-            f'<span style="font-size:0.78rem;font-weight:600;color:{TEXT_SEC};">Elaborazione in corso…</span>'
+            f'<div style="display:flex;align-items:center;gap:8px;padding:6px 0;">'
+            f'<span class="aml-spin" style="font-size:0.85rem;color:{TEXT_SEC};">⚙</span>'
+            f'<span style="font-size:0.78rem;font-weight:600;color:{TEXT_SEC};">Ragionamento in corso…</span>'
             f'</div>', unsafe_allow_html=True)
         _render()
 
@@ -1057,7 +1065,7 @@ def _run_with_stream(key: str, client):
         buf["text"] += chunk
         buf["phase"] = "writing"
         status_box.markdown(
-            f'<div style="display:flex;align-items:center;gap:8px;padding:8px 0;">'
+            f'<div style="display:flex;align-items:center;gap:8px;padding:6px 0;">'
             f'<span class="aml-pulse" style="color:{ACCENT};font-size:0.85rem;">✦</span>'
             f'<span style="font-size:0.78rem;font-weight:600;color:{ACCENT};">Redazione output…</span>'
             f'</div>', unsafe_allow_html=True)
@@ -1334,118 +1342,237 @@ def _render_section_content(key: str, client):
             _run_with_stream(key, client)
 
 
+# ── Right panel: agent status + live criticalities ────────────────
+def _render_right_panel(queued_key=None):
+    """Always-visible right column: progress per agent + criticality feed."""
+    done, total = main_progress()
+    pc = GREEN if done == total else ACCENT
+
+    # Header + progress bar
+    st.markdown(
+        f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
+        f'<span style="font-size:0.65rem;font-weight:700;letter-spacing:1px;color:{TEXT_SEC};'
+        f'text-transform:uppercase;">Agenti</span>'
+        f'<span style="font-size:0.72rem;font-weight:700;color:{pc};">{done}/{total}</span>'
+        f'</div>',
+        unsafe_allow_html=True)
+    st.progress(done / total if total else 0)
+    st.markdown(f'<div style="height:8px;"></div>', unsafe_allow_html=True)
+
+    all_in_queue = st.session_state.get("run_queue", [])
+    for sec in MAIN_SECTIONS:
+        k       = sec["key"]
+        status  = sec_status(k)
+        is_run  = (k == queued_key)
+        is_q    = (k in all_in_queue)
+
+        content = get_content(k) if status == "completed" else None
+        parsed  = parse_json_result(content) if content else None
+        risk    = (parsed.get("rischioComplessivo", "") if parsed else "") or ""
+        rc      = get_risk_color(risk) if risk else BORDER
+
+        if is_run:
+            dot, dc, dcls = "⚙", ACCENT, ' class="aml-spin"'
+            bg, brd = "rgba(196,30,58,0.04)", f"border:1px solid {ACCENT};"
+        elif status == "completed":
+            dot, dc, dcls = "✓", rc, ""
+            bg, brd = "#fff", f"border:1px solid {BORDER};border-left:3px solid {rc};"
+        elif is_q:
+            dot, dc, dcls = "…", TEXT_SEC, ""
+            bg, brd = BG, f"border:1px solid {BORDER};"
+        else:
+            dot, dc, dcls = "○", TEXT_SEC, ""
+            bg, brd = BG, f"border:1px solid {BORDER};opacity:0.65;"
+
+        badge = risk_badge(risk) if (status == "completed" and risk) else ""
+        st.markdown(
+            f'<div style="display:flex;align-items:center;gap:7px;padding:7px 10px;'
+            f'background:{bg};{brd}border-radius:6px;margin-bottom:4px;">'
+            f'<span{dcls} style="color:{dc};font-size:0.7rem;width:13px;text-align:center;">{dot}</span>'
+            f'<span style="font-size:0.78rem;color:{TEXT};flex:1;">{sec["icon"]} {sec["label"]}</span>'
+            + badge +
+            f'</div>',
+            unsafe_allow_html=True)
+
+    st.markdown(
+        f'<div style="height:1px;background:{BORDER};margin:12px 0 10px;"></div>',
+        unsafe_allow_html=True)
+
+    # ── Live criticality feed ─────────────────────────────────────
+    all_crit, all_anom = [], []
+    for sec in MAIN_SECTIONS:
+        content = get_content(sec["key"])
+        parsed  = parse_json_result(content) if content else None
+        if not parsed:
+            continue
+        ov = st.session_state.crit_overrides.get(sec["key"], {})
+        for i, ev in enumerate(parsed.get("principaliEvidenze", [])):
+            lvl = (ev.get("livello", "") or "").upper()
+            if (ov.get(i, {}).get("status", "") or "").lower() == "chiuso":
+                continue
+            entry = {
+                "sec":      sec["label"],
+                "evidenza": ev.get("evidenza", ""),
+                "normativa": ev.get("normativa", ""),
+            }
+            if lvl.startswith("CRITICO"):
+                all_crit.append(entry)
+            elif lvl.startswith("ANOMALIA"):
+                all_anom.append(entry)
+
+    if all_crit:
+        st.markdown(
+            f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
+            f'color:{DANGER};text-transform:uppercase;margin-bottom:6px;">🔴 Criticità</div>',
+            unsafe_allow_html=True)
+        for e in all_crit:
+            et = e["evidenza"][:130] + ("…" if len(e["evidenza"]) > 130 else "")
+            st.markdown(
+                f'<div style="background:#FEF2F2;border-left:3px solid {DANGER};'
+                f'border-radius:0 5px 5px 0;padding:7px 9px;margin-bottom:4px;">'
+                f'<div style="font-size:0.6rem;font-weight:700;color:{DANGER};'
+                f'margin-bottom:2px;text-transform:uppercase;">{e["sec"]}</div>'
+                f'<div style="font-size:0.72rem;color:{TEXT};line-height:1.4;">{et}</div>'
+                + (f'<div style="font-size:0.6rem;color:{TEXT_SEC};margin-top:2px;">📎 {e["normativa"]}</div>'
+                   if e["normativa"] else "")
+                + '</div>',
+                unsafe_allow_html=True)
+
+    if all_anom:
+        top_margin = "margin-top:10px;" if all_crit else ""
+        st.markdown(
+            f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
+            f'color:{YELLOW};text-transform:uppercase;margin-bottom:6px;{top_margin}">🟡 Attenzioni</div>',
+            unsafe_allow_html=True)
+        for e in all_anom:
+            et = e["evidenza"][:110] + ("…" if len(e["evidenza"]) > 110 else "")
+            st.markdown(
+                f'<div style="background:#FFFBEB;border-left:3px solid {YELLOW};'
+                f'border-radius:0 5px 5px 0;padding:7px 9px;margin-bottom:4px;">'
+                f'<div style="font-size:0.6rem;font-weight:700;color:{YELLOW};'
+                f'margin-bottom:2px;text-transform:uppercase;">{e["sec"]}</div>'
+                f'<div style="font-size:0.72rem;color:{TEXT};line-height:1.4;">{et}</div>'
+                + (f'<div style="font-size:0.6rem;color:{TEXT_SEC};margin-top:2px;">📎 {e["normativa"]}</div>'
+                   if e["normativa"] else "")
+                + '</div>',
+                unsafe_allow_html=True)
+
+    if not all_crit and not all_anom:
+        if done > 0:
+            st.markdown(
+                f'<div style="text-align:center;padding:14px 0;color:{GREEN};font-size:0.78rem;">'
+                f'✓ Nessuna criticità aperta</div>',
+                unsafe_allow_html=True)
+        else:
+            st.markdown(
+                f'<div style="text-align:center;padding:14px 0;color:{TEXT_SEC};font-size:0.8rem;">'
+                f'Analisi in attesa…</div>',
+                unsafe_allow_html=True)
+
+
 # ── STEP 4: ANALYSIS ─────────────────────────────────────────────
 def render_analysis():
     render_header()
     client = get_client()
 
-    # Pop next agent from queue (if any) and run it immediately
+    # Pop next agent from queue (if any)
     queued_key = None
     if st.session_state.get("run_queue"):
         queued_key = st.session_state["run_queue"][0]
         st.session_state["run_queue"] = st.session_state["run_queue"][1:]
         st.session_state.active_section = queued_key
 
-    # ── Utility buttons row ───────────────────────────────────────
-    util_l, util_r = st.columns([6, 1])
-    with util_r:
-        if st.button("✕ Nuovo caso", key="new_case_top", use_container_width=True):
-            for k in list(st.session_state.keys()): del st.session_state[k]
-            st.rerun()
+    # ── Two-column layout: main content | right panel ─────────────
+    main_col, right_col = st.columns([2.8, 1.2])
 
-    # ── Queue running mode ────────────────────────────────────────
+    # ── Main column ───────────────────────────────────────────────
+    # We must create streaming placeholders INSIDE the column context
+    # so they appear in the left column even when updated from outside.
+    status_box = None
+    stream_box  = None
+
+    with main_col:
+        # Top-right: "Nuovo caso" button
+        _, btn_c = st.columns([5, 1])
+        with btn_c:
+            if st.button("✕ Nuovo", key="new_case_top", use_container_width=True):
+                for k in list(st.session_state.keys()):
+                    del st.session_state[k]
+                st.rerun()
+
+        if queued_key:
+            sec = next(s for s in ALL_SECTIONS if s["key"] == queued_key)
+
+            # Progress pills (pipeline tracker)
+            pills = ""
+            for s in MAIN_SECTIONS:
+                is_done = sec_status(s["key"]) == "completed"
+                is_run  = s["key"] == queued_key
+                if is_run:
+                    pb, pf, pl = f"rgba(196,30,58,0.12)", ACCENT, f"⚙ {s['label']}"
+                elif is_done:
+                    pb, pf, pl = "#DCFCE7", GREEN, f"✓ {s['label']}"
+                else:
+                    pb, pf, pl = BG, TEXT_SEC, f"○ {s['label']}"
+                pills += (
+                    f'<span style="background:{pb};color:{pf};font-size:0.72rem;'
+                    f'font-weight:600;padding:4px 13px;border-radius:20px;'
+                    f'border:1px solid {BORDER};">{pl}</span>')
+            st.markdown(
+                f'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">'
+                + pills + '</div>',
+                unsafe_allow_html=True)
+
+            # Running agent card
+            st.markdown(
+                f'<div style="background:#fff;border:1px solid {BORDER};'
+                f'border-left:4px solid {ACCENT};border-radius:0 10px 10px 0;'
+                f'padding:16px 20px;margin-bottom:16px;">'
+                f'<div style="display:flex;align-items:center;gap:12px;">'
+                f'<span class="aml-spin" style="font-size:1.1rem;color:{ACCENT};">⚙</span>'
+                f'<div>'
+                f'<div style="font-size:0.9rem;font-weight:700;color:{TEXT};">'
+                f'{sec["icon"]} {sec["full_label"]}</div>'
+                f'<div style="font-size:0.75rem;color:{TEXT_SEC};margin-top:2px;">'
+                f'Analisi in corso — attendi 1-2 minuti…</div>'
+                f'</div></div></div>',
+                unsafe_allow_html=True)
+
+            # ← Placeholders INSIDE main_col: streaming renders here
+            status_box = st.empty()
+            stream_box  = st.empty()
+
+        else:
+            # ── Idle mode: tabs with completed sections ───────────
+            tab_labels = [f"{s['icon']} {s['label']}" for s in MAIN_SECTIONS]
+            tabs = st.tabs(tab_labels)
+            for tab, sec in zip(tabs, MAIN_SECTIONS):
+                with tab:
+                    _render_section_content(sec["key"], client)
+
+            st.markdown(f'<div style="height:16px;"></div>', unsafe_allow_html=True)
+            done, total = main_progress()
+            if done == total:
+                st.markdown(
+                    f'<div style="background:#DCFCE7;border:1px solid #86EFAC;'
+                    f'border-radius:8px;padding:10px 16px;margin-bottom:12px;'
+                    f'font-size:0.82rem;color:#15803D;font-weight:600;">'
+                    f'✓ Tutte le sezioni completate — la valutazione finale è disponibile.</div>',
+                    unsafe_allow_html=True)
+                if st.button("Procedi alla Valutazione Finale →",
+                             key="go_final", use_container_width=True):
+                    st.session_state.step = "final"
+                    st.rerun()
+
+    # ── Right panel (always visible) ─────────────────────────────
+    with right_col:
+        _render_right_panel(queued_key)
+
+    # ── Run agent after columns are laid out ──────────────────────
+    # The streaming boxes are already slotted inside main_col above.
     if queued_key:
-        sec = next(s for s in ALL_SECTIONS if s["key"] == queued_key)
-
-        # Progress pills
-        pills = ""
-        for s in MAIN_SECTIONS:
-            is_done = sec_status(s["key"]) == "completed"
-            is_run  = s["key"] == queued_key
-            if is_run:
-                pb, pf = f"rgba(196,30,58,0.1)", ACCENT
-                pl = f"⚙ {s['label']}"
-            elif is_done:
-                pb, pf = "#DCFCE7", GREEN
-                pl = f"✓ {s['label']}"
-            else:
-                pb, pf = BG, TEXT_SEC
-                pl = f"○ {s['label']}"
-            pills += (
-                f'<span style="background:{pb};color:{pf};font-size:0.72rem;font-weight:600;'
-                f'padding:3px 12px;border-radius:20px;border:1px solid {BORDER};">{pl}</span>')
-        st.markdown(
-            f'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">{pills}</div>',
-            unsafe_allow_html=True)
-
-        # Running section card
-        st.markdown(
-            f'<div style="background:#fff;border:1px solid {BORDER};border-left:4px solid {ACCENT};'
-            f'border-radius:0 10px 10px 0;padding:14px 18px;margin-bottom:14px;">'
-            f'<div style="display:flex;align-items:center;gap:10px;">'
-            f'<span class="aml-spin" style="font-size:1rem;color:{ACCENT};">⚙</span>'
-            f'<div><div style="font-size:0.88rem;font-weight:600;color:{TEXT};">'
-            f'{sec["icon"]} {sec["full_label"]}</div>'
-            f'<div style="font-size:0.75rem;color:{TEXT_SEC};">'
-            f'Analisi in corso — l\'operazione può richiedere 1-2 minuti…</div>'
-            f'</div></div></div>',
-            unsafe_allow_html=True)
-
-        _run_with_stream(queued_key, client)
-        return
-
-    # ── Idle mode: section tabs ───────────────────────────────────
-
-    # Global criticality indicators
-    total_crit = total_anom = 0
-    for sec in MAIN_SECTIONS:
-        sk = sec["key"]
-        sc = get_content(sk)
-        sp = parse_json_result(sc) if sc else None
-        if not sp:
-            continue
-        ov = st.session_state.crit_overrides.get(sk, {})
-        for i, ev in enumerate(sp.get("principaliEvidenze", [])):
-            lvl = (ev.get("livello","") or "").upper()
-            if (ov.get(i, {}).get("status","") or "").lower() == "chiuso":
-                continue
-            if lvl.startswith("CRITICO"):
-                total_crit += 1
-            elif lvl.startswith("ANOMALIA"):
-                total_anom += 1
-    ind_parts = []
-    if total_crit:
-        ind_parts.append(
-            f'<span style="background:#FEF2F2;color:{DANGER};font-size:0.72rem;font-weight:700;'
-            f'padding:4px 14px;border-radius:20px;border:1px solid #FECACA;">🔴 {total_crit} criticità</span>')
-    if total_anom:
-        ind_parts.append(
-            f'<span style="background:#FFFBEB;color:{YELLOW};font-size:0.72rem;font-weight:700;'
-            f'padding:4px 14px;border-radius:20px;border:1px solid #FDE68A;">🟡 {total_anom} attenzioni</span>')
-    if ind_parts:
-        st.markdown(
-            f'<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:8px;">'
-            + "".join(ind_parts) + '</div>', unsafe_allow_html=True)
-
-    # Section tabs — all 5 sections navigable
-    tab_labels = [f"{s['icon']} {s['label']}" for s in MAIN_SECTIONS]
-    tabs = st.tabs(tab_labels)
-    for tab, sec in zip(tabs, MAIN_SECTIONS):
-        with tab:
-            _render_section_content(sec["key"], client)
-
-    st.markdown(f'<div style="height:16px;"></div>', unsafe_allow_html=True)
-    done, total = main_progress()
-    if done == total:
-        st.markdown(
-            f'<div style="background:#DCFCE7;border:1px solid #86EFAC;border-radius:8px;'
-            f'padding:10px 16px;margin-bottom:12px;font-size:0.82rem;color:#15803D;font-weight:600;">'
-            f'✓ Tutte le sezioni completate — la valutazione finale è disponibile.</div>',
-            unsafe_allow_html=True)
-        if st.button("Procedi alla Valutazione Finale →",
-                     key="go_final", use_container_width=True):
-            st.session_state.step = "final"
-            st.rerun()
+        _run_with_stream(queued_key, client,
+                         status_box=status_box, stream_box=stream_box)
 
 
 
