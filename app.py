@@ -358,6 +358,71 @@ def risk_badge(level: str) -> str:
             f'font-size:0.68rem;font-weight:700;letter-spacing:0.4px;'
             f'padding:2px 9px;border-radius:20px;">{label}</span>')
 
+
+def classify_evidence(ev: dict) -> dict:
+    """Classify a single principaliEvidenze entry and return display style."""
+    livello = (ev.get("livello", "") or "").upper()
+    testo   = (ev.get("evidenza", "") or "").lower()
+
+    if "CRITICO" in livello:
+        return {"bg_color": "#FDECEA", "text_color": "#B71C1C",
+                "border_color": "#C62828", "label": "Critico"}
+    elif "ANOMALIA" in livello:
+        return {"bg_color": "#FFF3E0", "text_color": "#E65100",
+                "border_color": "#F57C00", "label": "Anomalia"}
+    elif "ATTENZIONE" in livello:
+        parole_positive = [
+            "nessun", "assenza totale", "completa tracciabil",
+            "coerente", "regolare", "primario standing",
+            "correttamente", "conforme", "positiv",
+            "standard intra", "tutti paesi standard",
+            "tracciata", "verificat", "pulito", "privo",
+        ]
+        parole_negative = [
+            "anomal", "sospett", "incongruen", "assenza di",
+            "mancanza", "irregolar", "eleват", "sproporzionat",
+            "opac", "rischio", "criticità", "atipic",
+            "incoerente", "incompatibil",
+        ]
+        is_positive = any(p in testo for p in parole_positive)
+        is_negative = any(p in testo for p in parole_negative)
+        if is_positive and not is_negative:
+            return {"bg_color": "#F1F8E9", "text_color": "#2E7D32",
+                    "border_color": "#558B2F", "label": "Elemento positivo"}
+        else:
+            return {"bg_color": "#FFFDE7", "text_color": "#F57F17",
+                    "border_color": "#F9A825", "label": "Punto di attenzione"}
+    else:
+        return {"bg_color": "#F5F5F5", "text_color": "#616161",
+                "border_color": "#9E9E9E", "label": livello or "Info"}
+
+
+def render_evidenze(evidenze: list) -> None:
+    """Render a list of principaliEvidenze dicts with semantic colour coding."""
+    if not evidenze:
+        return
+    for ev in evidenze:
+        style     = classify_evidence(ev)
+        desc      = ev.get("evidenza", "") or ""
+        norm      = ev.get("normativa", "") or ""
+        norm_html = (
+            f'<p style="color:#9E9E9E;font-size:11px;font-style:italic;margin:0;">{norm}</p>'
+            if norm else ""
+        )
+        st.markdown(
+            f'<div style="background-color:{style["bg_color"]};'
+            f'border-left:4px solid {style["border_color"]};'
+            f'border-radius:4px;padding:12px 16px;margin-bottom:10px;">'
+            f'<span style="background-color:{style["border_color"]};color:white;'
+            f'font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;'
+            f'text-transform:uppercase;letter-spacing:0.5px;">{style["label"]}</span>'
+            f'<p style="color:{style["text_color"]};font-size:13px;'
+            f'margin:8px 0 4px 0;line-height:1.5;">{desc}</p>'
+            + norm_html +
+            f'</div>',
+            unsafe_allow_html=True)
+
+
 def run_section(key, client, on_token=None, on_thinking=None):
     state   = st.session_state.kyc_state
     company = state.case.company_name
@@ -602,46 +667,13 @@ def render_prose_result(key: str, parsed: dict):
             + narrativa.replace("\n", "<br>") + '</div>',
             unsafe_allow_html=True)
 
-    # ── Evidenze table ───────────────────────────────────────────
+    # ── Evidenze ─────────────────────────────────────────────────
     if evidenze:
         st.markdown(
             f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
             f'color:{TEXT_SEC};margin:6px 0 10px;text-transform:uppercase;">Principali Evidenze</div>',
             unsafe_allow_html=True)
-        rows_html = ""
-        lv_cfg = {
-            "CRITICO":    ("#FEF2F2","#B91C1C"),
-            "ANOMALIA":   ("#FFFBEB","#92400E"),
-            "ATTENZIONE": ("#F0FDF4","#15803D"),
-        }
-        for idx, ev in enumerate(evidenze):
-            lvl  = (ev.get("livello") or "ATTENZIONE").upper()
-            etxt = ev.get("evidenza","")
-            ntxt = ev.get("normativa","")
-            bg_r, col_r = lv_cfg.get(lvl, lv_cfg["ATTENZIONE"])
-            row_bg = "#fff" if idx % 2 == 0 else f"{BG}"
-            rows_html += (
-                f'<tr style="background:{row_bg};">'
-                f'<td style="padding:8px 10px;border-bottom:1px solid {BORDER};white-space:nowrap;">'
-                f'{risk_badge(lvl)}</td>'
-                f'<td style="padding:8px 12px;border-bottom:1px solid {BORDER};'
-                f'font-size:0.82rem;color:{TEXT};line-height:1.5;">{etxt}</td>'
-                f'<td style="padding:8px 10px;border-bottom:1px solid {BORDER};'
-                f'font-size:0.72rem;color:{TEXT_SEC};font-style:italic;">{ntxt}</td>'
-                f'</tr>'
-            )
-        st.markdown(
-            f'<div style="border:1px solid {BORDER};border-radius:8px;overflow:hidden;margin-bottom:18px;">'
-            f'<table style="width:100%;border-collapse:collapse;">'
-            f'<thead><tr style="background:#F8FAFC;">'
-            f'<th style="padding:8px 10px;font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
-            f'color:{TEXT_SEC};text-align:left;border-bottom:1px solid {BORDER};text-transform:uppercase;">Livello</th>'
-            f'<th style="padding:8px 12px;font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
-            f'color:{TEXT_SEC};text-align:left;border-bottom:1px solid {BORDER};text-transform:uppercase;">Evidenza</th>'
-            f'<th style="padding:8px 10px;font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
-            f'color:{TEXT_SEC};text-align:left;border-bottom:1px solid {BORDER};text-transform:uppercase;">Normativa</th>'
-            f'</tr></thead><tbody>{rows_html}</tbody></table></div>',
-            unsafe_allow_html=True)
+        render_evidenze(evidenze)
 
     # ── Flags ────────────────────────────────────────────────────
     if flags:
@@ -1391,23 +1423,7 @@ def _render_section_content(key: str, client):
                     f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
                     f'color:{TEXT_SEC};margin:6px 0 8px;text-transform:uppercase;">Principali Evidenze AML</div>',
                     unsafe_allow_html=True)
-                for ev in evidenze:
-                    livello = (ev.get("livello","") or "").upper()
-                    bg_f, fg_f, bd_f, cat_label = _flag_style(livello)
-                    desc = ev.get("evidenza","")
-                    norm = ev.get("normativa","")
-                    st.markdown(
-                        f'<div style="background:{bg_f};border:1px solid {BORDER};'
-                        f'border-left:3px solid {bd_f};border-radius:0 6px 6px 0;'
-                        f'padding:8px 12px;margin-bottom:5px;">'
-                        f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">'
-                        f'<span style="font-size:0.62rem;font-weight:700;color:{fg_f};'
-                        f'background:{bd_f}22;padding:1px 7px;border-radius:20px;">{cat_label}</span>'
-                        f'</div>'
-                        + (f'<div style="font-size:0.8rem;color:{TEXT};line-height:1.5;">{desc}</div>' if desc else '')
-                        + (f'<div style="font-size:0.68rem;color:{TEXT_SEC};margin-top:3px;">{norm}</div>' if norm else '')
-                        + f'</div>',
-                        unsafe_allow_html=True)
+                render_evidenze(evidenze)
 
             # Action row: re-run + edit JSON
             st.markdown(f'<div style="margin-top:14px;"></div>', unsafe_allow_html=True)
@@ -1880,31 +1896,28 @@ def render_final_valuation():
                     f'color:{TEXT_SEC};margin:0 0 8px;text-transform:uppercase;">Flag AML</div>',
                     unsafe_allow_html=True)
                 for _ev in _all_evidenze:
-                    _l = _ev["livello"]
-                    if _l == "CRITICO":
-                        _bg, _fg, _bd = "#FEE2E2", "#DC2626", "#DC2626"
-                        _dot = "🔴"
-                    elif _l in ("ANOMALIA", "ATTENZIONE"):
-                        _bg, _fg, _bd = "#FFFBEB", "#D97706", "#D97706"
-                        _dot = "🟡"
-                    else:
-                        _bg, _fg, _bd = "#F3F4F6", "#6B7280", "#9CA3AF"
-                        _dot = "⚪"
-                    _norm_html = (f'<div style="font-size:0.68rem;color:{TEXT_SEC};margin-top:3px;">📎 {_ev["normativa"]}</div>'
-                                  if _ev["normativa"] else "")
+                    _style    = classify_evidence(_ev)
+                    _bg       = _style["bg_color"]
+                    _fg       = _style["text_color"]
+                    _bd       = _style["border_color"]
+                    _lbl      = _style["label"]
+                    _norm_html = (
+                        f'<p style="color:#9E9E9E;font-size:11px;font-style:italic;margin:4px 0 0;">'
+                        f'📎 {_ev["normativa"]}</p>'
+                        if _ev["normativa"] else ""
+                    )
                     st.markdown(
-                        f'<div style="display:flex;align-items:flex-start;gap:10px;'
-                        f'background:{_bg};border:1px solid {BORDER};border-left:3px solid {_bd};'
-                        f'border-radius:0 6px 6px 0;padding:9px 12px;margin-bottom:5px;">'
-                        f'<div style="padding-top:2px;font-size:0.75rem;">{_dot}</div>'
-                        f'<div style="flex:1;">'
-                        f'<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">'
-                        f'<span style="font-size:0.78rem;font-weight:600;color:{_fg};">{_ev["evidenza"]}</span>'
-                        f'</div>'
-                        f'<div style="font-size:0.67rem;color:{TEXT_SEC};">'
-                        f'{_ev["sec_icon"]} {_ev["sezione"]}</div>'
+                        f'<div style="background-color:{_bg};border-left:4px solid {_bd};'
+                        f'border-radius:4px;padding:12px 16px;margin-bottom:8px;">'
+                        f'<span style="background-color:{_bd};color:white;font-size:11px;'
+                        f'font-weight:600;padding:2px 8px;border-radius:10px;'
+                        f'text-transform:uppercase;letter-spacing:0.5px;">{_lbl}</span>'
+                        f'<p style="color:{_fg};font-size:13px;margin:8px 0 3px 0;'
+                        f'line-height:1.5;">{_ev["evidenza"]}</p>'
+                        f'<p style="font-size:11px;color:{TEXT_SEC};margin:0;">'
+                        f'{_ev["sec_icon"]} {_ev["sezione"]}</p>'
                         + _norm_html +
-                        f'</div></div>',
+                        f'</div>',
                         unsafe_allow_html=True)
 
     st.markdown(f'<div style="height:16px;"></div>', unsafe_allow_html=True)
