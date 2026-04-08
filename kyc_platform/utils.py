@@ -52,8 +52,9 @@ def run_agent(
     final_text = ""
 
     while True:
-        # budget_tokens must be strictly less than max_tokens
-        budget_tokens = min(8000, max_tokens - 1024)
+        # budget_tokens must be strictly less than max_tokens.
+        # Reserve at least 4000 tokens for text output (thinking + output = max_tokens).
+        budget_tokens = min(8000, max_tokens - 4000)
         with client.messages.stream(
             model="claude-sonnet-4-6",
             max_tokens=max_tokens,

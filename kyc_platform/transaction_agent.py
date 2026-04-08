@@ -260,7 +260,7 @@ def run(
         system_prompt=SYSTEM_PROMPT,
         user_message=user_msg,
         header=f"Transaction & Geographic Risk Agent{subject}",
-        max_tokens=8000,
+        max_tokens=16000,
         use_web_search=False if use_web_search is None else use_web_search,
         show_output=show_output,
         on_token=on_token,
