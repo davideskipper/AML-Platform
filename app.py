@@ -22,57 +22,137 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-RED = "#CC0000"
+# ── Design system constants ───────────────────────────────────────
+BG       = "#F7F8FA"
+SB_BG    = "#1A1F2E"
+ACCENT   = "#C41E3A"
+BLUE     = "#2E5FA3"
+TEXT     = "#1A1A2E"
+TEXT_SEC = "#6B7280"
+BORDER   = "#E5E7EB"
+GREEN    = "#16A34A"
+YELLOW   = "#D97706"
+DANGER   = "#DC2626"
+RED      = ACCENT   # legacy alias
 
 st.markdown(f"""
 <style>
-  .stApp, [data-testid="stAppViewContainer"] {{ background:#fff; color:#1a1a1a; }}
-  [data-testid="stHeader"] {{ background:#fff; border-bottom:2px solid {RED}; }}
-  section[data-testid="stSidebar"], [data-testid="collapsedControl"] {{ display:none !important; }}
-  h1,h2,h3,h4 {{ color:#1a1a1a !important; }}
-  label, p {{ color:#333 !important; }}
+  /* ── Base ── */
+  .stApp, [data-testid="stAppViewContainer"] {{
+    background: {BG} !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif !important;
+    color: {TEXT} !important;
+  }}
+  [data-testid="stHeader"] {{
+    background: #fff !important;
+    border-bottom: 1px solid {BORDER} !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important;
+  }}
+  #MainMenu, footer, [data-testid="stToolbar"] {{ display: none !important; visibility: hidden !important; }}
+  section[data-testid="stSidebar"], [data-testid="collapsedControl"] {{ display: none !important; }}
+  [data-testid="block-container"] {{ padding-top: 1.2rem !important; padding-bottom: 2rem !important; }}
+
+  /* ── Typography ── */
+  h1, h2, h3, h4 {{ color: {TEXT} !important; font-weight: 600 !important; letter-spacing: -0.2px !important; }}
+  label {{ color: {TEXT_SEC} !important; }}
+  p {{ color: {TEXT} !important; line-height: 1.65 !important; }}
+
+  /* ── Inputs ── */
   .stTextInput input, .stNumberInput input {{
-    background:#f9f9f9 !important; color:#1a1a1a !important;
-    border:1px solid #d8d8d8 !important; border-radius:4px !important; }}
+    background: #fff !important; color: {TEXT} !important;
+    border: 1px solid {BORDER} !important; border-radius: 6px !important;
+    font-size: 0.875rem !important; padding: 8px 12px !important;
+    transition: border-color 0.15s, box-shadow 0.15s !important;
+  }}
+  .stTextInput input:focus, .stNumberInput input:focus {{
+    border-color: {BLUE} !important;
+    box-shadow: 0 0 0 3px rgba(46,95,163,0.12) !important;
+    outline: none !important;
+  }}
   .stTextArea textarea {{
-    background:#f9f9f9 !important; color:#1a1a1a !important;
-    border:1px solid #d8d8d8 !important; border-radius:4px !important;
-    font-size:0.84rem !important; }}
+    background: #fff !important; color: {TEXT} !important;
+    border: 1px solid {BORDER} !important; border-radius: 6px !important;
+    font-size: 0.84rem !important; line-height: 1.6 !important;
+    transition: border-color 0.15s !important;
+  }}
+  .stTextArea textarea:focus {{
+    border-color: {BLUE} !important;
+    box-shadow: 0 0 0 3px rgba(46,95,163,0.12) !important;
+  }}
   .stSelectbox > div > div {{
-    background:#f9f9f9 !important; color:#1a1a1a !important;
-    border:1px solid #d8d8d8 !important; }}
+    background: #fff !important; color: {TEXT} !important;
+    border: 1px solid {BORDER} !important; border-radius: 6px !important;
+    font-size: 0.875rem !important;
+  }}
+
+  /* ── Buttons ── */
   .stButton > button {{
-    background:{RED} !important; color:#fff !important;
-    border:none !important; border-radius:4px !important;
-    font-weight:600 !important; }}
-  .stButton > button:hover {{ background:#aa0000 !important; }}
-  .stProgress > div > div > div {{ background:{RED} !important; }}
-  details summary {{ color:#444 !important; }}
-  details {{ background:#f9f9f9 !important; border:1px solid #e0e0e0 !important; }}
-  hr {{ border-color:#eee !important; margin:0.5rem 0 !important; }}
-  ::-webkit-scrollbar {{ width:4px; }}
-  ::-webkit-scrollbar-thumb {{ background:#ddd; border-radius:3px; }}
+    background: {ACCENT} !important; color: #fff !important;
+    border: none !important; border-radius: 6px !important;
+    font-weight: 600 !important; font-size: 0.875rem !important;
+    padding: 8px 20px !important; letter-spacing: 0.1px !important;
+    transition: background 0.15s, transform 0.1s, box-shadow 0.15s !important;
+  }}
+  .stButton > button:hover {{
+    background: #a8192f !important; transform: translateY(-1px) !important;
+    box-shadow: 0 4px 14px rgba(196,30,58,0.28) !important;
+  }}
+  .stButton > button:active {{ transform: translateY(0) !important; }}
+  .stButton > button:disabled {{
+    background: #E5E7EB !important; color: #9CA3AF !important;
+    cursor: not-allowed !important; transform: none !important; box-shadow: none !important;
+  }}
+
+  /* ── Progress ── */
+  .stProgress > div > div > div {{ background: {ACCENT} !important; border-radius: 4px !important; }}
+
+  /* ── File uploader ── */
   [data-testid="stFileUploader"] {{
-    background:#f9f9f9 !important; border:1px dashed #ccc !important; border-radius:4px; }}
-  .stRadio label {{ color:#333 !important; }}
-  @keyframes spin {{ from {{ transform: rotate(0deg); }} to {{ transform: rotate(360deg); }} }}
-  .aml-spin {{ display:inline-block; animation: spin 1s linear infinite; }}
-  /* Sidebar nav: transparent button overlaid on styled label row */
+    background: #fff !important; border: 2px dashed {BORDER} !important;
+    border-radius: 8px !important; transition: border-color 0.2s !important;
+  }}
+  [data-testid="stFileUploader"]:hover {{ border-color: {BLUE} !important; }}
+
+  /* ── Radio ── */
+  .stRadio label {{
+    color: {TEXT} !important; text-transform: none !important;
+    letter-spacing: 0 !important; font-size: 0.875rem !important;
+  }}
+
+  /* ── Expander ── */
+  details summary {{ color: {TEXT} !important; font-weight: 500 !important; }}
+  details {{ background: #fff !important; border: 1px solid {BORDER} !important; border-radius: 8px !important; }}
+
+  /* ── Alerts ── */
+  [data-testid="stAlert"] {{ border-radius: 6px !important; }}
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar {{ width: 5px; height: 5px; }}
+  ::-webkit-scrollbar-track {{ background: #f1f5f9; }}
+  ::-webkit-scrollbar-thumb {{ background: #CBD5E1; border-radius: 3px; }}
+  ::-webkit-scrollbar-thumb:hover {{ background: #94A3B8; }}
+
+  /* ── HR ── */
+  hr {{ border-color: {BORDER} !important; margin: 1rem 0 !important; }}
+
+  /* ── Animations ── */
+  @keyframes aml-spin {{ from {{ transform: rotate(0deg); }} to {{ transform: rotate(360deg); }} }}
+  .aml-spin {{ display: inline-block !important; animation: aml-spin 1s linear infinite !important; }}
+  @keyframes aml-pulse {{ 0%,100% {{ opacity:1; }} 50% {{ opacity:0.5; }} }}
+  .aml-pulse {{ animation: aml-pulse 1.5s ease-in-out infinite !important; }}
+
+  /* ── Sidebar nav: transparent button overlaid on label row ── */
   #aml-sb-marker ~ div[data-testid="stButton"] {{
-    margin-top: -40px !important;
-    position: relative !important;
-    z-index: 5 !important;
+    margin-top: -40px !important; position: relative !important; z-index: 5 !important;
   }}
   #aml-sb-marker ~ div[data-testid="stButton"] > button {{
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    height: 40px !important;
-    min-height: 0 !important;
-    padding: 0 !important;
-    opacity: 0 !important;
-    cursor: pointer !important;
-    width: 100% !important;
+    background: transparent !important; border: none !important; box-shadow: none !important;
+    height: 40px !important; min-height: 0 !important; padding: 0 !important;
+    opacity: 0 !important; cursor: pointer !important; width: 100% !important;
+    transform: none !important;
+  }}
+  #aml-sb-marker ~ div[data-testid="stButton"] > button:hover {{
+    background: transparent !important; transform: none !important; box-shadow: none !important;
   }}
 </style>
 """, unsafe_allow_html=True)
@@ -116,9 +196,9 @@ REQUIRED_DOCS = {
 }
 
 RISK_COLORS = {
-    "LOW": "#22aa55", "MEDIUM": "#f59e0b", "HIGH": "#ef4444", "CRITICAL": "#7c3aed",
-    "BASSO": "#22aa55", "MEDIO": "#f59e0b", "MEDIO-ALTO": "#f97316",
-    "ALTO": "#ef4444", "CRITICO": "#7c3aed",
+    "LOW": GREEN, "MEDIUM": YELLOW, "HIGH": DANGER, "CRITICAL": "#7C3AED",
+    "BASSO": GREEN, "MEDIO": YELLOW, "MEDIO-ALTO": "#F97316",
+    "ALTO": DANGER, "CRITICO": "#7C3AED", "NON_VALUTABILE": TEXT_SEC,
 }
 
 # ── Session state ─────────────────────────────────────────────────
@@ -252,7 +332,29 @@ def parse_json_result(text: str):
     return _try(stripped)
 
 def get_risk_color(level: str) -> str:
-    return RISK_COLORS.get((level or "").upper(), "#888")
+    return RISK_COLORS.get((level or "").upper(), TEXT_SEC)
+
+
+def risk_badge(level: str) -> str:
+    """Return HTML badge for a risk/evidence level."""
+    _cfg = {
+        "LOW":           ("#DCFCE7", "#15803D", "BASSO"),
+        "BASSO":         ("#DCFCE7", "#15803D", "BASSO"),
+        "MEDIUM":        ("#FEF9C3", "#92400E", "MEDIO"),
+        "MEDIO":         ("#FEF9C3", "#92400E", "MEDIO"),
+        "MEDIO-ALTO":    ("#FFEDD5", "#C2410C", "MEDIO-ALTO"),
+        "HIGH":          ("#FEE2E2", "#B91C1C", "ALTO"),
+        "ALTO":          ("#FEE2E2", "#B91C1C", "ALTO"),
+        "CRITICAL":      ("#F3E8FF", "#6B21A8", "CRITICO"),
+        "CRITICO":       ("#F3E8FF", "#6B21A8", "CRITICO"),
+        "NON_VALUTABILE":("#F3F4F6", "#6B7280", "N/V"),
+        "ATTENZIONE":    ("#DCFCE7", "#15803D", "ATTENZIONE"),
+        "ANOMALIA":      ("#FEF9C3", "#92400E", "ANOMALIA"),
+    }
+    bg, fg, label = _cfg.get((level or "").upper(), ("#F3F4F6", "#6B7280", level or "—"))
+    return (f'<span style="display:inline-block;background:{bg};color:{fg};'
+            f'font-size:0.68rem;font-weight:700;letter-spacing:0.4px;'
+            f'padding:2px 9px;border-radius:20px;">{label}</span>')
 
 def run_section(key, client, on_token=None, on_thinking=None):
     state   = st.session_state.kyc_state
@@ -350,27 +452,33 @@ def render_step_nav(current_step_id: str):
     parts = []
     for i, step_id in enumerate(_STEP_ORDER):
         label = _STEP_LABELS[step_id]
+        num   = str(i + 1)
         if i < current_idx:
-            # Past step — grey tick
-            parts.append(
-                f'<span style="color:#999;font-size:0.82rem;">✔ {label}</span>'
-            )
+            num_style  = f"background:{BLUE};color:#fff;"
+            label_style = f"color:{BLUE};font-weight:500;"
+            num_label   = "✓"
         elif i == current_idx:
-            # Active step — bold red
-            parts.append(
-                f'<span style="color:{RED};font-size:0.82rem;font-weight:700;">{label}</span>'
-            )
+            num_style  = f"background:{ACCENT};color:#fff;"
+            label_style = f"color:{TEXT};font-weight:700;"
+            num_label   = num
         else:
-            # Future step — light grey
-            parts.append(
-                f'<span style="color:#ccc;font-size:0.82rem;">{label}</span>'
-            )
+            num_style  = f"background:{BORDER};color:{TEXT_SEC};"
+            label_style = f"color:{TEXT_SEC};font-weight:400;"
+            num_label   = num
+        parts.append(
+            f'<span style="display:inline-flex;align-items:center;gap:6px;">'
+            f'<span style="{num_style}width:20px;height:20px;border-radius:50%;'
+            f'font-size:0.62rem;font-weight:700;display:inline-flex;'
+            f'align-items:center;justify-content:center;">{num_label}</span>'
+            f'<span style="{label_style}font-size:0.8rem;">{label}</span>'
+            f'</span>'
+        )
         if i < len(_STEP_ORDER) - 1:
-            parts.append('<span style="color:#ddd;margin:0 8px;font-size:0.82rem;">→</span>')
+            parts.append(f'<span style="color:{BORDER};margin:0 10px;font-size:0.8rem;">──</span>')
 
     st.markdown(
-        '<div style="display:flex;align-items:center;flex-wrap:wrap;'
-        'padding:6px 0 10px;margin-bottom:4px;">'
+        f'<div style="display:flex;align-items:center;flex-wrap:wrap;'
+        f'padding:8px 0 12px;margin-bottom:2px;border-bottom:1px solid {BORDER};">'
         + "".join(parts) + "</div>",
         unsafe_allow_html=True,
     )
@@ -379,169 +487,253 @@ def render_step_nav(current_step_id: str):
 # ── Header ────────────────────────────────────────────────────────
 def render_header():
     state = st.session_state.kyc_state
-    h_left, h_right = st.columns([6, 1])
+    h_left, h_right = st.columns([7, 1])
     with h_left:
         if st.session_state.step == "analysis" and state.case.company_name:
             done, total = main_progress()
-            rc = "#22aa55" if done == total else RED
+            pct  = int(done / total * 100)
+            rc   = GREEN if done == total else ACCENT
+            prog_bar = (
+                f'<div style="display:inline-flex;align-items:center;gap:6px;'
+                f'background:{"#DCFCE7" if done==total else "#FEE2E2"};'
+                f'padding:2px 10px;border-radius:20px;">'
+                f'<span style="font-size:0.62rem;font-weight:700;color:{rc};">{done}/{total}</span>'
+                f'</div>'
+            )
             st.markdown(
-                '<div style="padding:6px 0 10px;border-bottom:2px solid ' + RED + ';margin-bottom:10px;">'
-                + _logo_html(34) +
-                '<span style="color:#ddd;margin:0 12px;">|</span>'
-                '<span style="font-size:0.78rem;color:#888;">AML IntelliGent Platform · KYC/CDD</span>'
-                '<span style="color:#ddd;margin:0 10px;">|</span>'
-                '<span style="color:#1a1a1a;font-size:0.9rem;font-weight:600;">' + state.case.company_name + '</span>'
-                '<span style="color:#aaa;font-size:0.72rem;margin-left:8px;">' + (state.case.case_id or '') + '</span>'
-                '<span style="background:' + rc + ';color:#fff;font-size:0.62rem;padding:2px 8px;'
-                'border-radius:10px;margin-left:10px;">' + str(done) + '/' + str(total) + '</span>'
-                '</div>', unsafe_allow_html=True)
+                f'<div style="padding:8px 0 10px;margin-bottom:6px;'
+                f'display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+                + _logo_html(30) +
+                f'<span style="color:{BORDER};font-size:1.2rem;margin:0 2px;">|</span>'
+                f'<span style="font-size:0.72rem;color:{TEXT_SEC};font-weight:500;letter-spacing:0.5px;">AML IntelliGent · KYC/CDD</span>'
+                f'<span style="color:{BORDER};font-size:1.2rem;margin:0 2px;">|</span>'
+                f'<span style="font-size:0.9rem;font-weight:700;color:{TEXT};">{state.case.company_name}</span>'
+                + (f'<span style="font-size:0.72rem;color:{TEXT_SEC};">{state.case.case_id}</span>' if state.case.case_id else '')
+                + prog_bar +
+                f'</div>',
+                unsafe_allow_html=True)
         else:
             st.markdown(
-                '<div style="padding:6px 0 10px;border-bottom:2px solid ' + RED + ';margin-bottom:10px;">'
-                + _logo_html(34) +
-                '<span style="color:#ddd;margin:0 12px;">|</span>'
-                '<span style="font-size:0.78rem;color:#888;">AML IntelliGent Platform · KYC/CDD</span>'
-                '</div>', unsafe_allow_html=True)
+                f'<div style="padding:8px 0 10px;margin-bottom:6px;'
+                f'display:flex;align-items:center;gap:10px;">'
+                + _logo_html(30) +
+                f'<span style="color:{BORDER};font-size:1.2rem;margin:0 2px;">|</span>'
+                f'<span style="font-size:0.72rem;color:{TEXT_SEC};font-weight:500;letter-spacing:0.5px;">AML IntelliGent Platform · KYC/CDD</span>'
+                f'</div>',
+                unsafe_allow_html=True)
     with h_right:
-        st.markdown('<div style="text-align:right;padding-top:4px;font-size:0.65rem;color:#bbb;">claude-sonnet-4-6</div>',
-                    unsafe_allow_html=True)
-    # Show step nav for all steps except setup
+        st.markdown(
+            f'<div style="text-align:right;padding-top:10px;font-size:0.62rem;'
+            f'color:{TEXT_SEC};font-weight:500;">claude-sonnet-4-6</div>',
+            unsafe_allow_html=True)
     if st.session_state.step not in ("setup", ""):
         render_step_nav(st.session_state.step)
 
 
 # ── render_prose_result ───────────────────────────────────────────
 def render_prose_result(key: str, parsed: dict):
-    """Displays agent result as professional prose — no raw JSON."""
+    """Displays agent result as professional card — no raw JSON."""
     risk      = parsed.get("rischioComplessivo","") or parsed.get("customerRiskRating","")
     narrativa = (parsed.get("narrativa") or parsed.get("narrativaCompleta")
                  or parsed.get("sintesiEsecutiva","") or "")
     evidenze  = parsed.get("principaliEvidenze", [])
     flags     = parsed.get("flags", [])
 
+    # ── Risk header bar ──────────────────────────────────────────
     if risk:
-        rc = get_risk_color(risk)
+        rc   = get_risk_color(risk)
         racc = parsed.get("raccomandazione","")
         racc_str = ""
         if isinstance(racc, dict):
-            acc  = racc.get("accettazione","")
-            adv  = racc.get("livelloAdeguataVerifica","")
-            freq = racc.get("frequenzaMonitoraggio","")
-            parts_r = [x for x in [acc, adv, freq] if x]
-            if parts_r: racc_str = " &nbsp;·&nbsp; ".join(parts_r)
+            parts_r = [x for x in [racc.get("accettazione",""),
+                                    racc.get("livelloAdeguataVerifica",""),
+                                    racc.get("frequenzaMonitoraggio","")] if x]
+            if parts_r: racc_str = " · ".join(parts_r)
         elif isinstance(racc, str) and racc:
             racc_str = racc
         st.markdown(
-            '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px;">'
-            '<span style="background:' + rc + ';color:#fff;font-size:0.82rem;font-weight:700;'
-            'padding:5px 18px;border-radius:20px;">⬤ RISCHIO: ' + risk + '</span>'
-            + (f'<span style="font-size:0.76rem;color:#777;">{racc_str}</span>' if racc_str else '')
-            + '</div>', unsafe_allow_html=True)
+            f'<div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;'
+            f'background:#fff;border:1px solid {BORDER};border-left:4px solid {rc};'
+            f'border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:18px;">'
+            f'<span style="font-size:0.7rem;font-weight:700;letter-spacing:1px;color:{TEXT_SEC};">RISCHIO COMPLESSIVO</span>'
+            f'{risk_badge(risk)}'
+            + (f'<span style="margin-left:auto;font-size:0.76rem;color:{TEXT_SEC};">{racc_str}</span>' if racc_str else '')
+            + f'</div>',
+            unsafe_allow_html=True)
 
-    # Risk matrix — only for final_valuation
+    # ── Risk matrix (final_valuation only) ──────────────────────
     if key == "final_valuation":
         mx = parsed.get("matriceRischio")
         if mx:
-            labels = [("identitaStruttura","Identità/Struttura"),("reputazionale","Reputazionale"),
+            st.markdown(
+                f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
+                f'color:{TEXT_SEC};margin:4px 0 10px;text-transform:uppercase;">Matrice di Rischio</div>',
+                unsafe_allow_html=True)
+            labels = [("identitaStruttura","Identità / Struttura"),("reputazionale","Reputazionale"),
                       ("economico","Economico"),("transazionale","Transazionale"),("geografico","Geografico")]
             cols = st.columns(5)
             for i, (dim, lbl) in enumerate(labels):
-                val  = mx.get(dim,{})
-                sc   = int(val.get("score",0)) if isinstance(val,dict) else 0
-                bc   = RED if sc >= 4 else "#f59e0b" if sc == 3 else "#22aa55"
-                motiv = val.get("motivazione","") if isinstance(val,dict) else ""
+                val   = mx.get(dim, {})
+                sc    = int(val.get("score", 0)) if isinstance(val, dict) else 0
+                motiv = val.get("motivazione","") if isinstance(val, dict) else ""
+                if sc >= 4: bc, bg = DANGER, "#FEF2F2"
+                elif sc == 3: bc, bg = YELLOW, "#FFFBEB"
+                else: bc, bg = GREEN, "#F0FDF4"
+                bar_w = sc * 20
                 with cols[i]:
                     st.markdown(
-                        '<div style="text-align:center;background:#f8f8f8;border-radius:6px;'
-                        'padding:10px 4px;border:1px solid #eee;" title="' + motiv + '">'
-                        '<div style="font-size:0.58rem;color:#999;margin-bottom:3px;">' + lbl + '</div>'
-                        '<div style="font-size:1.5rem;font-weight:900;color:' + bc + ';">' + str(sc)
-                        + '<span style="font-size:0.55rem;color:#ccc;">/5</span></div>'
-                        '<div style="margin:4px 8px 0;height:3px;background:#eee;border-radius:2px;">'
-                        '<div style="width:' + str(sc*20) + '%;height:100%;background:' + bc + ';border-radius:2px;"></div>'
-                        '</div></div>', unsafe_allow_html=True)
-            st.markdown("")
+                        f'<div style="text-align:center;background:{bg};border-radius:8px;'
+                        f'padding:12px 6px;border:1px solid {BORDER};" title="{motiv}">'
+                        f'<div style="font-size:0.6rem;color:{TEXT_SEC};margin-bottom:6px;font-weight:500;">{lbl}</div>'
+                        f'<div style="font-size:1.6rem;font-weight:800;color:{bc};line-height:1;">{sc}'
+                        f'<span style="font-size:0.6rem;color:{TEXT_SEC};font-weight:400;">/5</span></div>'
+                        f'<div style="margin:6px 6px 0;height:4px;background:{BORDER};border-radius:2px;">'
+                        f'<div style="width:{bar_w}%;height:100%;background:{bc};border-radius:2px;'
+                        f'transition:width 0.4s;"></div></div>'
+                        f'</div>',
+                        unsafe_allow_html=True)
+            st.markdown("<div style='margin-bottom:14px;'></div>", unsafe_allow_html=True)
 
+    # ── Narrativa ────────────────────────────────────────────────
     if narrativa:
         st.markdown(
-            '<div style="font-size:0.62rem;font-weight:700;letter-spacing:1.5px;color:#777;'
-            'margin:12px 0 6px;">ANALISI</div>', unsafe_allow_html=True)
+            f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
+            f'color:{TEXT_SEC};margin:14px 0 8px;text-transform:uppercase;">Analisi</div>',
+            unsafe_allow_html=True)
         st.markdown(
-            '<div style="background:#fff;border:1px solid #e8e8e8;'
-            'padding:16px 20px;border-radius:6px;font-size:0.87rem;'
-            'line-height:1.8;color:#1a1a1a;margin-bottom:16px;">'
-            + narrativa.replace("\n", "<br>") + '</div>', unsafe_allow_html=True)
+            f'<div style="background:#fff;border:1px solid {BORDER};border-radius:8px;'
+            f'padding:18px 22px;font-size:0.875rem;line-height:1.85;color:{TEXT};margin-bottom:18px;">'
+            + narrativa.replace("\n", "<br>") + '</div>',
+            unsafe_allow_html=True)
 
+    # ── Evidenze table ───────────────────────────────────────────
     if evidenze:
         st.markdown(
-            '<div style="font-size:0.62rem;font-weight:700;letter-spacing:1.5px;color:#555;'
-            'margin:8px 0 8px;">PRINCIPALI EVIDENZE DI ATTENZIONE</div>', unsafe_allow_html=True)
-        level_styles = {
-            "CRITICO":    ("#fef2f2","#dc2626","🔴"),
-            "ANOMALIA":   ("#fffbeb","#d97706","🟡"),
-            "ATTENZIONE": ("#f0fdf4","#16a34a","🟢"),
+            f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
+            f'color:{TEXT_SEC};margin:6px 0 10px;text-transform:uppercase;">Principali Evidenze</div>',
+            unsafe_allow_html=True)
+        rows_html = ""
+        lv_cfg = {
+            "CRITICO":    ("#FEF2F2","#B91C1C"),
+            "ANOMALIA":   ("#FFFBEB","#92400E"),
+            "ATTENZIONE": ("#F0FDF4","#15803D"),
         }
-        for ev in evidenze:
+        for idx, ev in enumerate(evidenze):
             lvl  = (ev.get("livello") or "ATTENZIONE").upper()
             etxt = ev.get("evidenza","")
             ntxt = ev.get("normativa","")
-            bg_e, col_e, ico_e = level_styles.get(lvl, level_styles["ATTENZIONE"])
-            st.markdown(
-                '<div style="background:' + bg_e + ';border-left:3px solid ' + col_e + ';'
-                'border-radius:0 5px 5px 0;padding:8px 12px;margin-bottom:6px;">'
-                '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'
-                '<span style="font-size:0.8rem;color:#1a1a1a;line-height:1.5;">'
-                '<span style="color:' + col_e + ';margin-right:5px;">' + ico_e + '</span>' + etxt + '</span>'
-                '<span style="font-size:0.6rem;font-weight:700;color:' + col_e + ';white-space:nowrap;'
-                'padding:1px 6px;border-radius:8px;border:1px solid ' + col_e + ';">' + lvl + '</span></div>'
-                + (f'<div style="font-size:0.68rem;color:#888;margin-top:4px;margin-left:16px;">📎 {ntxt}</div>'
-                   if ntxt else '')
-                + '</div>', unsafe_allow_html=True)
+            bg_r, col_r = lv_cfg.get(lvl, lv_cfg["ATTENZIONE"])
+            row_bg = "#fff" if idx % 2 == 0 else f"{BG}"
+            rows_html += (
+                f'<tr style="background:{row_bg};">'
+                f'<td style="padding:8px 10px;border-bottom:1px solid {BORDER};white-space:nowrap;">'
+                f'{risk_badge(lvl)}</td>'
+                f'<td style="padding:8px 12px;border-bottom:1px solid {BORDER};'
+                f'font-size:0.82rem;color:{TEXT};line-height:1.5;">{etxt}</td>'
+                f'<td style="padding:8px 10px;border-bottom:1px solid {BORDER};'
+                f'font-size:0.72rem;color:{TEXT_SEC};font-style:italic;">{ntxt}</td>'
+                f'</tr>'
+            )
+        st.markdown(
+            f'<div style="border:1px solid {BORDER};border-radius:8px;overflow:hidden;margin-bottom:18px;">'
+            f'<table style="width:100%;border-collapse:collapse;">'
+            f'<thead><tr style="background:#F8FAFC;">'
+            f'<th style="padding:8px 10px;font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
+            f'color:{TEXT_SEC};text-align:left;border-bottom:1px solid {BORDER};text-transform:uppercase;">Livello</th>'
+            f'<th style="padding:8px 12px;font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
+            f'color:{TEXT_SEC};text-align:left;border-bottom:1px solid {BORDER};text-transform:uppercase;">Evidenza</th>'
+            f'<th style="padding:8px 10px;font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
+            f'color:{TEXT_SEC};text-align:left;border-bottom:1px solid {BORDER};text-transform:uppercase;">Normativa</th>'
+            f'</tr></thead><tbody>{rows_html}</tbody></table></div>',
+            unsafe_allow_html=True)
 
+    # ── Flags ────────────────────────────────────────────────────
     if flags:
         st.markdown(
-            '<div style="font-size:0.62rem;font-weight:700;letter-spacing:1.5px;color:#555;'
-            'margin:8px 0 6px;">FLAG AML</div>', unsafe_allow_html=True)
+            f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
+            f'color:{TEXT_SEC};margin:6px 0 10px;text-transform:uppercase;">Flag AML</div>',
+            unsafe_allow_html=True)
         for fl in flags:
             frc  = get_risk_color(fl.get("rischio",""))
             tipo = fl.get("tipo","")
             desc = fl.get("descrizione","")
             norm = fl.get("riferimentoNormativo","") or fl.get("indicatoreUIF","")
             st.markdown(
-                '<div style="border-left:3px solid ' + frc + ';padding:5px 10px;margin-bottom:4px;'
-                'background:#fff;border-radius:0 4px 4px 0;">'
-                '<span style="font-size:0.78rem;font-weight:600;">' + tipo + '</span>'
-                + (f'<span style="font-size:0.76rem;color:#555;"> — {desc}</span>' if desc else '')
-                + (f'<span style="font-size:0.66rem;color:#bbb;margin-left:6px;">📎 {norm}</span>' if norm else '')
-                + '</div>', unsafe_allow_html=True)
+                f'<div style="display:flex;align-items:flex-start;gap:10px;'
+                f'background:#fff;border:1px solid {BORDER};border-left:3px solid {frc};'
+                f'border-radius:0 6px 6px 0;padding:8px 12px;margin-bottom:5px;">'
+                f'<div style="flex:1;">'
+                f'<span style="font-size:0.8rem;font-weight:600;color:{TEXT};">{tipo}</span>'
+                + (f'<span style="font-size:0.78rem;color:{TEXT_SEC};"> — {desc}</span>' if desc else '')
+                + (f'<div style="font-size:0.68rem;color:{TEXT_SEC};margin-top:2px;">📎 {norm}</div>' if norm else '')
+                + f'</div></div>',
+                unsafe_allow_html=True)
 
 
 # ── STEP 1: SETUP ────────────────────────────────────────────────
+def _field_label(text: str, required: bool = False) -> None:
+    star = f'<span style="color:{ACCENT};">*</span>' if required else ""
+    st.markdown(
+        f'<div style="font-size:0.7rem;font-weight:600;letter-spacing:0.5px;'
+        f'color:{TEXT_SEC};text-transform:uppercase;margin-bottom:3px;">{text}{star}</div>',
+        unsafe_allow_html=True)
+
 def render_setup():
     render_header()
-    _, col, _ = st.columns([1, 2, 1])
+    _, col, _ = st.columns([1, 2.4, 1])
     with col:
+        # Page title card
         st.markdown(
-            '<div style="text-align:center;padding:20px 0 16px;">'
-            '<div style="font-size:1.7rem;font-weight:700;color:#1a1a1a;">Nuova Analisi Controparte</div>'
-            '<div style="color:#888;margin-top:5px;font-size:0.85rem;">'
-            'Inserisci i dati della controparte e carica la knowledge base normativa</div></div>',
+            f'<div style="background:#fff;border:1px solid {BORDER};border-radius:12px;'
+            f'padding:28px 32px;margin-bottom:20px;">'
+            f'<div style="font-size:1.45rem;font-weight:700;color:{TEXT};margin-bottom:6px;">'
+            f'Nuova Analisi Controparte</div>'
+            f'<div style="font-size:0.85rem;color:{TEXT_SEC};">'
+            f'Inserisci i dati della controparte e carica la knowledge base normativa</div>'
+            f'</div>',
             unsafe_allow_html=True)
+
         if not get_api_key():
-            st.error("⚠️  API Key Anthropic non trovata — aggiungi ANTHROPIC_API_KEY nei Secrets")
-        st.markdown("#### Controparte")
-        company = st.text_input("Ragione Sociale *", placeholder="es. Meridian Capital S.r.l.")
+            st.error("⚠️  API Key Anthropic non trovata — aggiungi ANTHROPIC_API_KEY nei Secrets.")
+
+        # Controparte card
+        st.markdown(
+            f'<div style="background:#fff;border:1px solid {BORDER};border-radius:10px;'
+            f'padding:22px 26px;margin-bottom:16px;">'
+            f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
+            f'color:{BLUE};text-transform:uppercase;margin-bottom:16px;">Dati Controparte</div>',
+            unsafe_allow_html=True)
+
+        _field_label("Ragione Sociale", required=True)
+        company = st.text_input("Ragione Sociale", placeholder="es. Meridian Capital S.r.l.",
+                                label_visibility="collapsed")
         c1, c2 = st.columns(2)
-        with c1: country = st.text_input("Paese *", placeholder="es. Italia")
-        with c2: sector  = st.text_input("Settore", placeholder="es. Wealth Management")
+        with c1:
+            _field_label("Paese", required=True)
+            country = st.text_input("Paese", placeholder="es. Italia", label_visibility="collapsed")
+        with c2:
+            _field_label("Settore")
+            sector = st.text_input("Settore", placeholder="es. Wealth Management", label_visibility="collapsed")
         c3, c4 = st.columns(2)
-        with c3: case_id = st.text_input("Case ID", placeholder="es. AML-2026-0341")
-        with c4: analyst = st.text_input("Analista", placeholder="es. M. Rossi")
-        st.markdown("---")
-        st.markdown("#### 📚 Knowledge Base Normativa")
-        st.markdown('<div style="font-size:0.78rem;color:#888;margin-bottom:8px;">'
-                    'FATF guidelines, circolari UIF, D.Lgs. 231/2007, liste sanzioni, policy AML interne.</div>',
-                    unsafe_allow_html=True)
+        with c3:
+            _field_label("Case ID")
+            case_id = st.text_input("Case ID", placeholder="es. AML-2026-0341", label_visibility="collapsed")
+        with c4:
+            _field_label("Analista")
+            analyst = st.text_input("Analista", placeholder="es. M. Rossi", label_visibility="collapsed")
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # KB card
+        st.markdown(
+            f'<div style="background:#fff;border:1px solid {BORDER};border-radius:10px;'
+            f'padding:22px 26px;margin-bottom:20px;">'
+            f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
+            f'color:{BLUE};text-transform:uppercase;margin-bottom:6px;">Knowledge Base Normativa</div>'
+            f'<div style="font-size:0.78rem;color:{TEXT_SEC};margin-bottom:14px;">'
+            f'FATF guidelines, circolari UIF, D.Lgs.&nbsp;231/2007, liste sanzioni, policy AML interne.</div>',
+            unsafe_allow_html=True)
+
         kb_files = st.file_uploader("KB", type=["pdf","docx","txt","md","csv"],
                                     accept_multiple_files=True, key="kb_upload",
                                     label_visibility="collapsed")
@@ -552,11 +744,16 @@ def render_setup():
                 names.append(f.name)
             st.session_state.knowledge_base = "\n\n".join(texts)
             st.session_state.kb_doc_names   = names
-            st.success(f"✓ {len(texts)} file · {len(st.session_state.knowledge_base):,} caratteri")
+            st.success(f"✓ {len(texts)} documento/i caricati · {len(st.session_state.knowledge_base):,} caratteri")
         elif st.session_state.kb_doc_names:
-            st.info("📚 " + " · ".join(st.session_state.kb_doc_names))
-        st.markdown("---")
-        if st.button("Continua →  Carica Documenti", use_container_width=True):
+            st.markdown(
+                f'<div style="font-size:0.78rem;color:{BLUE};padding:6px 0;">'
+                + " · ".join(f"📄 {n}" for n in st.session_state.kb_doc_names)
+                + '</div>', unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        if st.button("Continua → Carica Documenti", use_container_width=True):
             if not company.strip() or not country.strip():
                 st.error("Ragione Sociale e Paese sono obbligatori.")
             elif not get_api_key():
@@ -585,12 +782,11 @@ def render_upload():
     render_header()
     _, col, _ = st.columns([0.5, 5, 0.5])
     with col:
-        st.markdown("### 📎 Carica i documenti della controparte")
         st.markdown(
-            '<div style="font-size:0.78rem;color:#888;margin-bottom:12px;">'
-            'Nomina i file con il prefisso della sezione per l\'assegnazione automatica: '
-            '<b>01_</b> Struttura · <b>02_</b> UBO/PEP · <b>03_</b> Reputational · '
-            '<b>04_</b> Economic · <b>05_</b> Transactional</div>',
+            f'<div style="font-size:1.15rem;font-weight:700;color:{TEXT};margin-bottom:4px;">Carica Documenti</div>'
+            f'<div style="font-size:0.82rem;color:{TEXT_SEC};margin-bottom:16px;">'
+            f'Prefisso automatico: <b>01_</b> Struttura · <b>02_</b> UBO/PEP · '
+            f'<b>03_</b> Reputational · <b>04_</b> Economic · <b>05_</b> Transactional</div>',
             unsafe_allow_html=True)
 
         uploaded = st.file_uploader(
@@ -636,8 +832,8 @@ def render_upload():
         files_data = st.session_state.uploaded_files_data
         if files_data:
             st.markdown(
-                '<div style="font-size:0.8rem;font-weight:700;color:#1a1a1a;'
-                'margin:16px 0 8px;">Assegnazione sezioni</div>',
+                f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
+                f'color:{TEXT_SEC};text-transform:uppercase;margin:18px 0 10px;">Assegnazione Sezioni</div>',
                 unsafe_allow_html=True)
 
             section_options = [("", "— Non assegnato —")] + [
@@ -648,12 +844,18 @@ def render_upload():
 
             for fd in files_data:
                 fname = fd["name"]
-                disp  = fname if len(fname) <= 40 else fname[:37] + "..."
+                disp  = fname if len(fname) <= 44 else fname[:41] + "..."
+                ext   = fd.get("ext","").lstrip(".")
+                sz_kb = fd.get("size", 0) // 1024
                 row_l, row_r = st.columns([2, 3])
                 with row_l:
                     st.markdown(
-                        f'<div style="font-size:0.82rem;padding:8px 0;color:#1a1a1a;">'
-                        f'📄 {disp}</div>',
+                        f'<div style="background:#fff;border:1px solid {BORDER};border-radius:6px;'
+                        f'padding:8px 12px;margin-bottom:4px;display:flex;align-items:center;gap:8px;">'
+                        f'<span style="font-size:0.9rem;">📄</span>'
+                        f'<div><div style="font-size:0.82rem;font-weight:500;color:{TEXT};">{disp}</div>'
+                        f'<div style="font-size:0.68rem;color:{TEXT_SEC};">{ext.upper()} · {sz_kb} KB</div>'
+                        f'</div></div>',
                         unsafe_allow_html=True)
                 with row_r:
                     current_key = st.session_state.file_assignments.get(fname, "")
@@ -671,7 +873,7 @@ def render_upload():
                     if chosen_key != st.session_state.file_assignments.get(fname):
                         st.session_state.file_assignments[fname] = chosen_key
 
-        st.markdown("---")
+        st.markdown(f'<div style="height:12px;"></div>', unsafe_allow_html=True)
         nav_l, nav_r = st.columns([1, 1])
         with nav_l:
             if st.button("← Indietro", key="upload_back", use_container_width=True):
@@ -691,10 +893,10 @@ def render_mode_config():
     render_header()
     _, col, _ = st.columns([0.5, 5, 0.5])
     with col:
-        st.markdown("### ⚙️ Configura le modalità di analisi")
         st.markdown(
-            '<div style="font-size:0.78rem;color:#888;margin-bottom:16px;">'
-            'Scegli se ogni sezione deve essere analizzata dall\'agente AI o inserita manualmente.</div>',
+            f'<div style="font-size:1.15rem;font-weight:700;color:{TEXT};margin-bottom:4px;">Configura Modalità Analisi</div>'
+            f'<div style="font-size:0.82rem;color:{TEXT_SEC};margin-bottom:18px;">'
+            f'Scegli per ogni sezione se usare l\'agente AI o inserire l\'analisi manualmente.</div>',
             unsafe_allow_html=True)
 
         files_data    = st.session_state.uploaded_files_data
@@ -708,12 +910,12 @@ def render_mode_config():
 
             # Card
             st.markdown(
-                f'<div style="background:#f9f9f9;border:1px solid #e8e8e8;border-radius:8px;'
+                f'<div style="background:#fff;border:1px solid {BORDER};border-radius:10px;'
                 f'padding:14px 18px;margin-bottom:10px;">'
-                f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
-                f'<span style="font-size:1.1rem;">{sec["icon"]}</span>'
-                f'<span style="font-size:0.7rem;color:#bbb;font-weight:700;">{sec["number"]}</span>'
-                f'<span style="font-size:0.92rem;font-weight:700;color:#1a1a1a;">{sec["full_label"]}</span>'
+                f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">'
+                f'<span style="font-size:1.05rem;">{sec["icon"]}</span>'
+                f'<span style="font-size:0.62rem;color:{TEXT_SEC};font-weight:700;letter-spacing:0.5px;">{sec["number"]}</span>'
+                f'<span style="font-size:0.92rem;font-weight:600;color:{TEXT};">{sec["full_label"]}</span>'
                 f'</div>',
                 unsafe_allow_html=True)
 
@@ -748,12 +950,12 @@ def render_mode_config():
                     st.markdown(f'<div style="padding-top:4px;">{tags}</div>', unsafe_allow_html=True)
                 else:
                     st.markdown(
-                        '<span style="font-size:0.72rem;color:#bbb;">Nessun documento assegnato</span>',
+                        f'<span style="font-size:0.72rem;color:{TEXT_SEC};">Nessun documento assegnato</span>',
                         unsafe_allow_html=True)
 
             st.markdown('</div>', unsafe_allow_html=True)
 
-        st.markdown("---")
+        st.markdown(f'<div style="height:12px;"></div>', unsafe_allow_html=True)
         nav_l, nav_r = st.columns([1, 1])
         with nav_l:
             if st.button("← Indietro", key="mode_back", use_container_width=True):
@@ -817,6 +1019,7 @@ def _run_with_stream(key: str, client):
         st.error("API Key non configurata nei Secrets.")
         return
 
+    sec_info  = next(s for s in ALL_SECTIONS if s["key"] == key)
     status_box = st.empty()
     stream_box = st.empty()
     buf = {"text": "", "thinking": "", "phase": "thinking"}
@@ -824,22 +1027,23 @@ def _run_with_stream(key: str, client):
     def _render():
         parts = []
         if buf["thinking"] and buf["phase"] == "thinking":
-            th = buf["thinking"][-800:] if len(buf["thinking"]) > 800 else buf["thinking"]
+            th = buf["thinking"][-600:] if len(buf["thinking"]) > 600 else buf["thinking"]
             parts.append(
-                '<div style="font-size:0.68rem;color:#aaa;font-style:italic;'
-                'margin-bottom:6px;border-left:2px solid #ddd;padding-left:8px;">'
-                '🧠 ' + th.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                f'<div style="font-size:0.68rem;color:{TEXT_SEC};font-style:italic;'
+                f'border-left:2px solid {BORDER};padding-left:10px;margin-bottom:8px;">'
+                + th.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                 + '</div>')
         if buf["text"]:
             disp = buf["text"][-3000:] if len(buf["text"]) > 3000 else buf["text"]
             parts.append(
-                '<div style="font-family:monospace;font-size:0.7rem;white-space:pre-wrap;">'
+                f'<div style="font-family:\'SFMono-Regular\',Consolas,monospace;'
+                f'font-size:0.72rem;white-space:pre-wrap;color:{TEXT};">'
                 + disp.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                 + '</div>')
         if parts:
             stream_box.markdown(
-                '<div style="background:#f8f8f8;border:1px solid #eee;border-radius:6px;'
-                'padding:10px 14px;max-height:280px;overflow-y:auto;">'
+                f'<div style="background:#0F172A;border-radius:8px;'
+                f'padding:14px 16px;max-height:300px;overflow-y:auto;color:#E2E8F0;">'
                 + "".join(parts) + '</div>',
                 unsafe_allow_html=True)
 
@@ -847,16 +1051,20 @@ def _run_with_stream(key: str, client):
         buf["thinking"] += chunk
         buf["phase"] = "thinking"
         status_box.markdown(
-            f'<div style="font-size:0.75rem;font-weight:600;color:#aaa;margin:6px 0 2px;">'
-            f'🧠 Analisi in corso…</div>', unsafe_allow_html=True)
+            f'<div style="display:flex;align-items:center;gap:8px;padding:8px 0;">'
+            f'<span class="aml-spin" style="font-size:0.85rem;">⚙</span>'
+            f'<span style="font-size:0.78rem;font-weight:600;color:{TEXT_SEC};">Elaborazione in corso…</span>'
+            f'</div>', unsafe_allow_html=True)
         _render()
 
     def on_token(chunk):
         buf["text"] += chunk
         buf["phase"] = "writing"
         status_box.markdown(
-            f'<div style="font-size:0.75rem;font-weight:600;color:{RED};margin:6px 0 2px;">'
-            f'✍️ Redazione…</div>', unsafe_allow_html=True)
+            f'<div style="display:flex;align-items:center;gap:8px;padding:8px 0;">'
+            f'<span class="aml-pulse" style="color:{ACCENT};font-size:0.85rem;">✦</span>'
+            f'<span style="font-size:0.78rem;font-weight:600;color:{ACCENT};">Redazione output…</span>'
+            f'</div>', unsafe_allow_html=True)
         _render()
 
     try:
@@ -868,50 +1076,77 @@ def _run_with_stream(key: str, client):
 
 # ── Analysis sidebar ──────────────────────────────────────────────
 def _render_analysis_sidebar(queued_key=None):
-    queue      = st.session_state.get("run_queue", [])
     active_key = st.session_state.get("active_section", "registry")
+    state      = st.session_state.kyc_state
+
+    # Dark sidebar header
+    st.markdown(
+        f'<div style="background:{SB_BG};border-radius:10px;padding:16px 14px 10px;margin-bottom:4px;">'
+        f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.5px;'
+        f'color:rgba(255,255,255,0.45);text-transform:uppercase;margin-bottom:2px;">AML IntelliGent</div>'
+        + (f'<div style="font-size:0.85rem;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;'
+           f'text-overflow:ellipsis;">{state.case.company_name}</div>'
+           if state.case.company_name else '')
+        + f'<div style="font-size:0.68rem;color:rgba(255,255,255,0.45);margin-top:2px;">KYC · CDD · AML</div>'
+        f'</div>',
+        unsafe_allow_html=True)
 
     # Sentinel: CSS uses this to scope the transparent button overlays
     st.markdown('<div id="aml-sb-marker" style="height:0;overflow:hidden;"></div>',
                 unsafe_allow_html=True)
 
     for sec in MAIN_SECTIONS:
-        k         = sec["key"]
-        status    = sec_status(k)
-        is_active = (k == active_key)
+        k          = sec["key"]
+        status     = sec_status(k)
+        is_active  = (k == active_key)
         is_running = (k == queued_key)
 
-        # Colours: green = done, grey = pending/running
-        if status == "completed":
-            dot_c     = "#22aa55"
-            label_c   = "#1a1a1a"
-            dot       = "●"
-        elif is_running:
-            dot_c     = "#aaa"
-            label_c   = "#777"
-            dot       = "⚙"   # will spin via CSS
+        # Status icon + colors
+        if is_running:
+            icon  = '⚙'
+            dot_c = "rgba(255,255,255,0.4)"
+            dot_class = 'class="aml-spin"'
+            lbl_c = "rgba(255,255,255,0.7)"
+            bg    = "rgba(255,255,255,0.06)"
+            brd   = f"border-left:3px solid rgba(255,255,255,0.2);"
+        elif status == "completed":
+            # Get risk for color coding
+            content = get_content(k)
+            parsed_c = parse_json_result(content) if content else None
+            risk_c  = (parsed_c.get("rischioComplessivo","") if parsed_c else "") or ""
+            rc = get_risk_color(risk_c) if risk_c else GREEN
+            icon  = '✓'
+            dot_c = rc
+            dot_class = ''
+            lbl_c = "#fff" if is_active else "rgba(255,255,255,0.75)"
+            bg    = f"rgba(255,255,255,0.10)" if is_active else "rgba(255,255,255,0.04)"
+            brd   = f"border-left:3px solid {ACCENT};" if is_active else f"border-left:3px solid {rc};"
         else:
-            dot_c     = "#d0d0d0"
-            label_c   = "#aaa"
-            dot       = "○"
-
-        dot_class = 'class="aml-spin"' if is_running else ''
-        border    = f"border-left:3px solid {RED};background:#fff9f9;" if is_active else "border-left:3px solid transparent;"
+            icon  = '○'
+            dot_c = "rgba(255,255,255,0.25)"
+            dot_class = ''
+            lbl_c = "rgba(255,255,255,0.45)" if not is_active else "rgba(255,255,255,0.85)"
+            bg    = "rgba(255,255,255,0.06)" if is_active else "transparent"
+            brd   = f"border-left:3px solid {ACCENT};" if is_active else "border-left:3px solid transparent;"
 
         st.markdown(
-            f'<div style="{border}padding:8px 8px 8px 10px;border-radius:0 4px 4px 0;'
-            f'margin-bottom:2px;cursor:pointer;">'
-            f'<span {dot_class} style="color:{dot_c};font-size:0.65rem;margin-right:6px;">{dot}</span>'
-            f'<span style="font-size:0.82rem;font-weight:{"700" if is_active else "400"};color:{label_c};">'
+            f'<div style="{brd}background:{bg};padding:9px 10px 9px 12px;'
+            f'border-radius:0 6px 6px 0;margin-bottom:2px;cursor:pointer;'
+            f'transition:background 0.15s;">'
+            f'<div style="display:flex;align-items:center;gap:8px;">'
+            f'<span {dot_class} style="color:{dot_c};font-size:0.7rem;width:14px;text-align:center;">{icon}</span>'
+            f'<span style="font-size:0.82rem;font-weight:{"600" if is_active else "400"};color:{lbl_c};">'
             f'{sec["icon"]} {sec["label"]}</span>'
-            f'</div>',
+            f'</div></div>',
             unsafe_allow_html=True)
 
         if st.button(" ", key=f"sb_{k}", use_container_width=True, help=sec["full_label"]):
             st.session_state.active_section = k
             st.rerun()
 
-    st.markdown('<hr style="margin:10px 0;border-color:#f0f0f0;">', unsafe_allow_html=True)
+    st.markdown(
+        f'<div style="height:1px;background:rgba(255,255,255,0.08);margin:10px 0;"></div>',
+        unsafe_allow_html=True)
 
     c1, c2 = st.columns(2)
     with c1:
@@ -919,7 +1154,7 @@ def _render_analysis_sidebar(queued_key=None):
             for k in list(st.session_state.keys()): del st.session_state[k]
             st.rerun()
     with c2:
-        if st.button("⚙", key="go_setup_sb", use_container_width=True, help="Setup"):
+        if st.button("⚙ Setup", key="go_setup_sb", use_container_width=True):
             st.session_state.step = "setup"; st.rerun()
 
 
@@ -928,8 +1163,10 @@ def _render_crit_panel(key: str):
     content = get_content(key)
     parsed  = parse_json_result(content) if content else None
     if not parsed:
-        st.markdown('<div style="color:#aaa;font-size:0.8rem;padding:8px;">Nessun risultato disponibile.</div>',
-                    unsafe_allow_html=True)
+        st.markdown(
+            f'<div style="color:{TEXT_SEC};font-size:0.8rem;padding:12px;">'
+            f'Nessun risultato disponibile.</div>',
+            unsafe_allow_html=True)
         return
 
     evidenze  = parsed.get("principaliEvidenze", [])
@@ -940,42 +1177,47 @@ def _render_crit_panel(key: str):
     anomalie = [(i, ev) for i, ev in enumerate(evidenze)
                 if (ev.get("livello","") or "").upper().startswith("ANOMALIA")]
 
-    def _render_group(group, header_html):
+    def _render_group(group, grp_label, grp_color):
         if not group:
             return
-        st.markdown(header_html, unsafe_allow_html=True)
+        st.markdown(
+            f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
+            f'color:{grp_color};margin:12px 0 8px;text-transform:uppercase;">{grp_label}</div>',
+            unsafe_allow_html=True)
         for idx, ev in group:
             ov = overrides.get(idx, {})
             is_closed = (ov.get("status","") or "").lower() == "chiuso"
-            etxt  = ev.get("evidenza","")
-            ntxt  = ev.get("normativa","")
-            prop  = ev.get("proposta","") or etxt
-            lvl   = (ev.get("livello","") or "").upper()
-            bg_c  = "#fef2f2" if lvl.startswith("CRITICO") else "#fffbeb"
-            brd_c = "#dc2626"  if lvl.startswith("CRITICO") else "#d97706"
-            opacity = "opacity:0.5;" if is_closed else ""
+            etxt = ev.get("evidenza","")
+            ntxt = ev.get("normativa","")
+            lvl  = (ev.get("livello","") or "").upper()
+            brd_c = DANGER if lvl.startswith("CRITICO") else YELLOW
+            bg_c  = "#FEF2F2" if lvl.startswith("CRITICO") else "#FFFBEB"
+            opacity = "opacity:0.45;" if is_closed else ""
+            status_pill = ""
+            if ov:
+                st_color = GREEN if ov.get("status","") == "Chiuso" else TEXT_SEC
+                status_pill = (f'<span style="font-size:0.62rem;color:{st_color};'
+                               f'font-weight:600;">{ov.get("status","")}</span>')
 
             st.markdown(
                 f'<div style="background:{bg_c};border-left:3px solid {brd_c};'
-                f'border-radius:0 5px 5px 0;padding:10px 12px;margin-bottom:8px;{opacity}">'
-                f'<div style="font-size:0.8rem;color:#1a1a1a;font-weight:600;margin-bottom:4px;">{etxt}</div>'
-                f'<div style="font-size:0.75rem;color:#555;margin-bottom:4px;">Proposta: {prop}</div>'
-                + (f'<div style="font-size:0.67rem;color:#999;">📎 {ntxt}</div>' if ntxt else '')
-                + (f'<div style="font-size:0.67rem;color:{brd_c};font-weight:700;margin-top:4px;">'
-                   f'Stato: {ov.get("status","—")}</div>' if ov else '')
-                + f'</div>',
+                f'border-radius:0 6px 6px 0;padding:10px 12px;margin-bottom:6px;{opacity}">'
+                f'<div style="font-size:0.8rem;color:{TEXT};font-weight:600;'
+                f'margin-bottom:4px;line-height:1.4;">{etxt}</div>'
+                + (f'<div style="font-size:0.7rem;color:{TEXT_SEC};">📎 {ntxt}</div>' if ntxt else '')
+                + (f'<div style="margin-top:5px;">{status_pill}</div>' if status_pill else '')
+                + '</div>',
                 unsafe_allow_html=True)
 
-            # Edit status button
             edit_key = f"crit_edit_{key}_{idx}"
-            if st.button(f"Modifica stato ▾", key=f"crit_btn_{key}_{idx}"):
+            if st.button("Aggiorna stato ▾", key=f"crit_btn_{key}_{idx}"):
                 st.session_state[edit_key] = not st.session_state.get(edit_key, False)
                 st.rerun()
 
             if st.session_state.get(edit_key, False):
                 with st.form(key=f"crit_form_{key}_{idx}"):
-                    cur_status = ov.get("status","Confermato")
-                    cur_motiv  = ov.get("motivation","")
+                    cur_status  = ov.get("status","Confermato")
+                    cur_motiv   = ov.get("motivation","")
                     status_opts = ["Confermato","In revisione","Chiuso"]
                     try:
                         s_idx = status_opts.index(cur_status)
@@ -993,14 +1235,14 @@ def _render_crit_panel(key: str):
                         st.session_state[edit_key] = False
                         st.rerun()
 
-    _render_group(critics,
-        '<div style="font-size:0.75rem;font-weight:700;color:#dc2626;margin:8px 0 6px;">🔴 Criticità</div>')
-    _render_group(anomalie,
-        '<div style="font-size:0.75rem;font-weight:700;color:#d97706;margin:8px 0 6px;">🟡 Attenzione</div>')
+    _render_group(critics,  "🔴 Criticità", DANGER)
+    _render_group(anomalie, "🟡 Attenzioni", YELLOW)
 
     if not critics and not anomalie:
-        st.markdown('<div style="color:#aaa;font-size:0.8rem;padding:8px;">Nessuna criticità rilevata.</div>',
-                    unsafe_allow_html=True)
+        st.markdown(
+            f'<div style="text-align:center;padding:20px 0;color:{TEXT_SEC};font-size:0.8rem;">'
+            f'✓ Nessuna criticità aperta</div>',
+            unsafe_allow_html=True)
 
 
 # ── Section content ───────────────────────────────────────────────
@@ -1011,12 +1253,19 @@ def _render_section_content(key: str, client):
     parsed  = parse_json_result(content) if content else None
     mode    = st.session_state.section_modes.get(key, "agent")
 
-    # ── Section title (clean, no badges) ──────────────────────────
+    # Section header
+    risk_val = (parsed.get("rischioComplessivo","") if parsed else "") or ""
+    badge_html = risk_badge(risk_val) if risk_val else ""
     st.markdown(
-        f'<div style="border-bottom:1px solid #f0f0f0;padding-bottom:10px;margin-bottom:16px;">'
-        f'<span style="font-size:0.6rem;color:#bbb;font-weight:700;letter-spacing:1px;">{sec["number"]}</span>'
-        f'<span style="font-size:1.05rem;font-weight:700;color:#1a1a1a;margin-left:8px;">'
+        f'<div style="display:flex;align-items:center;justify-content:space-between;'
+        f'border-bottom:1px solid {BORDER};padding-bottom:12px;margin-bottom:18px;">'
+        f'<div style="display:flex;align-items:center;gap:8px;">'
+        f'<span style="font-size:0.62rem;color:{TEXT_SEC};font-weight:700;'
+        f'letter-spacing:0.8px;">{sec["number"]}</span>'
+        f'<span style="font-size:1rem;font-weight:700;color:{TEXT};">'
         f'{sec["icon"]} {sec["full_label"]}</span>'
+        f'</div>'
+        + badge_html +
         f'</div>',
         unsafe_allow_html=True)
 
@@ -1031,23 +1280,32 @@ def _render_section_content(key: str, client):
             st.rerun()
         return
 
-    # ── Agent mode: result ────────────────────────────────────────
+    # ── Agent mode: completed ─────────────────────────────────────
     if status == "completed" and content:
         if parsed:
+            # Left-border card colored by risk
+            rc = get_risk_color(risk_val) if risk_val else BLUE
             narrativa = (parsed.get("narrativa") or parsed.get("narrativaCompleta")
                          or parsed.get("sintesiEsecutiva","") or "")
             if narrativa:
                 st.markdown(
-                    '<div style="background:#fff;border:1px solid #ebebeb;'
-                    'padding:18px 22px;border-radius:6px;font-size:0.87rem;'
-                    'line-height:1.85;color:#1a1a1a;">'
+                    f'<div style="background:#fff;border:1px solid {BORDER};'
+                    f'border-left:4px solid {rc};border-radius:0 8px 8px 0;'
+                    f'padding:18px 22px;font-size:0.875rem;'
+                    f'line-height:1.85;color:{TEXT};margin-bottom:16px;">'
                     + narrativa.replace("\n","<br>") + '</div>',
                     unsafe_allow_html=True)
 
+            # Render evidenze table and flags below the narrativa card
+            evidenze = parsed.get("principaliEvidenze",[])
+            flags    = parsed.get("flags",[])
+            if evidenze or flags:
+                render_prose_result(key, {"principaliEvidenze": evidenze, "flags": flags})
+
             # Edit toggle
             etk = f"show_edit_{key}"
-            st.markdown("<div style='margin-top:10px;'></div>", unsafe_allow_html=True)
-            if st.button("✏️ Modifica", key=f"edit_toggle_{key}"):
+            st.markdown(f'<div style="margin-top:10px;"></div>', unsafe_allow_html=True)
+            if st.button("✏️ Modifica JSON", key=f"edit_toggle_{key}"):
                 st.session_state[etk] = not st.session_state.get(etk, False)
                 st.rerun()
             if st.session_state.get(etk, False):
@@ -1065,13 +1323,18 @@ def _render_section_content(key: str, client):
                 st.session_state.edited_content[key] = edited
                 st.session_state.kyc_state.add_result(key, edited)
 
+    # ── Agent mode: empty ─────────────────────────────────────────
     elif status == "empty":
         st.markdown(
-            f'<div style="text-align:center;padding:40px 0;">'
-            f'<div style="font-size:3rem;opacity:0.15;">{sec["icon"]}</div>'
-            f'<div style="font-size:0.8rem;color:#ccc;margin-top:10px;">In attesa di analisi</div>'
+            f'<div style="text-align:center;padding:48px 0;background:#fff;'
+            f'border:1px solid {BORDER};border-radius:10px;margin-bottom:12px;">'
+            f'<div style="font-size:3rem;opacity:0.12;">{sec["icon"]}</div>'
+            f'<div style="font-size:0.85rem;color:{TEXT_SEC};margin-top:10px;font-weight:500;">'
+            f'In attesa di analisi</div>'
+            f'<div style="font-size:0.75rem;color:{TEXT_SEC};opacity:0.7;margin-top:4px;">'
+            f'{sec["desc"]}</div>'
             f'</div>', unsafe_allow_html=True)
-        if st.button("▶ Avvia agente", key=f"run_{key}"):
+        if st.button(f"▶ Avvia {sec['label']}", key=f"run_{key}", use_container_width=True):
             _run_with_stream(key, client)
 
 
@@ -1121,14 +1384,16 @@ def render_analysis():
     # Show indicator row (right-aligned above columns)
     ind_parts = []
     if total_crit:
-        ind_parts.append(f'<span style="background:#fef2f2;color:#dc2626;font-size:0.75rem;font-weight:700;'
-                         f'padding:4px 12px;border-radius:12px;border:1px solid #fecaca;">🔴 {total_crit} criticità</span>')
+        ind_parts.append(
+            f'<span style="background:#FEF2F2;color:{DANGER};font-size:0.72rem;font-weight:700;'
+            f'padding:4px 14px;border-radius:20px;border:1px solid #FECACA;">🔴 {total_crit} criticità</span>')
     if total_anom:
-        ind_parts.append(f'<span style="background:#fffbeb;color:#d97706;font-size:0.75rem;font-weight:700;'
-                         f'padding:4px 12px;border-radius:12px;border:1px solid #fde68a;">🟡 {total_anom} attenzioni</span>')
+        ind_parts.append(
+            f'<span style="background:#FFFBEB;color:{YELLOW};font-size:0.72rem;font-weight:700;'
+            f'padding:4px 14px;border-radius:20px;border:1px solid #FDE68A;">🟡 {total_anom} attenzioni</span>')
     if ind_parts:
         st.markdown(
-            f'<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px;">'
+            f'<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;">'
             + "".join(ind_parts) + '</div>',
             unsafe_allow_html=True)
 
@@ -1150,9 +1415,14 @@ def render_analysis():
         if queued_key:
             sec = next(s for s in ALL_SECTIONS if s["key"] == queued_key)
             st.markdown(
-                f'<div style="font-size:0.88rem;font-weight:600;color:#777;margin-bottom:14px;">'
-                f'<span class="aml-spin" style="display:inline-block;margin-right:6px;">⚙</span>'
-                f'{sec["icon"]} {sec["full_label"]} — analisi in corso…</div>',
+                f'<div style="background:#fff;border:1px solid {BORDER};border-left:4px solid {ACCENT};'
+                f'border-radius:0 10px 10px 0;padding:14px 18px;margin-bottom:18px;">'
+                f'<div style="display:flex;align-items:center;gap:10px;">'
+                f'<span class="aml-spin" style="font-size:1rem;color:{ACCENT};">⚙</span>'
+                f'<div><div style="font-size:0.88rem;font-weight:600;color:{TEXT};">'
+                f'{sec["icon"]} {sec["full_label"]}</div>'
+                f'<div style="font-size:0.75rem;color:{TEXT_SEC};">Analisi in corso — attendere…</div>'
+                f'</div></div></div>',
                 unsafe_allow_html=True)
             if run_now:
                 # Phase 2: old page fully cleared — run the agent
@@ -1183,10 +1453,15 @@ def render_analysis():
 
             _render_section_content(active_key, client)
 
-            st.markdown('<hr style="margin:20px 0;border-color:#f0f0f0;">', unsafe_allow_html=True)
+            st.markdown(f'<div style="height:16px;"></div>', unsafe_allow_html=True)
             done, total = main_progress()
             if done == total:
-                if st.button("💾 Salva e Procedi alla Valutazione Finale →",
+                st.markdown(
+                    f'<div style="background:#DCFCE7;border:1px solid #86EFAC;border-radius:8px;'
+                    f'padding:10px 16px;margin-bottom:12px;font-size:0.82rem;color:#15803D;font-weight:600;">'
+                    f'✓ Tutte le sezioni completate — la valutazione finale è disponibile.</div>',
+                    unsafe_allow_html=True)
+                if st.button("Procedi alla Valutazione Finale →",
                              key="go_final", use_container_width=True):
                     st.session_state.step = "final"
                     st.rerun()
@@ -1194,12 +1469,13 @@ def render_analysis():
     if col_crit:
         with col_crit:
             st.markdown(
-                '<div style="font-size:0.85rem;font-weight:700;color:#1a1a1a;'
-                'border-bottom:1px solid #f0f0f0;padding-bottom:8px;margin-bottom:12px;">'
-                'Criticità &amp; Attenzioni</div>',
+                f'<div style="background:#fff;border:1px solid {BORDER};border-radius:10px;padding:16px;">'
+                f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
+                f'color:{TEXT_SEC};text-transform:uppercase;margin-bottom:12px;">Criticità &amp; Attenzioni</div>',
                 unsafe_allow_html=True)
             _render_crit_panel(crit_panel_open)
-            if st.button("✕ Chiudi", key="close_crit_panel"):
+            st.markdown('</div>', unsafe_allow_html=True)
+            if st.button("✕ Chiudi pannello", key="close_crit_panel", use_container_width=True):
                 st.session_state.crit_panel_section = None
                 st.rerun()
 
@@ -1215,53 +1491,56 @@ def render_final_valuation():
     render_header()
     _, col, _ = st.columns([0.3, 5.4, 0.3])
     with col:
-        st.markdown("### ⚡ Valutazione Finale")
+        st.markdown(
+            f'<div style="font-size:1.2rem;font-weight:700;color:{TEXT};margin-bottom:4px;">⚡ Valutazione Finale</div>'
+            f'<div style="font-size:0.82rem;color:{TEXT_SEC};margin-bottom:16px;">'
+            f'Sintesi del rischio AML e raccomandazione operativa per il fascicolo cliente.</div>',
+            unsafe_allow_html=True)
 
         # Mode selector
         current_final_mode = st.session_state.final_mode or "manual"
-        mode_map = {"✍️ A mano": "manual", "🤖 Super Agent": "agent"}
+        mode_map    = {"✍️ A mano": "manual", "🤖 Super Agent": "agent"}
         mode_labels = list(mode_map.keys())
-        mode_idx = 1 if current_final_mode == "agent" else 0
+        mode_idx    = 1 if current_final_mode == "agent" else 0
         chosen_label = st.radio(
-            "Modalità valutazione",
-            mode_labels,
-            index=mode_idx,
-            horizontal=True,
-            key="final_mode_radio",
-            label_visibility="collapsed")
+            "Modalità valutazione", mode_labels, index=mode_idx,
+            horizontal=True, key="final_mode_radio", label_visibility="collapsed")
         st.session_state.final_mode = mode_map[chosen_label]
 
-        st.markdown("---")
+        st.markdown(f'<div style="height:10px;"></div>', unsafe_allow_html=True)
 
         client = get_client()
-        key = "final_valuation"
+        key    = "final_valuation"
 
         if st.session_state.final_mode == "manual":
-            # Manual narrative
             existing = get_content(key) or ""
+            st.markdown(
+                f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
+                f'color:{TEXT_SEC};text-transform:uppercase;margin-bottom:6px;">Narrativa di Valutazione</div>',
+                unsafe_allow_html=True)
             manual_narrative = st.text_area(
-                "Narrativa di valutazione",
-                value=existing,
-                height=280,
-                key="final_manual_text",
-                placeholder="Inserisci la valutazione finale della controparte…")
-            st.markdown("**Profilo di rischio**")
+                "Narrativa", value=existing, height=280, key="final_manual_text",
+                placeholder="Inserisci la valutazione finale della controparte…",
+                label_visibility="collapsed")
+            st.markdown(
+                f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
+                f'color:{TEXT_SEC};text-transform:uppercase;margin:12px 0 6px;">Profilo di Rischio</div>',
+                unsafe_allow_html=True)
             risk_opts = ["Confermato", "Innalzamento", "Abbassamento", "Modifica"]
-            risk_choice = st.radio("Profilo di rischio", risk_opts,
-                                   horizontal=True, key="final_risk_radio",
-                                   label_visibility="collapsed")
+            risk_choice = st.radio("Profilo", risk_opts, horizontal=True,
+                                   key="final_risk_radio", label_visibility="collapsed")
             if st.button("💾 Salva Valutazione", key="final_manual_save", use_container_width=True):
                 narrative_full = f"[{risk_choice}]\n\n{manual_narrative}"
                 st.session_state.edited_content[key] = narrative_full
                 st.session_state.kyc_state.add_result(key, narrative_full)
-                st.success("Valutazione salvata.")
+                st.success("✓ Valutazione salvata.")
 
         else:
             # Super Agent mode
             content = get_content(key)
             parsed  = parse_json_result(content) if content else None
 
-            # Collect findings from all sections
+            # Collect active findings
             all_findings = []
             overrides    = st.session_state.crit_overrides
             for sec in MAIN_SECTIONS:
@@ -1278,36 +1557,44 @@ def render_final_valuation():
                     if ov_status == "chiuso":
                         continue
                     all_findings.append({
-                        "sezione": sec["full_label"],
-                        "livello": lvl,
-                        "evidenza": ev.get("evidenza",""),
-                        "normativa": ev.get("normativa",""),
+                        "sezione": sec["full_label"], "livello": lvl,
+                        "evidenza": ev.get("evidenza",""), "normativa": ev.get("normativa",""),
                     })
 
-            st.markdown(
-                f'<div style="font-size:0.8rem;color:#888;margin-bottom:12px;">'
-                f'{len(all_findings)} evidenze attive raccolte dalle sezioni di analisi.</div>',
-                unsafe_allow_html=True)
+            # Findings summary chips
+            n_crit = sum(1 for f in all_findings if f["livello"] == "CRITICO")
+            n_anom = sum(1 for f in all_findings if f["livello"] == "ANOMALIA")
+            chips  = ""
+            if n_crit:
+                chips += (f'<span style="background:#FEF2F2;color:{DANGER};font-size:0.72rem;'
+                          f'font-weight:700;padding:3px 12px;border-radius:20px;margin-right:6px;">'
+                          f'🔴 {n_crit} critiche</span>')
+            if n_anom:
+                chips += (f'<span style="background:#FFFBEB;color:{YELLOW};font-size:0.72rem;'
+                          f'font-weight:700;padding:3px 12px;border-radius:20px;">'
+                          f'🟡 {n_anom} anomalie</span>')
+            if chips:
+                st.markdown(
+                    f'<div style="margin-bottom:12px;">{chips}</div>',
+                    unsafe_allow_html=True)
 
-            if st.button("▶ Avvia Super Agent", key="run_super_agent", use_container_width=True):
+            if st.button("▶ Avvia Final Valuation Agent", key="run_super_agent", use_container_width=True):
                 _run_with_stream(key, client)
                 return
 
             if parsed:
                 render_prose_result(key, parsed)
 
-                # Editable narrative below
-                st.markdown("---")
-                st.markdown("**Modifica narrativa**")
+                st.markdown(f'<div style="height:12px;"></div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
+                    f'color:{TEXT_SEC};text-transform:uppercase;margin-bottom:8px;">Modifica Narrativa</div>',
+                    unsafe_allow_html=True)
                 narrativa = (parsed.get("narrativa") or parsed.get("narrativaCompleta")
                              or parsed.get("sintesiEsecutiva","") or "")
                 edited_narrative = st.text_area(
-                    "Narrativa",
-                    value=narrativa,
-                    height=200,
-                    key="final_agent_edit",
-                    label_visibility="collapsed")
-
+                    "Narrativa", value=narrativa, height=200,
+                    key="final_agent_edit", label_visibility="collapsed")
                 risk_profile_opts = ["Confermato", "Innalzamento", "Abbassamento", "Modifica"]
                 risk_profile = st.radio("Profilo di rischio", risk_profile_opts,
                                         horizontal=True, key="final_agent_risk",
@@ -1316,9 +1603,9 @@ def render_final_valuation():
                     new_content = content.replace(narrativa, edited_narrative) if narrativa else content
                     st.session_state.edited_content[key] = new_content
                     st.session_state.kyc_state.add_result(key, new_content)
-                    st.success("Modifiche salvate.")
+                    st.success("✓ Modifiche salvate.")
 
-        st.markdown("---")
+        st.markdown(f'<div style="height:16px;"></div>', unsafe_allow_html=True)
         if st.button("← Torna all'analisi", key="back_to_analysis"):
             st.session_state.step = "analysis"
             st.rerun()
