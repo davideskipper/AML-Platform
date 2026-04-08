@@ -1564,12 +1564,50 @@ def render_analysis():
             f'{brd}white-space:nowrap;">'
             + icon_html + s["label"] + '</span>')
 
-    top_l, top_r = st.columns([4, 1])
+    # ── Count findings across completed sections ─────────────────────
+    _ev_counts = {"CRITICO": 0, "ANOMALIA": 0, "ATTENZIONE": 0, "LOW": 0}
+    for _s in MAIN_SECTIONS:
+        _c = get_content(_s["key"])
+        _p = parse_json_result(_c) if _c else None
+        if not _p:
+            continue
+        for _ev in _p.get("principaliEvidenze", []):
+            _lv = (_ev.get("livello") or "").upper()
+            if _lv == "CRITICO":    _ev_counts["CRITICO"]    += 1
+            elif _lv == "ANOMALIA": _ev_counts["ANOMALIA"]   += 1
+            elif _lv == "ATTENZIONE": _ev_counts["ATTENZIONE"] += 1
+        for _fl in _p.get("flags", []):
+            _r = (_fl.get("rischio") or "").upper()
+            if _r == "CRITICAL":   _ev_counts["CRITICO"]    += 1
+            elif _r == "HIGH":     _ev_counts["ANOMALIA"]   += 1
+            elif _r == "MEDIUM":   _ev_counts["ATTENZIONE"] += 1
+            elif _r == "LOW":      _ev_counts["LOW"]        += 1
+
+    _badge_cfg = [
+        ("CRITICO",    "#7C3AED", "#F3E8FF"),
+        ("ANOMALIA",   "#DC2626", "#FEE2E2"),
+        ("ATTENZIONE", "#D97706", "#FFFBEB"),
+        ("LOW",        "#6B7280", "#F3F4F6"),
+    ]
+    _badges_html = "".join(
+        f'<span style="display:inline-flex;align-items:center;gap:3px;'
+        f'background:{_bg};color:{_fg};font-size:0.68rem;font-weight:700;'
+        f'padding:2px 8px;border-radius:20px;white-space:nowrap;">● {_ev_counts[_k]}</span>'
+        for _k, _fg, _bg in _badge_cfg if _ev_counts[_k] > 0
+    )
+
+    top_l, top_m, top_r = st.columns([3.5, 1.5, 1])
     with top_l:
         st.markdown(
             f'<div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;'
             f'padding:2px 0 10px;">' + pills + '</div>',
             unsafe_allow_html=True)
+    with top_m:
+        if _badges_html:
+            st.markdown(
+                f'<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;'
+                f'padding:4px 0 10px;justify-content:flex-end;">' + _badges_html + '</div>',
+                unsafe_allow_html=True)
     with top_r:
         if st.button("⚡ Valutazione Finale", key="go_final_top", use_container_width=True):
             st.session_state.step = "final"
