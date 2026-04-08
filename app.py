@@ -1533,8 +1533,10 @@ def render_analysis():
             f'{brd}white-space:nowrap;">'
             + icon_html + s["label"] + '</span>')
 
-    # ── Count findings across completed sections ─────────────────────
-    _ev_counts = {"CRITICO": 0, "ANOMALIA": 0, "ATTENZIONE": 0, "LOW": 0}
+    # ── Count principaliEvidenze by livello across completed sections ──
+    # Source: only principaliEvidenze (authoritative per-agent output).
+    # Levels: CRITICO (purple) · ANOMALIA (red) · ATTENZIONE (yellow).
+    _ev_counts = {"CRITICO": 0, "ANOMALIA": 0, "ATTENZIONE": 0}
     for _s in MAIN_SECTIONS:
         _c = get_content(_s["key"])
         _p = parse_json_result(_c) if _c else None
@@ -1542,27 +1544,20 @@ def render_analysis():
             continue
         for _ev in _p.get("principaliEvidenze", []):
             _lv = (_ev.get("livello") or "").upper()
-            if _lv == "CRITICO":    _ev_counts["CRITICO"]    += 1
-            elif _lv == "ANOMALIA": _ev_counts["ANOMALIA"]   += 1
-            elif _lv == "ATTENZIONE": _ev_counts["ATTENZIONE"] += 1
-        for _fl in _p.get("flags", []):
-            _r = (_fl.get("rischio") or "").upper()
-            if _r == "CRITICAL":   _ev_counts["CRITICO"]    += 1
-            elif _r == "HIGH":     _ev_counts["ANOMALIA"]   += 1
-            elif _r == "MEDIUM":   _ev_counts["ATTENZIONE"] += 1
-            elif _r == "LOW":      _ev_counts["LOW"]        += 1
+            if _lv in _ev_counts:
+                _ev_counts[_lv] += 1
 
     _badge_cfg = [
-        ("CRITICO",    "#7C3AED", "#F3E8FF"),
-        ("ANOMALIA",   "#DC2626", "#FEE2E2"),
-        ("ATTENZIONE", "#D97706", "#FFFBEB"),
-        ("LOW",        "#6B7280", "#F3F4F6"),
+        ("CRITICO",    "#7C3AED", "#F3E8FF", "Critici"),
+        ("ANOMALIA",   "#DC2626", "#FEE2E2", "Anomalie"),
+        ("ATTENZIONE", "#D97706", "#FFFBEB", "Attenzioni"),
     ]
     _badges_html = "".join(
-        f'<span style="display:inline-flex;align-items:center;gap:3px;'
+        f'<span style="display:inline-flex;align-items:center;gap:4px;'
         f'background:{_bg};color:{_fg};font-size:0.68rem;font-weight:700;'
-        f'padding:2px 8px;border-radius:20px;white-space:nowrap;">● {_ev_counts[_k]}</span>'
-        for _k, _fg, _bg in _badge_cfg if _ev_counts[_k] > 0
+        f'padding:3px 9px;border-radius:20px;white-space:nowrap;">'
+        f'<span style="font-size:0.6rem;">●</span>{_ev_counts[_k]} {_lbl}</span>'
+        for _k, _fg, _bg, _lbl in _badge_cfg if _ev_counts[_k] > 0
     )
 
     top_l, top_m, top_r = st.columns([3.5, 1.5, 1])
