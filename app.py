@@ -1497,99 +1497,93 @@ def render_analysis():
         st.session_state["run_queue"] = st.session_state["run_queue"][1:]
         st.session_state.active_section = queued_key
 
-    # ── Two-column layout: main content | right panel ─────────────
-    main_col, right_col = st.columns([2.8, 1.2])
+    # ── Top bar: agent status pills + Valutazione Finale button ──────
+    done, total = main_progress()
+    all_in_queue = st.session_state.get("run_queue", [])
 
-    with right_col:
-        _render_right_panel(queued_key)
+    # Build status pills for each section
+    pills = ""
+    for s in MAIN_SECTIONS:
+        k = s["key"]
+        st_s = sec_status(k)
+        is_run = (k == queued_key)
+        is_q   = (k in all_in_queue)
 
-    with main_col:
-        # Top-right: "Nuovo caso" button
-        _, btn_c = st.columns([5, 1])
-        with btn_c:
-            if st.button("Nuovo", key="new_case_top", use_container_width=True):
-                for k in list(st.session_state.keys()):
-                    del st.session_state[k]
-                st.rerun()
+        content = get_content(k) if st_s == "completed" else None
+        parsed  = parse_json_result(content) if content else None
+        risk    = (parsed.get("rischioComplessivo","") if parsed else "") or ""
+        rc      = get_risk_color(risk) if risk else TEXT_SEC
 
-        if queued_key:
-            sec = next(s for s in ALL_SECTIONS if s["key"] == queued_key)
-
-            # Progress pills (pipeline tracker)
-            pills = ""
-            for s in MAIN_SECTIONS:
-                is_done = sec_status(s["key"]) == "completed"
-                is_run  = s["key"] == queued_key
-                if is_run:
-                    pb, pf, pl = f"rgba(196,30,58,0.12)", ACCENT, f"⚙ {s['label']}"
-                elif is_done:
-                    pb, pf, pl = "#DCFCE7", GREEN, f"✓ {s['label']}"
-                else:
-                    pb, pf, pl = BG, TEXT_SEC, f"○ {s['label']}"
-                pills += (
-                    f'<span style="background:{pb};color:{pf};font-size:0.72rem;'
-                    f'font-weight:600;padding:4px 13px;border-radius:20px;'
-                    f'border:1px solid {BORDER};">{pl}</span>')
-            st.markdown(
-                f'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">'
-                + pills + '</div>',
-                unsafe_allow_html=True)
-
-            # Running agent card
-            st.markdown(
-                f'<div style="background:#fff;border:1px solid {BORDER};'
-                f'border-left:4px solid {ACCENT};border-radius:0 10px 10px 0;'
-                f'padding:16px 20px;margin-bottom:16px;">'
-                f'<div style="display:flex;align-items:center;gap:12px;">'
-                f'<span class="aml-spin" style="font-size:1.1rem;color:{ACCENT};">⚙</span>'
-                f'<div>'
-                f'<div style="font-size:0.9rem;font-weight:700;color:{TEXT};">'
-                f'{sec["icon"]} {sec["full_label"]}</div>'
-                f'<div style="font-size:0.75rem;color:{TEXT_SEC};margin-top:2px;">'
-                f'Analisi in corso — attendi 1-2 minuti…</div>'
-                f'</div></div></div>',
-                unsafe_allow_html=True)
-
-            # Run agent — placeholders created inside this column context
-            _run_with_stream(queued_key, client)
-
+        if is_run:
+            pb, pf = "rgba(30,35,40,0.08)", "#1E2328"
+            icon_html = '<span class="aml-spin" style="font-size:0.65rem;">⚙</span> '
+        elif st_s == "completed":
+            pb, pf = "#F0F0F0", "#1E2328"
+            icon_html = f'<span style="color:{rc};">✓</span> '
+        elif is_q:
+            pb, pf = BG, TEXT_SEC
+            icon_html = '<span>…</span> '
         else:
-            # ── Idle mode: tabs with completed sections ───────────
+            pb, pf = BG, TEXT_SEC
+            icon_html = '<span style="opacity:0.4;">○</span> '
 
-            # Final valuation CTA — always visible
-            done, total = main_progress()
-            if done == total:
-                cta_col, _ = st.columns([3, 1])
-                with cta_col:
-                    st.markdown(
-                        f'<div style="background:#F0FDF4;border:1px solid #86EFAC;'
-                        f'border-radius:8px;padding:8px 14px;margin-bottom:10px;'
-                        f'font-size:0.8rem;color:#15803D;font-weight:600;">'
-                        f'✓ Tutte le sezioni completate — la valutazione finale è disponibile.</div>',
-                        unsafe_allow_html=True)
-            else:
-                cta_col, _ = st.columns([3, 1])
-                with cta_col:
-                    st.markdown(
-                        f'<div style="background:#F8F9FA;border:1px solid {BORDER};'
-                        f'border-radius:8px;padding:8px 14px;margin-bottom:10px;'
-                        f'font-size:0.8rem;color:{TEXT_SEC};">'
-                        f'⚡ Valutazione Finale disponibile anche con analisi parziale ({done}/{total} completate)</div>',
-                        unsafe_allow_html=True)
-            btn_col, _ = st.columns([2, 3])
-            with btn_col:
-                if st.button("⚡ Procedi alla Valutazione Finale →",
-                             key="go_final", use_container_width=True):
-                    st.session_state.step = "final"
-                    st.rerun()
+        risk_dot = (f'<span style="display:inline-block;width:6px;height:6px;'
+                    f'border-radius:50%;background:{rc};margin-left:5px;vertical-align:middle;"></span>'
+                    if (st_s == "completed" and risk) else "")
 
-            st.markdown(f'<div style="height:6px;"></div>', unsafe_allow_html=True)
+        pills += (
+            f'<span style="background:{pb};color:{pf};font-size:0.72rem;'
+            f'font-weight:600;padding:4px 11px;border-radius:20px;'
+            f'border:1px solid {BORDER};white-space:nowrap;">'
+            + icon_html + s["label"] + risk_dot + '</span>')
 
-            tab_labels = [f"{s['icon']} {s['label']}" for s in MAIN_SECTIONS]
-            tabs = st.tabs(tab_labels)
-            for tab, sec in zip(tabs, MAIN_SECTIONS):
-                with tab:
-                    _render_section_content(sec["key"], client)
+    top_l, top_r = st.columns([4, 1])
+    with top_l:
+        st.markdown(
+            f'<div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;'
+            f'padding:2px 0 10px;">' + pills + '</div>',
+            unsafe_allow_html=True)
+    with top_r:
+        if st.button("⚡ Valutazione Finale", key="go_final_top", use_container_width=True):
+            st.session_state.step = "final"
+            st.rerun()
+
+    # ── Main content (single column) ─────────────────────────────────
+    if queued_key:
+        sec = next(s for s in ALL_SECTIONS if s["key"] == queued_key)
+
+        # Running agent card
+        st.markdown(
+            f'<div style="background:#fff;border:1px solid {BORDER};'
+            f'border-left:4px solid #1E2328;border-radius:0 10px 10px 0;'
+            f'padding:14px 20px;margin-bottom:14px;">'
+            f'<div style="display:flex;align-items:center;gap:12px;">'
+            f'<span class="aml-spin" style="font-size:1.1rem;color:#1E2328;">⚙</span>'
+            f'<div>'
+            f'<div style="font-size:0.9rem;font-weight:700;color:{TEXT};">'
+            f'{sec["icon"]} {sec["full_label"]}</div>'
+            f'<div style="font-size:0.75rem;color:{TEXT_SEC};margin-top:2px;">'
+            f'Analisi in corso — attendi 1-2 minuti…</div>'
+            f'</div></div></div>',
+            unsafe_allow_html=True)
+
+        _run_with_stream(queued_key, client)
+
+    else:
+        # ── Idle mode: CTA + tabs ─────────────────────────────────
+        if done == total and total > 0:
+            st.markdown(
+                f'<div style="background:#F0FDF4;border:1px solid #86EFAC;'
+                f'border-radius:8px;padding:8px 14px;margin-bottom:8px;'
+                f'font-size:0.8rem;color:#15803D;font-weight:600;">'
+                f'✓ Tutte le sezioni completate — la valutazione finale è disponibile.</div>',
+                unsafe_allow_html=True)
+
+        tab_labels = [f"{s['icon']} {s['label']}" for s in MAIN_SECTIONS]
+        tabs = st.tabs(tab_labels)
+        for tab, sec in zip(tabs, MAIN_SECTIONS):
+            with tab:
+                _render_section_content(sec["key"], client)
 
 
 
