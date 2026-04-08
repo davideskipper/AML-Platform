@@ -13,10 +13,9 @@ exposed as user-defined tools in its tool list.
 """
 
 import json
-import sys
 import anthropic
 
-from .models import SessionState, CaseContext
+from .models import SessionState
 from . import (
     registry_agent,
     ubo_pep_agent,

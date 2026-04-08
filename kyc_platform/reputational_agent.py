@@ -119,15 +119,15 @@ def run(
     if manual_context:
         user_msg += f"\nDocumenti e informazioni forniti dall'analista:\n{manual_context}"
 
-    _use_web = True if use_web_search is None else use_web_search
+    use_web = use_web_search if use_web_search is not None else True
     return run_agent(
         client=client,
         system_prompt=SYSTEM_PROMPT,
         user_message=user_msg,
         header=f"Reputational Agent — {company_name}",
         max_tokens=6000,
-        use_web_search=_use_web,
-        max_search_uses=3 if _use_web else None,
+        use_web_search=use_web,
+        max_search_uses=3 if use_web else None,
         show_output=show_output,
         on_token=on_token,
         on_thinking=on_thinking,

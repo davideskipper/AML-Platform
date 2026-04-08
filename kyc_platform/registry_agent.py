@@ -6,17 +6,8 @@ and extracts structured AML-relevant information.
 Returns a structured JSON with risk flags and a compliance narrative.
 """
 
-import json as _json
 import anthropic
-from .utils import run_agent
-
-_NO_DOCS_JSON = _json.dumps({
-    "rischioComplessivo": "NON_VALUTABILE",
-    "principaliEvidenze": [],
-    "flags": [],
-    "narrativa": "Nessun documento societario fornito dall'analista. L'analisi non può essere eseguita senza visura camerale, statuto o organigramma.",
-    "note": "Caricare i documenti societari (visura, statuto, organigramma) prima di avviare l'agente."
-}, ensure_ascii=False)
+from .utils import run_standard_agent
 
 SYSTEM_PROMPT = """REGOLE FONDAMENTALI — ANTI-ALLUCINAZIONE:
 - Analizza ESCLUSIVAMENTE i documenti e i dati forniti nel messaggio utente.
@@ -100,22 +91,12 @@ def run(
     use_web_search=None,
 ) -> str:
     """Run the Registry Agent. Returns JSON findings as text."""
-    user_msg = (
-        f"Analizza la struttura societaria della seguente azienda:\n\n"
-        f"Azienda: {company_name}\n"
-        f"Paese: {country}\n"
-    )
-    if manual_context:
-        user_msg += f"\nDocumenti e informazioni forniti dall'analista:\n{manual_context}"
-
-    return run_agent(
-        client=client,
-        system_prompt=SYSTEM_PROMPT,
-        user_message=user_msg,
-        header=f"Registry Agent — {company_name}",
-        max_tokens=6000,
+    return run_standard_agent(
+        client, SYSTEM_PROMPT,
+        "Analizza la struttura societaria della seguente azienda:",
+        "Documenti e informazioni forniti dall'analista:",
+        company_name, country, manual_context, show_output,
+        on_token, on_thinking,
         use_web_search=False if use_web_search is None else use_web_search,
-        show_output=show_output,
-        on_token=on_token,
-        on_thinking=on_thinking,
+        header=f"Registry Agent — {company_name}",
     )

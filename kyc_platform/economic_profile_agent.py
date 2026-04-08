@@ -6,17 +6,13 @@ and evaluates economic consistency for AML purposes.
 Returns structured JSON with financial indicators and flags.
 """
 
-import json as _json
 import anthropic
-from .utils import run_agent
+from .utils import run_standard_agent, no_docs_json
 
-_NO_DOCS_JSON = _json.dumps({
-    "rischioComplessivo": "NON_VALUTABILE",
-    "principaliEvidenze": [],
-    "flags": [],
-    "narrativa": "Nessun documento finanziario fornito dall'analista. L'analisi non può essere eseguita senza bilancio, conto economico o dichiarazione dei redditi.",
-    "note": "Caricare i documenti finanziari (bilancio, conto economico, dichiarazione redditi) prima di avviare l'agente."
-}, ensure_ascii=False)
+_NO_DOCS_JSON = no_docs_json(
+    "Nessun documento finanziario fornito dall'analista. L'analisi non può essere eseguita senza bilancio, conto economico o dichiarazione dei redditi.",
+    "Caricare i documenti finanziari (bilancio, conto economico, dichiarazione redditi) prima di avviare l'agente.",
+)
 
 SYSTEM_PROMPT = """REGOLE FONDAMENTALI — ANTI-ALLUCINAZIONE:
 - Analizza ESCLUSIVAMENTE i documenti e i dati forniti nel messaggio utente.
@@ -108,23 +104,12 @@ def run(
     """Run the Economic Profile Agent. Returns JSON findings as text."""
     if not manual_context or not manual_context.strip():
         return _NO_DOCS_JSON
-
-    user_msg = (
-        f"Analizza il profilo economico e i documenti finanziari di:\n\n"
-        f"Azienda: {company_name}\n"
-        f"Paese: {country}\n"
-    )
-    if manual_context:
-        user_msg += f"\nDocumenti finanziari forniti dall'analista:\n{manual_context}"
-
-    return run_agent(
-        client=client,
-        system_prompt=SYSTEM_PROMPT,
-        user_message=user_msg,
-        header=f"Economic Profile Agent — {company_name}",
-        max_tokens=6000,
+    return run_standard_agent(
+        client, SYSTEM_PROMPT,
+        "Analizza il profilo economico e i documenti finanziari di:",
+        "Documenti finanziari forniti dall'analista:",
+        company_name, country, manual_context, show_output,
+        on_token, on_thinking,
         use_web_search=False if use_web_search is None else use_web_search,
-        show_output=show_output,
-        on_token=on_token,
-        on_thinking=on_thinking,
+        header=f"Economic Profile Agent — {company_name}",
     )

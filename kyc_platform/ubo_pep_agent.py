@@ -5,17 +5,8 @@ Identifies Ultimate Beneficial Owners and screens for PEPs.
 Returns structured JSON with ownership chain, PEP status, and flags.
 """
 
-import json as _json
 import anthropic
-from .utils import run_agent
-
-_NO_DOCS_JSON = _json.dumps({
-    "rischioComplessivo": "NON_VALUTABILE",
-    "principaliEvidenze": [],
-    "flags": [],
-    "narrativa": "Nessun documento UBO/identità fornito dall'analista. L'analisi non può essere eseguita senza dichiarazione UBO, documenti d'identità o organigramma.",
-    "note": "Caricare i documenti UBO (dichiarazione, documenti d'identità, organigramma) prima di avviare l'agente."
-}, ensure_ascii=False)
+from .utils import run_standard_agent
 
 SYSTEM_PROMPT = """REGOLE FONDAMENTALI — ANTI-ALLUCINAZIONE:
 - Analizza ESCLUSIVAMENTE i documenti e i dati forniti nel messaggio utente.
@@ -107,22 +98,12 @@ def run(
     use_web_search=None,
 ) -> str:
     """Run the UBO/PEP Agent. Returns JSON findings as text."""
-    user_msg = (
-        f"Esegui l'identificazione UBO e lo screening PEP/sanzioni per:\n\n"
-        f"Azienda: {company_name}\n"
-        f"Paese: {country}\n"
-    )
-    if manual_context:
-        user_msg += f"\nDocumenti e informazioni forniti dall'analista:\n{manual_context}"
-
-    return run_agent(
-        client=client,
-        system_prompt=SYSTEM_PROMPT,
-        user_message=user_msg,
-        header=f"UBO/PEP Agent — {company_name}",
-        max_tokens=6000,
+    return run_standard_agent(
+        client, SYSTEM_PROMPT,
+        "Esegui l'identificazione UBO e lo screening PEP/sanzioni per:",
+        "Documenti e informazioni forniti dall'analista:",
+        company_name, country, manual_context, show_output,
+        on_token, on_thinking,
         use_web_search=False if use_web_search is None else use_web_search,
-        show_output=show_output,
-        on_token=on_token,
-        on_thinking=on_thinking,
+        header=f"UBO/PEP Agent — {company_name}",
     )

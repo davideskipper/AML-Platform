@@ -11,7 +11,6 @@ class CaseContext:
     company_name: str = ""
     country: str = ""
     case_id: str = ""
-    sector: str = ""
 
 
 @dataclass
@@ -26,14 +25,3 @@ class SessionState:
 
     def has_result(self, agent_name: str) -> bool:
         return bool(self.results.get(agent_name))
-
-    def completed_agents(self) -> list:
-        return list(self.results.keys())
-
-    def all_findings_text(self) -> str:
-        """Return all collected findings as a single formatted string."""
-        parts = []
-        for name, findings in self.results.items():
-            label = name.upper().replace("_", " ")
-            parts.append(f"{'='*60}\n## {label}\n{'='*60}\n{findings}")
-        return "\n\n".join(parts)

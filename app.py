@@ -751,7 +751,6 @@ def render_setup():
                 s = st.session_state.kyc_state
                 s.case.company_name = company.strip()
                 s.case.country      = country.strip()
-                s.case.sector       = sector.strip()
                 s.case.case_id      = case_id.strip() or f"AML-{datetime.now().strftime('%Y%m%d-%H%M')}"
                 log_event("Sistema", f"Caso aperto: {company} ({country})", "super")
                 # Reset per-case analysis state so agents default to "agent" mode

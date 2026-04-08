@@ -1,20 +1,21 @@
-"""Shared utilities: agent runner, formatting helpers."""
+"""Shared utilities: agent runner, output validation, shared helpers."""
 
 import json
 import anthropic
 
 
-_WIDTH = 65
-
-
-def print_section(header: str) -> None:
-    print(f"\n{'━' * _WIDTH}")
-    print(f"  {header}")
-    print(f"{'━' * _WIDTH}")
-
-
-def print_divider() -> None:
-    print(f"{'─' * _WIDTH}")
+def no_docs_json(narrativa: str, note: str, extra_fields: dict = None) -> str:
+    """Return a standard NON_VALUTABILE JSON string for agents lacking required docs."""
+    d = {
+        "rischioComplessivo": "NON_VALUTABILE",
+        "principaliEvidenze": [],
+        "flags": [],
+        "narrativa": narrativa,
+        "note": note,
+    }
+    if extra_fields:
+        d.update(extra_fields)
+    return json.dumps(d, ensure_ascii=False)
 
 
 def run_agent(
@@ -37,9 +38,6 @@ def run_agent(
 
     Returns the final assistant text.
     """
-    if header and show_output:
-        print_section(header)
-
     tools = []
     if use_web_search:
         web_search_tool = {"type": "web_search_20260209", "name": "web_search"}
@@ -94,6 +92,41 @@ def run_agent(
         print()  # trailing newline after streaming
 
     return final_text
+
+
+def run_standard_agent(
+    client: anthropic.Anthropic,
+    system_prompt: str,
+    task_intro: str,
+    context_label: str,
+    company_name: str,
+    country: str,
+    manual_context: str = "",
+    show_output: bool = True,
+    on_token=None,
+    on_thinking=None,
+    use_web_search: bool = False,
+    max_tokens: int = 6000,
+    header: str = "",
+) -> str:
+    """
+    Generic runner for standard two-parameter agents (company + country).
+    Builds the user message and delegates to run_agent().
+    """
+    user_msg = f"{task_intro}\n\nAzienda: {company_name}\nPaese: {country}\n"
+    if manual_context:
+        user_msg += f"\n{context_label}\n{manual_context}"
+    return run_agent(
+        client=client,
+        system_prompt=system_prompt,
+        user_message=user_msg,
+        header=header or f"Agent — {company_name}",
+        max_tokens=max_tokens,
+        use_web_search=use_web_search,
+        show_output=show_output,
+        on_token=on_token,
+        on_thinking=on_thinking,
+    )
 
 
 # ── Output validation ─────────────────────────────────────────────

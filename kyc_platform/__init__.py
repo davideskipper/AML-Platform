@@ -8,8 +8,7 @@ Agents:
   - UBO/PEP Agent         — beneficial owners & PEP screening
   - Reputational Agent    — adverse media & regulatory actions
   - Economic Profile Agent— balance sheet & financial analysis
-  - Risk Countries Agent  — geographic & FATF exposure
-  - Transaction Agent     — Excel transaction file analysis
+  - Transaction Agent     — Excel transaction file analysis + geographic risk
   - Super Agent           — conversational orchestrator
   - Final Valuation Agent — comprehensive opinion report
 
