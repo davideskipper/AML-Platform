@@ -954,21 +954,21 @@ def render_mode_config():
                 chosen = st.radio(
                     "Modalità", options=["🤖 Agente", "✍️ Manuale"],
                     index=0 if current_mode == "agent" else 1,
-                    key=f"mode_{key}", horizontal=True, label_visibility="collapsed")
+                    horizontal=True, label_visibility="collapsed")
                 st.session_state.section_modes[key] = "agent" if chosen == "🤖 Agente" else "manual"
 
                 if st.session_state.section_modes.get(key) == "agent":
                     web_val = st.session_state.section_web.get(key, False)
                     st.session_state.section_web[key] = st.checkbox(
-                        "🌐 Web search", value=web_val, key=f"web_{key}")
+                        "🌐 Web search", value=web_val)
 
     with ctrl_col:
         st.markdown(f'<div style="height:48px;"></div>', unsafe_allow_html=True)
-        if st.button("← Indietro", key="mode_back", use_container_width=True):
+        if st.button("← Indietro", use_container_width=True):
             st.session_state.step = "upload"
             st.rerun()
         st.markdown(f'<div style="height:6px;"></div>', unsafe_allow_html=True)
-        if st.button("▶ Avvia Analisi", key="mode_next", use_container_width=True):
+        if st.button("▶ Avvia Analisi", use_container_width=True):
             files_data   = st.session_state.uploaded_files_data
             file_assigns = st.session_state.file_assignments
             section_docs, section_doc_names = {}, {}
