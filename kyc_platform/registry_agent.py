@@ -6,10 +6,26 @@ and extracts structured AML-relevant information.
 Returns a structured JSON with risk flags and a compliance narrative.
 """
 
+import json as _json
 import anthropic
 from .utils import run_agent
 
-SYSTEM_PROMPT = """Sei un AML Registry Analysis Agent specializzato in compliance societaria italiana ed europea.
+_NO_DOCS_JSON = _json.dumps({
+    "rischioComplessivo": "NON_VALUTABILE",
+    "principaliEvidenze": [],
+    "flags": [],
+    "narrativa": "Nessun documento societario fornito dall'analista. L'analisi non può essere eseguita senza visura camerale, statuto o organigramma.",
+    "note": "Caricare i documenti societari (visura, statuto, organigramma) prima di avviare l'agente."
+}, ensure_ascii=False)
+
+SYSTEM_PROMPT = """REGOLE FONDAMENTALI — ANTI-ALLUCINAZIONE:
+- Analizza ESCLUSIVAMENTE i documenti e i dati forniti nel messaggio utente.
+- NON inventare, NON assumere, NON dedurre informazioni non presenti nei documenti.
+- Se un dato non è presente: usa "NON DISPONIBILE" o ometti il campo.
+- Se i documenti sono insufficienti, dichiaralo nella narrativa e nei flag.
+- Non colmare lacune con la tua conoscenza generale del settore o di aziende specifiche.
+
+Sei un AML Registry Analysis Agent specializzato in compliance societaria italiana ed europea.
 Analizza i documenti societari forniti (visura camerale, statuto, organigramma) ed estrai
 informazioni strutturate rilevanti per la valutazione del rischio AML.
 
@@ -84,6 +100,9 @@ def run(
     use_web_search=None,
 ) -> str:
     """Run the Registry Agent. Returns JSON findings as text."""
+    if not manual_context or not manual_context.strip():
+        return _NO_DOCS_JSON
+
     user_msg = (
         f"Analizza la struttura societaria della seguente azienda:\n\n"
         f"Azienda: {company_name}\n"

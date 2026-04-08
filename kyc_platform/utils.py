@@ -1,5 +1,6 @@
 """Shared utilities: agent runner, formatting helpers."""
 
+import json
 import anthropic
 
 
@@ -93,3 +94,52 @@ def run_agent(
         print()  # trailing newline after streaming
 
     return final_text
+
+
+# ── Output validation ─────────────────────────────────────────────
+
+_VALID_RISK_LEVELS = {"LOW", "MEDIUM", "HIGH", "CRITICAL", "NON_VALUTABILE"}
+_HALLUCINATION_MARKERS = [
+    "da compilare", "inserire qui", "TODO", "PLACEHOLDER",
+    "esempio", "sample text", "<nome>", "<data>",
+]
+
+
+def validate_agent_output(agent_name: str, output: str) -> tuple:
+    """
+    Validate agent JSON output. Returns (is_valid: bool, error_msg: str).
+    Checks: JSON parseable, rischioComplessivo enum, narrativa min length,
+    absence of hallucination placeholder strings.
+    """
+    if not output or not output.strip():
+        return False, f"{agent_name}: output vuoto"
+
+    # Extract JSON
+    s = output.find("{")
+    e = output.rfind("}") + 1
+    if s < 0 or e <= s:
+        return False, f"{agent_name}: output non contiene JSON valido"
+
+    try:
+        data = json.loads(output[s:e])
+    except (json.JSONDecodeError, ValueError) as exc:
+        return False, f"{agent_name}: JSON non valido — {exc}"
+
+    # Check rischioComplessivo enum
+    risk = data.get("rischioComplessivo", "")
+    if risk and risk not in _VALID_RISK_LEVELS:
+        return False, f"{agent_name}: rischioComplessivo '{risk}' non riconosciuto"
+
+    # Check narrativa minimum length (skip for NON_VALUTABILE outputs)
+    if risk != "NON_VALUTABILE":
+        narrativa = data.get("narrativa", "")
+        if narrativa and len(narrativa) < 100:
+            return False, f"{agent_name}: narrativa troppo breve ({len(narrativa)} caratteri)"
+
+    # Check for hallucination placeholders
+    output_lower = output.lower()
+    for marker in _HALLUCINATION_MARKERS:
+        if marker.lower() in output_lower:
+            return False, f"{agent_name}: possibile placeholder di allucinazione: '{marker}'"
+
+    return True, ""

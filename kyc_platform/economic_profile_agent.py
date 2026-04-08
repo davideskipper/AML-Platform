@@ -6,10 +6,26 @@ and evaluates economic consistency for AML purposes.
 Returns structured JSON with financial indicators and flags.
 """
 
+import json as _json
 import anthropic
 from .utils import run_agent
 
-SYSTEM_PROMPT = """Sei un AML Economic Profile Analysis Agent specializzato nell'analisi di bilancio
+_NO_DOCS_JSON = _json.dumps({
+    "rischioComplessivo": "NON_VALUTABILE",
+    "principaliEvidenze": [],
+    "flags": [],
+    "narrativa": "Nessun documento finanziario fornito dall'analista. L'analisi non può essere eseguita senza bilancio, conto economico o dichiarazione dei redditi.",
+    "note": "Caricare i documenti finanziari (bilancio, conto economico, dichiarazione redditi) prima di avviare l'agente."
+}, ensure_ascii=False)
+
+SYSTEM_PROMPT = """REGOLE FONDAMENTALI — ANTI-ALLUCINAZIONE:
+- Analizza ESCLUSIVAMENTE i documenti e i dati forniti nel messaggio utente.
+- NON inventare, NON assumere, NON dedurre informazioni non presenti nei documenti.
+- Se un dato non è presente: usa "NON DISPONIBILE" o ometti il campo.
+- Se i documenti sono insufficienti, dichiaralo nella narrativa e nei flag.
+- Non colmare lacune con la tua conoscenza generale del settore o di aziende specifiche.
+
+Sei un AML Economic Profile Analysis Agent specializzato nell'analisi di bilancio
 e nella valutazione della coerenza economica ai fini AML.
 Analizza i documenti finanziari forniti (bilancio, conto economico, dichiarazione redditi).
 
@@ -90,6 +106,9 @@ def run(
     use_web_search=None,
 ) -> str:
     """Run the Economic Profile Agent. Returns JSON findings as text."""
+    if not manual_context or not manual_context.strip():
+        return _NO_DOCS_JSON
+
     user_msg = (
         f"Analizza il profilo economico e i documenti finanziari di:\n\n"
         f"Azienda: {company_name}\n"

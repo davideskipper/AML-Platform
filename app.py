@@ -14,6 +14,7 @@ from kyc_platform import (
     registry_agent, ubo_pep_agent, reputational_agent,
     economic_profile_agent, transaction_agent, final_valuation_agent,
 )
+from kyc_platform.utils import validate_agent_output
 
 st.set_page_config(
     page_title="AML IntelliGent | Bain & Company",
@@ -302,6 +303,10 @@ def run_section(key, client, on_token=None, on_thinking=None):
                                                on_thinking=on_thinking)
         else:
             raise ValueError(f"Sezione sconosciuta: {key}")
+        is_valid, val_error = validate_agent_output(key, result)
+        if not is_valid:
+            log_event(sec["label"], f"⚠ Validazione: {val_error}", "error")
+            st.warning(f"Output non valido — {val_error}")
         state.add_result(key, result)
         st.session_state.edited_content[key] = result
         log_event(sec["label"], "Completato ✓", "done")

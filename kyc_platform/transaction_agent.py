@@ -7,10 +7,26 @@ Returns structured JSON. No web search — analysis based on provided data.
 """
 
 import os
+import json as _json
 import anthropic
 from .utils import run_agent
 
-SYSTEM_PROMPT = """Sei un AML Transaction Monitoring & Geographic Risk Agent.
+_NO_DOCS_JSON = _json.dumps({
+    "rischioComplessivo": "NON_VALUTABILE",
+    "principaliEvidenze": [],
+    "anomalieTransazionali": [],
+    "narrativa": "Nessun file transazionale fornito. L'analisi non può essere eseguita senza un file Excel o CSV con i movimenti bancari.",
+    "note": "Caricare il file Excel/CSV delle transazioni prima di avviare l'agente."
+}, ensure_ascii=False)
+
+SYSTEM_PROMPT = """REGOLE FONDAMENTALI — ANTI-ALLUCINAZIONE:
+- Analizza ESCLUSIVAMENTE i dati transazionali forniti nel messaggio utente.
+- NON inventare transazioni, importi, controparti o pattern non presenti nei dati.
+- Se un dato non è presente: usa "NON DISPONIBILE" o ometti il campo.
+- Non dedurre comportamenti o pattern da dati insufficienti.
+- Segnala esplicitamente quando il campione di dati è troppo limitato per conclusioni affidabili.
+
+Sei un AML Transaction Monitoring & Geographic Risk Agent.
 Svolgi due analisi integrate sul cliente: (A) analisi comportamentale dei flussi bancari
 e (B) valutazione del rischio geografico delle controparti.
 
@@ -204,6 +220,9 @@ def run(
     on_thinking=None,
     use_web_search=None,
 ) -> str:
+    if not excel_source:
+        return _NO_DOCS_JSON
+
     excel_text = _read_excel(excel_source)
     subject = f" per {company_name}" if company_name else ""
     user_msg = (

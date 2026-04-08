@@ -10,7 +10,23 @@ import json
 import anthropic
 from .utils import run_agent
 
-SYSTEM_PROMPT = """Sei il Final Valuation Agent AML. Ricevi gli output strutturati di 5 agenti specialisti:
+_NO_FINDINGS_JSON = json.dumps({
+    "customerRiskRating": "NON_VALUTABILE",
+    "scoreFinale": 0,
+    "principaliEvidenze": [],
+    "sintesiEsecutiva": "Nessun output dagli agenti specialisti disponibile. Eseguire almeno un agente prima di richiedere la valutazione finale.",
+    "narrativaCompleta": "La valutazione finale non può essere prodotta in assenza di output dagli agenti specialisti. Avviare l'analisi dei moduli Registry, UBO/PEP, Reputazionale, Profilo Economico e/o Transazionale prima di richiedere il report finale.",
+    "note": "Eseguire gli agenti specialisti prima di richiedere la valutazione finale."
+}, ensure_ascii=False)
+
+SYSTEM_PROMPT = """REGOLE FONDAMENTALI — ANTI-ALLUCINAZIONE:
+- Sintetizza ESCLUSIVAMENTE gli output JSON forniti dagli agenti specialisti.
+- NON inventare evidenze, rischi o raccomandazioni non presenti negli output ricevuti.
+- Se un agente non ha prodotto output, segnalalo come gap nell'analisi.
+- Non colmare lacune con conoscenza generale: riporta solo ciò che gli agenti hanno rilevato.
+- Il rating finale deve essere giustificato esclusivamente dai dati degli agenti.
+
+Sei il Final Valuation Agent AML. Ricevi gli output strutturati di 5 agenti specialisti:
 Registry, UBO/PEP, Reputational, Economic Profile e Transaction & Geographic Risk.
 Produci il report finale di rischio AML per il fascicolo cliente.
 
@@ -112,6 +128,9 @@ def run(
     on_thinking=None,
     use_web_search=None,
 ) -> str:
+    if not all_findings:
+        return _NO_FINDINGS_JSON
+
     parsed_findings = {}
     for agent_name, text in all_findings.items():
         if text:

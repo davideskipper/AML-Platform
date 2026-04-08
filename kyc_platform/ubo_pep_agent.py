@@ -5,10 +5,26 @@ Identifies Ultimate Beneficial Owners and screens for PEPs.
 Returns structured JSON with ownership chain, PEP status, and flags.
 """
 
+import json as _json
 import anthropic
 from .utils import run_agent
 
-SYSTEM_PROMPT = """Sei un AML UBO e PEP Analysis Agent specializzato nell'identificazione del titolare effettivo
+_NO_DOCS_JSON = _json.dumps({
+    "rischioComplessivo": "NON_VALUTABILE",
+    "principaliEvidenze": [],
+    "flags": [],
+    "narrativa": "Nessun documento UBO/identità fornito dall'analista. L'analisi non può essere eseguita senza dichiarazione UBO, documenti d'identità o organigramma.",
+    "note": "Caricare i documenti UBO (dichiarazione, documenti d'identità, organigramma) prima di avviare l'agente."
+}, ensure_ascii=False)
+
+SYSTEM_PROMPT = """REGOLE FONDAMENTALI — ANTI-ALLUCINAZIONE:
+- Analizza ESCLUSIVAMENTE i documenti e i dati forniti nel messaggio utente.
+- NON inventare, NON assumere, NON dedurre informazioni non presenti nei documenti.
+- Se un dato non è presente: usa "NON DISPONIBILE" o ometti il campo.
+- Se i documenti sono insufficienti, dichiaralo nella narrativa e nei flag.
+- Non colmare lacune con la tua conoscenza generale del settore o di aziende specifiche.
+
+Sei un AML UBO e PEP Analysis Agent specializzato nell'identificazione del titolare effettivo
 e nello screening delle persone politicamente esposte.
 Analizza le dichiarazioni UBO e i documenti d'identità forniti.
 
@@ -91,6 +107,9 @@ def run(
     use_web_search=None,
 ) -> str:
     """Run the UBO/PEP Agent. Returns JSON findings as text."""
+    if not manual_context or not manual_context.strip():
+        return _NO_DOCS_JSON
+
     user_msg = (
         f"Esegui l'identificazione UBO e lo screening PEP/sanzioni per:\n\n"
         f"Azienda: {company_name}\n"
