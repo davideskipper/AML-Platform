@@ -100,9 +100,6 @@ def run(
     use_web_search=None,
 ) -> str:
     """Run the Registry Agent. Returns JSON findings as text."""
-    if not manual_context or not manual_context.strip():
-        return _NO_DOCS_JSON
-
     user_msg = (
         f"Analizza la struttura societaria della seguente azienda:\n\n"
         f"Azienda: {company_name}\n"

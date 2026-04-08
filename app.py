@@ -754,6 +754,13 @@ def render_setup():
                 s.case.sector       = sector.strip()
                 s.case.case_id      = case_id.strip() or f"AML-{datetime.now().strftime('%Y%m%d-%H%M')}"
                 log_event("Sistema", f"Caso aperto: {company} ({country})", "super")
+                # Reset per-case analysis state so agents default to "agent" mode
+                st.session_state.section_modes = {}
+                st.session_state.section_web   = {}
+                st.session_state.run_queue     = []
+                for sec in ALL_SECTIONS:
+                    st.session_state.pop(f"mode_{sec['key']}", None)
+                    st.session_state.pop(f"web_{sec['key']}", None)
                 st.session_state.step = "upload"
                 st.rerun()
 

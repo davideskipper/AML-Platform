@@ -107,9 +107,6 @@ def run(
     use_web_search=None,
 ) -> str:
     """Run the UBO/PEP Agent. Returns JSON findings as text."""
-    if not manual_context or not manual_context.strip():
-        return _NO_DOCS_JSON
-
     user_msg = (
         f"Esegui l'identificazione UBO e lo screening PEP/sanzioni per:\n\n"
         f"Azienda: {company_name}\n"
