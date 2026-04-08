@@ -440,12 +440,11 @@ def _logo_html(height: int = 38) -> str:
 
 
 # ── Step Navigation Bar ───────────────────────────────────────────
-_STEP_ORDER = ["upload", "mode_config", "analysis", "final"]
+_STEP_ORDER = ["upload", "analysis", "final"]
 _STEP_LABELS = {
-    "upload":      "① Documenti",
-    "mode_config": "② Modalità",
-    "analysis":    "③ Analisi",
-    "final":       "④ Valutazione",
+    "upload":   "① Documenti",
+    "analysis": "② Analisi",
+    "final":    "③ Valutazione",
 }
 
 def render_step_nav(current_step_id: str):
@@ -901,8 +900,49 @@ def render_upload():
                 st.session_state.step = "setup"
                 st.rerun()
         with nav_r:
-            if st.button("Continua →", key="upload_next", use_container_width=True):
-                st.session_state.step = "mode_config"
+            if st.button("▶ Avvia Analisi", key="upload_next", use_container_width=True):
+                # Build section_docs / excel_raw_bytes (same logic as mode_config used to do)
+                _files_data   = st.session_state.uploaded_files_data
+                _file_assigns = st.session_state.file_assignments
+                _sec_docs, _sec_doc_names = {}, {}
+                for _sec in MAIN_SECTIONS:
+                    _sk = _sec["key"]
+                    _asgn = [fd for fd in _files_data if _file_assigns.get(fd["name"]) == _sk]
+                    if not _asgn:
+                        continue
+                    if _sk == "transaction":
+                        _fd  = _asgn[0]
+                        _raw = _fd.get("raw_bytes")
+                        import io as _io
+                        if _raw:
+                            _buf = _io.BytesIO(_raw)
+                        else:
+                            _buf = _io.BytesIO(_fd["content_text"].encode("utf-8", errors="replace"))
+                        _buf.name = _fd["name"]
+                        st.session_state.excel_raw_bytes = _buf
+                        st.session_state.excel_name      = _fd["name"]
+                        _sec_doc_names[_sk] = [_fd["name"]]
+                    else:
+                        _sec_docs[_sk]      = "\n\n".join(
+                            f"=== {fd['name']} ===\n{fd['content_text']}" for fd in _asgn)
+                        _sec_doc_names[_sk] = [fd["name"] for fd in _asgn]
+                st.session_state.section_docs      = _sec_docs
+                st.session_state.section_doc_names = _sec_doc_names
+                # Default every section to agent mode
+                for _sec in MAIN_SECTIONS:
+                    st.session_state.section_modes[_sec["key"]] = "agent"
+                    st.session_state.section_web[_sec["key"]]   = False
+                # Queue all sections
+                st.session_state.run_queue      = [s["key"] for s in MAIN_SECTIONS]
+                st.session_state.active_section = "registry"
+                # Clean up upload state so nothing ghosts
+                st.session_state.uploaded_files_data = []
+                st.session_state.file_assignments    = {}
+                st.session_state.upload_hash         = ""
+                for _k in list(st.session_state.keys()):
+                    if _k.startswith("assign_"):
+                        del st.session_state[_k]
+                st.session_state.step = "transit"
                 st.rerun()
 
 
@@ -1802,8 +1842,6 @@ elif step == "setup":
     render_setup()
 elif step == "upload":
     render_upload()
-elif step == "mode_config":
-    render_mode_config()
 elif step == "analysis":
     render_analysis()
 elif step == "final":
