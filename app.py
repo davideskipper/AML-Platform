@@ -779,11 +779,18 @@ def render_setup():
 
 # ── STEP 2: UPLOAD ────────────────────────────────────────────────
 def _auto_detect_section(filename: str) -> str:
-    """Return section key if filename starts with 0?N[space/_/-/.] for N=1..5, else ''."""
+    """Return section key if filename starts with 0?N[space/_/-/.] for N=1..5, else ''.
+    Excel/CSV files are always auto-assigned to 'transaction' since it is the only
+    section that consumes structured tabular data."""
     lower = filename.lower()
+    # Numeric prefix takes priority
     for i, sec in enumerate(MAIN_SECTIONS, 1):
         if re.match(r'^0?' + str(i) + r'[\s_\-\.]', lower):
             return sec["key"]
+    # Excel/CSV → transaction (only section that needs a spreadsheet)
+    ext = os.path.splitext(lower)[1]
+    if ext in (".xlsx", ".xls", ".csv"):
+        return "transaction"
     return ""
 
 def render_upload():

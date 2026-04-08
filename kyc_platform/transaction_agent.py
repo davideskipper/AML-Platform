@@ -146,7 +146,7 @@ def _read_excel(source) -> str:
     `source` can be:
       - str  → file path on disk
       - bytes / BytesIO / UploadedFile → in-memory buffer
-    All rows are included (no head() limit).
+    Up to 1000 rows are included per sheet to stay within API context limits.
     CSV separator is auto-detected (tries ';' first, then ',').
     """
     try:
@@ -200,12 +200,16 @@ def _read_excel(source) -> str:
                 buf.seek(0)
             dfs = _read_csv(buf)
 
+    _MAX_ROWS = 1000  # keep input within API context limits
     lines = []
     for sheet_name, df in dfs.items():
+        total_rows = len(df)
+        df_disp = df.head(_MAX_ROWS)
         lines.append(f"## Sheet: {sheet_name}")
-        lines.append(f"Rows: {len(df)}  |  Columns: {', '.join(str(c) for c in df.columns)}")
+        lines.append(f"Rows: {total_rows}  |  Columns: {', '.join(str(c) for c in df.columns)}"
+                     + (f"  |  [TRONCATO a {_MAX_ROWS} righe]" if total_rows > _MAX_ROWS else ""))
         lines.append("")
-        lines.append(df.to_string(index=False))
+        lines.append(df_disp.to_string(index=False))
         lines.append("")
     return "\n".join(lines)
 
