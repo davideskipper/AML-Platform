@@ -56,6 +56,23 @@ st.markdown(f"""
   .stRadio label {{ color:#333 !important; }}
   @keyframes spin {{ from {{ transform: rotate(0deg); }} to {{ transform: rotate(360deg); }} }}
   .aml-spin {{ display:inline-block; animation: spin 1s linear infinite; }}
+  /* Sidebar nav: transparent button overlaid on styled label row */
+  #aml-sb-marker ~ div[data-testid="stButton"] {{
+    margin-top: -40px !important;
+    position: relative !important;
+    z-index: 5 !important;
+  }}
+  #aml-sb-marker ~ div[data-testid="stButton"] > button {{
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    height: 40px !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    opacity: 0 !important;
+    cursor: pointer !important;
+    width: 100% !important;
+  }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -883,6 +900,10 @@ def _render_analysis_sidebar(queued_key=None):
     queue      = st.session_state.get("run_queue", [])
     active_key = st.session_state.get("active_section", "registry")
 
+    # Sentinel: CSS uses this to scope the transparent button overlays
+    st.markdown('<div id="aml-sb-marker" style="height:0;overflow:hidden;"></div>',
+                unsafe_allow_html=True)
+
     for sec in MAIN_SECTIONS:
         k         = sec["key"]
         status    = sec_status(k)
@@ -907,14 +928,15 @@ def _render_analysis_sidebar(queued_key=None):
         border    = f"border-left:3px solid {RED};background:#fff9f9;" if is_active else "border-left:3px solid transparent;"
 
         st.markdown(
-            f'<div style="{border}padding:8px 8px 8px 10px;border-radius:0 4px 4px 0;margin-bottom:2px;">'
+            f'<div style="{border}padding:8px 8px 8px 10px;border-radius:0 4px 4px 0;'
+            f'margin-bottom:2px;cursor:pointer;">'
             f'<span {dot_class} style="color:{dot_c};font-size:0.65rem;margin-right:6px;">{dot}</span>'
             f'<span style="font-size:0.82rem;font-weight:{"700" if is_active else "400"};color:{label_c};">'
             f'{sec["icon"]} {sec["label"]}</span>'
             f'</div>',
             unsafe_allow_html=True)
 
-        if st.button("‎", key=f"sb_{k}", use_container_width=True, help=sec["full_label"]):
+        if st.button(" ", key=f"sb_{k}", use_container_width=True, help=sec["full_label"]):
             st.session_state.active_section = k
             st.rerun()
 
