@@ -266,6 +266,17 @@ def get_content(key):
     return (st.session_state.edited_content.get(key)
             or st.session_state.kyc_state.results.get(key, ""))
 
+def get_parsed(key: str):
+    """Cached parse of a section's JSON — re-parses only when content changes."""
+    content = get_content(key)
+    cache   = st.session_state.setdefault("_parsed_cache", {})
+    entry   = cache.get(key)
+    if entry and entry[0] == id(content):
+        return entry[1]
+    parsed = parse_json_result(content) if content else None
+    cache[key] = (id(content), parsed)
+    return parsed
+
 def log_event(agent, msg, level="running"):
     st.session_state.agent_log.append(
         {"ts": datetime.now().strftime("%H:%M:%S"), "agent": agent, "msg": msg, "level": level})
@@ -1086,9 +1097,14 @@ def _run_with_stream(key: str, client):
     status_box = st.empty()
     stream_box = st.empty()
 
-    buf = {"text": "", "thinking": "", "phase": "thinking"}
+    import time as _time
+    buf = {"text": "", "thinking": "", "phase": "thinking", "_last_render": 0.0}
 
     def _render():
+        now = _time.monotonic()
+        if now - buf["_last_render"] < 0.10:
+            return
+        buf["_last_render"] = now
         parts = []
         if buf["thinking"] and buf["phase"] == "thinking":
             th = buf["thinking"][-800:] if len(buf["thinking"]) > 800 else buf["thinking"]
@@ -1145,8 +1161,7 @@ def _run_with_stream(key: str, client):
 
 # ── Criticality panel ─────────────────────────────────────────────
 def _render_crit_panel(key: str):
-    content = get_content(key)
-    parsed  = parse_json_result(content) if content else None
+    parsed  = get_parsed(key)
     if not parsed:
         st.markdown(
             f'<div style="color:{TEXT_SEC};font-size:0.8rem;padding:12px;">'
@@ -1235,7 +1250,7 @@ def _render_section_content(key: str, client):
     sec     = next(s for s in MAIN_SECTIONS if s["key"] == key)
     status  = sec_status(key)
     content = get_content(key)
-    parsed  = parse_json_result(content) if content else None
+    parsed  = get_parsed(key)
     mode    = st.session_state.section_modes.get(key, "agent")
 
     # Section header
@@ -1512,8 +1527,7 @@ def _render_right_panel(queued_key=None):
         is_run  = (k == queued_key)
         is_q    = (k in all_in_queue)
 
-        content = get_content(k) if status == "completed" else None
-        parsed  = parse_json_result(content) if content else None
+        parsed  = get_parsed(k) if status == "completed" else None
         risk    = (parsed.get("rischioComplessivo", "") if parsed else "") or ""
         rc      = get_risk_color(risk) if risk else BORDER
 
@@ -1598,8 +1612,7 @@ def render_analysis():
     # MANCANTE (grey) = missing information
     _fl_counts = {"CRITICO": 0, "ATTENZIONE": 0, "MANCANTE": 0}
     for _s in MAIN_SECTIONS:
-        _c = get_content(_s["key"])
-        _p = parse_json_result(_c) if _c else None
+        _p = get_parsed(_s["key"])
         if not _p:
             continue
         _flags_list = _p.get("flags") or []
@@ -1759,15 +1772,14 @@ def render_final_valuation():
     else:
         # Super Agent mode
         content = get_content(key)
-        parsed  = parse_json_result(content) if content else None
+        parsed  = get_parsed(key)
 
         # Collect active findings
         all_findings = []
         overrides    = st.session_state.crit_overrides
         for sec in MAIN_SECTIONS:
             sk = sec["key"]
-            sc = get_content(sk)
-            sp = parse_json_result(sc) if sc else None
+            sp = get_parsed(sk)
             if not sp:
                 continue
             for idx, ev in enumerate(sp.get("principaliEvidenze",[])):
@@ -1874,8 +1886,7 @@ def render_final_valuation():
             _lvl_order = {"CRITICO": 0, "ANOMALIA": 1, "ATTENZIONE": 2}
             _all_evidenze = []
             for _sec in MAIN_SECTIONS:
-                _sc = get_content(_sec["key"])
-                _sp = parse_json_result(_sc) if _sc else None
+                _sp = get_parsed(_sec["key"])
                 if not _sp:
                     continue
                 for _ev in _sp.get("principaliEvidenze", []):
