@@ -797,9 +797,7 @@ def render_upload():
     with col:
         st.markdown(
             f'<div style="font-size:1.15rem;font-weight:700;color:{TEXT};margin-bottom:4px;">Carica Documenti</div>'
-            f'<div style="font-size:0.82rem;color:{TEXT_SEC};margin-bottom:16px;">'
-            f'Prefisso automatico: <b>01_</b> Struttura · <b>02_</b> UBO/PEP · '
-            f'<b>03_</b> Reputational · <b>04_</b> Economic · <b>05_</b> Transactional</div>',
+            f'<div style="height:4px;"></div>',
             unsafe_allow_html=True)
 
         uploaded = st.file_uploader(
