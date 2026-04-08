@@ -905,33 +905,38 @@ def render_upload():
 
 
 # ── STEP 3: MODE CONFIG ───────────────────────────────────────────
-# NOTE: uses NO nested st.columns inside section cards to avoid ghost
-# widget rendering when transitioning to the analysis page.
+# CRITICAL: must use st.columns([3.5, 1.5, 1]) — identical to render_analysis().
+# Streamlit reconciles the DOM by element-tree path. If mode_config and analysis
+# use different column structures, Streamlit cannot properly clear the old columns,
+# leaving ghost widgets. Same structure = same paths = clean transition.
 def render_mode_config():
     render_header()
-    _, col, _ = st.columns([0.5, 5, 0.5])
-    with col:
-        st.markdown(
-            f'<div style="font-size:1.15rem;font-weight:700;color:{TEXT};margin-bottom:4px;">Configura Modalità Analisi</div>'
-            f'<div style="font-size:0.82rem;color:{TEXT_SEC};margin-bottom:18px;">'
-            f'Scegli per ogni sezione se usare l\'agente AI o inserire l\'analisi manualmente.</div>',
-            unsafe_allow_html=True)
 
-        files_data   = st.session_state.uploaded_files_data
-        file_assigns = st.session_state.file_assignments
+    # ── SAME column split as render_analysis() ────────────────────
+    main_col, _, ctrl_col = st.columns([3.5, 1.5, 1])
+
+    files_data   = st.session_state.uploaded_files_data
+    file_assigns = st.session_state.file_assignments
+
+    with main_col:
+        st.markdown(
+            f'<div style="font-size:1.05rem;font-weight:700;color:{TEXT};margin-bottom:4px;">'
+            f'Configura Modalità Analisi</div>'
+            f'<div style="font-size:0.8rem;color:{TEXT_SEC};margin-bottom:14px;">'
+            f'Scegli per ogni sezione se usare l\'agente AI o inserire manualmente.</div>',
+            unsafe_allow_html=True)
 
         for sec in MAIN_SECTIONS:
             key = sec["key"]
             assigned_files = [fd["name"] for fd in files_data
                               if file_assigns.get(fd["name"]) == key]
+            file_tags = "".join(
+                f'<span style="display:inline-block;background:#F0FFF4;border:1px solid #BBF7D0;'
+                f'border-radius:10px;padding:1px 8px;font-size:0.68rem;color:#166534;margin:1px 2px;">'
+                f'📄 {n[:30]}</span>'
+                for n in assigned_files)
 
             with st.container(border=True):
-                # Section label (HTML only, no widget columns)
-                file_tags = "".join(
-                    f'<span style="display:inline-block;background:#F0FFF4;border:1px solid #BBF7D0;'
-                    f'border-radius:10px;padding:1px 8px;font-size:0.68rem;color:#166534;margin:1px 2px;">'
-                    f'📄 {n[:30]}</span>'
-                    for n in assigned_files)
                 st.markdown(
                     f'<div style="display:flex;align-items:center;justify-content:space-between;'
                     f'flex-wrap:wrap;gap:6px;margin-bottom:8px;">'
@@ -945,74 +950,67 @@ def render_mode_config():
                     + f'</div>',
                     unsafe_allow_html=True)
 
-                # Mode radio (horizontal, no column wrapper)
                 current_mode = st.session_state.section_modes.get(key, "agent")
                 chosen = st.radio(
-                    "Modalità",
-                    options=["🤖 Agente", "✍️ Manuale"],
+                    "Modalità", options=["🤖 Agente", "✍️ Manuale"],
                     index=0 if current_mode == "agent" else 1,
-                    key=f"mode_{key}",
-                    horizontal=True,
-                    label_visibility="collapsed")
+                    key=f"mode_{key}", horizontal=True, label_visibility="collapsed")
                 st.session_state.section_modes[key] = "agent" if chosen == "🤖 Agente" else "manual"
 
-                # Web search checkbox (only for agent, no column wrapper)
                 if st.session_state.section_modes.get(key) == "agent":
                     web_val = st.session_state.section_web.get(key, False)
-                    new_web = st.checkbox("🌐 Web search", value=web_val, key=f"web_{key}")
-                    st.session_state.section_web[key] = new_web
+                    st.session_state.section_web[key] = st.checkbox(
+                        "🌐 Web search", value=web_val, key=f"web_{key}")
 
-        st.markdown(f'<div style="height:12px;"></div>', unsafe_allow_html=True)
-        nav_l, nav_r = st.columns([1, 1])
-        with nav_l:
-            if st.button("← Indietro", key="mode_back", use_container_width=True):
-                st.session_state.step = "upload"
-                st.rerun()
-        with nav_r:
-            if st.button("▶ Avvia Analisi", key="mode_next", use_container_width=True):
-                files_data   = st.session_state.uploaded_files_data
-                file_assigns = st.session_state.file_assignments
-                section_docs, section_doc_names = {}, {}
-                for sec in MAIN_SECTIONS:
-                    skey     = sec["key"]
-                    assigned = [fd for fd in files_data if file_assigns.get(fd["name"]) == skey]
-                    if not assigned:
-                        continue
-                    if skey == "transaction":
-                        fd  = assigned[0]
-                        raw = fd.get("raw_bytes")
-                        import io as _io
-                        buf = _io.BytesIO(raw) if raw else _io.BytesIO(
-                            fd["content_text"].encode("utf-8", errors="replace"))
-                        buf.name = fd["name"]
-                        st.session_state.excel_raw_bytes = buf
-                        st.session_state.excel_name      = fd["name"]
-                        section_doc_names[skey] = [fd["name"]]
-                    else:
-                        section_docs[skey]      = "\n\n".join(
-                            f"=== {fd['name']} ===\n{fd['content_text']}" for fd in assigned)
-                        section_doc_names[skey] = [fd["name"] for fd in assigned]
-                st.session_state.section_docs      = section_docs
-                st.session_state.section_doc_names = section_doc_names
-                # Queue only agent-mode sections
-                st.session_state.run_queue      = [
-                    s["key"] for s in MAIN_SECTIONS
-                    if st.session_state.section_modes.get(s["key"]) == "agent"]
-                st.session_state.active_section = "registry"
-                # Clear widget keys and upload state before transit
-                for s in MAIN_SECTIONS:
-                    st.session_state.pop(f"mode_{s['key']}", None)
-                    st.session_state.pop(f"web_{s['key']}", None)
-                for k in list(st.session_state.keys()):
-                    if k.startswith("assign_"):
-                        del st.session_state[k]
-                st.session_state.pop("mode_back", None)
-                st.session_state.pop("mode_next", None)
-                st.session_state.uploaded_files_data = []
-                st.session_state.file_assignments    = {}
-                st.session_state.upload_hash         = ""
-                st.session_state.step = "transit"
-                st.rerun()
+    with ctrl_col:
+        st.markdown(f'<div style="height:48px;"></div>', unsafe_allow_html=True)
+        if st.button("← Indietro", key="mode_back", use_container_width=True):
+            st.session_state.step = "upload"
+            st.rerun()
+        st.markdown(f'<div style="height:6px;"></div>', unsafe_allow_html=True)
+        if st.button("▶ Avvia Analisi", key="mode_next", use_container_width=True):
+            files_data   = st.session_state.uploaded_files_data
+            file_assigns = st.session_state.file_assignments
+            section_docs, section_doc_names = {}, {}
+            for sec in MAIN_SECTIONS:
+                skey     = sec["key"]
+                assigned = [fd for fd in files_data if file_assigns.get(fd["name"]) == skey]
+                if not assigned:
+                    continue
+                if skey == "transaction":
+                    fd  = assigned[0]
+                    raw = fd.get("raw_bytes")
+                    import io as _io
+                    buf = _io.BytesIO(raw) if raw else _io.BytesIO(
+                        fd["content_text"].encode("utf-8", errors="replace"))
+                    buf.name = fd["name"]
+                    st.session_state.excel_raw_bytes = buf
+                    st.session_state.excel_name      = fd["name"]
+                    section_doc_names[skey] = [fd["name"]]
+                else:
+                    section_docs[skey]      = "\n\n".join(
+                        f"=== {fd['name']} ===\n{fd['content_text']}" for fd in assigned)
+                    section_doc_names[skey] = [fd["name"] for fd in assigned]
+            st.session_state.section_docs      = section_docs
+            st.session_state.section_doc_names = section_doc_names
+            st.session_state.run_queue         = [
+                s["key"] for s in MAIN_SECTIONS
+                if st.session_state.section_modes.get(s["key"]) == "agent"]
+            st.session_state.active_section    = "registry"
+            # Clear mode/web/assign widget keys so they don't persist
+            for s in MAIN_SECTIONS:
+                st.session_state.pop(f"mode_{s['key']}", None)
+                st.session_state.pop(f"web_{s['key']}", None)
+            for k in list(st.session_state.keys()):
+                if k.startswith("assign_"):
+                    del st.session_state[k]
+            st.session_state.uploaded_files_data = []
+            st.session_state.file_assignments    = {}
+            st.session_state.upload_hash         = ""
+            # Go directly to analysis — no transit needed because column
+            # structure is identical, so Streamlit reconciles cleanly.
+            st.session_state.step = "analysis"
+            st.rerun()
 
 
 # ── STREAMING helper ──────────────────────────────────────────────
@@ -1789,19 +1787,7 @@ def render_final_valuation():
 step = st.session_state.step
 
 if step == "transit":
-    # Render a visible loading frame and sleep so the browser has time to
-    # apply the full DOM clear before the analysis page arrives.
-    # Without the sleep, st.rerun() fires before the browser processes the
-    # blank frame, leaving mode_config ghost widgets in the right column.
-    import time as _time
-    st.markdown(
-        f'<div style="display:flex;justify-content:center;align-items:center;'
-        f'height:55vh;flex-direction:column;gap:14px;">'
-        f'<span class="aml-spin" style="font-size:2rem;color:#1E2328;">⚙</span>'
-        f'<div style="font-size:0.88rem;color:#6B7280;font-weight:500;">Avvio analisi…</div>'
-        f'</div>',
-        unsafe_allow_html=True)
-    _time.sleep(0.45)
+    # Fallback: if something sets step="transit", go straight to analysis.
     st.session_state.step = "analysis"
     st.rerun()
 elif step == "setup":
