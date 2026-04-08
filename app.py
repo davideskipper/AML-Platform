@@ -87,19 +87,19 @@ st.markdown(f"""
 
   /* ── Buttons ── */
   .stButton > button {{
-    background: #1E2328 !important; color: #fff !important;
-    border: none !important; border-radius: 6px !important;
+    background: #E5E7EB !important; color: #111827 !important;
+    border: 1px solid #D1D5DB !important; border-radius: 6px !important;
     font-weight: 600 !important; font-size: 0.875rem !important;
     padding: 8px 20px !important; letter-spacing: 0.1px !important;
     transition: background 0.15s, transform 0.1s, box-shadow 0.15s !important;
   }}
   .stButton > button:hover {{
-    background: #374151 !important; transform: translateY(-1px) !important;
-    box-shadow: 0 4px 14px rgba(30,35,40,0.22) !important;
+    background: #D1D5DB !important; transform: translateY(-1px) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.10) !important;
   }}
   .stButton > button:active {{ transform: translateY(0) !important; }}
   .stButton > button:disabled {{
-    background: #E5E7EB !important; color: #9CA3AF !important;
+    background: #F3F4F6 !important; color: #9CA3AF !important;
     cursor: not-allowed !important; transform: none !important; box-shadow: none !important;
   }}
 
@@ -1707,16 +1707,20 @@ def render_final_valuation():
 
 
 # ── ROUTER ───────────────────────────────────────────────────────
+# Wrap every page in st.empty() so Streamlit fully replaces the component
+# tree on each step transition — prevents ghost widgets from previous pages.
+_page_slot = st.empty()
 step = st.session_state.step
-if step == "setup":
-    render_setup()
-elif step == "upload":
-    render_upload()
-elif step == "mode_config":
-    render_mode_config()
-elif step == "analysis":
-    render_analysis()
-elif step == "final":
-    render_final_valuation()
-else:
-    render_setup()
+with _page_slot.container():
+    if step == "setup":
+        render_setup()
+    elif step == "upload":
+        render_upload()
+    elif step == "mode_config":
+        render_mode_config()
+    elif step == "analysis":
+        render_analysis()
+    elif step == "final":
+        render_final_valuation()
+    else:
+        render_setup()
