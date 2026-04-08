@@ -22,7 +22,6 @@ from . import (
     ubo_pep_agent,
     reputational_agent,
     economic_profile_agent,
-    risk_countries_agent,
     transaction_agent,
     final_valuation_agent,
 )
@@ -108,26 +107,6 @@ TOOLS = [
         },
     },
     {
-        "name": "run_risk_countries_agent",
-        "description": (
-            "Risk Countries Agent: map geographic exposure against FATF lists, "
-            "EU/UN/OFAC sanctions, and national AML risk assessments."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "company_name":      {"type": "string"},
-                "country":           {"type": "string"},
-                "country_exposure":  {
-                    "type": "string",
-                    "description": "Countries of counterparties, subsidiaries, or shareholders (comma-separated or free text)",
-                },
-                "manual_context":    {"type": "string"},
-            },
-            "required": ["company_name", "country"],
-        },
-    },
-    {
         "name": "run_transaction_agent",
         "description": (
             "Transaction Agent: analyze an Excel or CSV file of transactions "
@@ -181,8 +160,8 @@ Your responsibilities:
 
 Recommended analysis sequence:
   Registry Agent → UBO/PEP Agent → Reputational Agent →
-  Economic Profile Agent → Risk Countries Agent →
-  (Transaction Agent if file available) → Final Valuation Agent
+  Economic Profile Agent → Transaction Agent (includes geographic risk) →
+  Final Valuation Agent
 
 Guidelines:
 - Be professional and concise
@@ -230,11 +209,6 @@ def _execute_tool(
         elif tool_name == "run_economic_profile_agent":
             result = economic_profile_agent.run(client, company, country, manual)
             state.add_result("economic_profile", result)
-
-        elif tool_name == "run_risk_countries_agent":
-            exposure = tool_input.get("country_exposure", "")
-            result = risk_countries_agent.run(client, company, country, exposure, manual)
-            state.add_result("risk_countries", result)
 
         elif tool_name == "run_transaction_agent":
             excel_path = tool_input.get("excel_path", "")
@@ -296,7 +270,7 @@ def run(client: anthropic.Anthropic) -> None:
         with client.messages.stream(
             model="claude-opus-4-6",
             max_tokens=4000,
-            thinking={"type": "adaptive"},
+            thinking={"type": "enabled", "budget_tokens": 8000},
             system=SYSTEM_PROMPT,
             tools=TOOLS,
             messages=messages,

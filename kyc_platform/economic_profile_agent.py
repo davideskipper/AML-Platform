@@ -30,6 +30,8 @@ ANALISI DICHIARAZIONE REDDITI — persone fisiche:
 - Segnala redditi da fonti difficilmente verificabili o atipiche
 - Verifica coerenza con attività professionale dichiarata
 
+Livelli di evidenza: ATTENZIONE = basso rischio, ANOMALIA = rischio medio, CRITICO = rischio alto.
+
 INDICATORI DI ANOMALIA (rif. UIF Provvedimento 12 maggio 2023):
 - Fatturato elevato con margini operativi anomalmente bassi o negativi
 - Ricavi non supportati da struttura aziendale (pochi dipendenti, asset minimi)
@@ -68,7 +70,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido. Nessun testo prima o dopo. N
     {
       "evidenza": "Descrizione sintetica dell'elemento di attenzione o anomalia rilevata",
       "normativa": "Riferimento normativo specifico (es. Art.20 D.Lgs.231/2007, UIF Indic.n.42/2023, FATF Rec.10)",
-      "livello": "ATTENZIONE (elemento da monitorare, basso rischio → verde) | ANOMALIA (comportamento sospetto, rischio medio → giallo) | CRITICO (red flag grave, rischio alto → rosso)"
+      "livello": "ATTENZIONE|ANOMALIA|CRITICO"
     }
   ],
   "rischioComplessivo": "LOW|MEDIUM|HIGH|CRITICAL",

@@ -132,6 +132,7 @@ DEFAULTS = {
     "section_doc_names": {},
     "section_notes": {},
     "excel_path": None,
+    "excel_raw_bytes": None,
     "excel_name": None,
     "edited_content": {},
     "agent_log": [],
@@ -290,9 +291,9 @@ def run_section(key, client, on_token=None, on_thinking=None):
                                                 show_output=False, on_token=on_token,
                                                 on_thinking=on_thinking, use_web_search=use_web)
         elif key == "transaction":
-            path = st.session_state.excel_path or ""
-            if not path: raise ValueError("Nessun file Excel/CSV caricato.")
-            result = transaction_agent.run(client, path, company, manual_ctx,
+            raw = st.session_state.get("excel_raw_bytes") or st.session_state.get("excel_path")
+            if not raw: raise ValueError("Nessun file Excel/CSV caricato.")
+            result = transaction_agent.run(client, raw, company, manual_ctx,
                                            show_output=False, on_token=on_token,
                                            on_thinking=on_thinking)
         elif key == "final_valuation":
@@ -768,14 +769,19 @@ def render_mode_config():
                         continue
                     if skey == "transaction":
                         fd  = assigned[0]
-                        ext = fd["ext"]
                         raw = fd.get("raw_bytes")
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
-                            if raw:
-                                tmp.write(raw)          # real binary Excel/CSV
-                            else:
-                                tmp.write(fd["content_text"].encode("utf-8", errors="replace"))
-                            st.session_state.excel_path = tmp.name
+                        if raw:
+                            # Pass raw bytes directly — no tempfile needed
+                            import io as _io
+                            buf = _io.BytesIO(raw)
+                            buf.name = fd["name"]       # give it a name so _read_excel detects ext
+                            st.session_state.excel_raw_bytes = buf
+                        else:
+                            # Fallback: encode text as UTF-8 BytesIO
+                            import io as _io
+                            buf = _io.BytesIO(fd["content_text"].encode("utf-8", errors="replace"))
+                            buf.name = fd["name"]
+                            st.session_state.excel_raw_bytes = buf
                         st.session_state.excel_name = fd["name"]
                         section_doc_names[skey] = [fd["name"]]
                     else:

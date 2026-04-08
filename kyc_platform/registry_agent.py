@@ -25,6 +25,8 @@ ESTRAI E VERIFICA:
 - Codici ATECO (valuta il rischio AML associato al settore)
 - REA, iscrizioni ad albi o registri speciali
 
+Livelli di evidenza: ATTENZIONE = basso rischio, ANOMALIA = rischio medio, CRITICO = rischio alto.
+
 FLAG AUTOMATICI — segnala sempre se presenti:
 - Sede legale presso studio professionale o indirizzo virtuale
 - Frequenti variazioni di soci, amministratori o oggetto sociale negli ultimi 24 mesi
@@ -62,7 +64,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido. Nessun testo prima o dopo. N
     {
       "evidenza": "Descrizione sintetica dell'elemento di attenzione o anomalia rilevata",
       "normativa": "Riferimento normativo specifico (es. Art.20 D.Lgs.231/2007, UIF Indic.n.42/2023, FATF Rec.10)",
-      "livello": "ATTENZIONE (elemento da monitorare, basso rischio → verde) | ANOMALIA (comportamento sospetto, rischio medio → giallo) | CRITICO (red flag grave, rischio alto → rosso)"
+      "livello": "ATTENZIONE|ANOMALIA|CRITICO"
     }
   ],
   "rischioComplessivo": "LOW|MEDIUM|HIGH|CRITICAL",

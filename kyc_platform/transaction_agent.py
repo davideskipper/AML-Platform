@@ -42,6 +42,8 @@ INTEGRAZIONE:
 - Investimenti sproporzionati rispetto al profilo
 - Pagamenti verso soggetti senza relazione commerciale documentabile
 
+Livelli di evidenza: ATTENZIONE = basso rischio, ANOMALIA = rischio medio, CRITICO = rischio alto.
+
 RED FLAG SPECIFICI:
 - Operazioni con controparti in paesi FATF Black List o sanzionati
 - Operatività incomprensibile rispetto alla natura del rapporto
@@ -113,7 +115,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido. Nessun testo prima o dopo. N
     {
       "evidenza": "Descrizione sintetica dell'anomalia o elemento di attenzione",
       "normativa": "Riferimento normativo specifico (es. UIF Indic. n.42/2023, Art.35 D.Lgs.231/2007, FATF Rec.10)",
-      "livello": "ATTENZIONE (elemento da monitorare, basso rischio → verde) | ANOMALIA (comportamento sospetto, rischio medio → giallo) | CRITICO (red flag grave, rischio alto → rosso)"
+      "livello": "ATTENZIONE|ANOMALIA|CRITICO"
     }
   ],
   "rischioComplessivo": "LOW|MEDIUM|HIGH|CRITICAL",
@@ -122,30 +124,79 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido. Nessun testo prima o dopo. N
 }"""
 
 
-def _read_excel(filepath: str) -> str:
+def _read_excel(source) -> str:
+    """
+    Read an Excel/CSV source and return a text representation.
+    `source` can be:
+      - str  → file path on disk
+      - bytes / BytesIO / UploadedFile → in-memory buffer
+    All rows are included (no head() limit).
+    CSV separator is auto-detected (tries ';' first, then ',').
+    """
     try:
         import pandas as pd
     except ImportError:
         raise RuntimeError("pandas not installed. Run: pip install pandas openpyxl")
-    if not os.path.exists(filepath):
-        raise FileNotFoundError(f"File not found: {filepath}")
-    ext = os.path.splitext(filepath)[1].lower()
-    dfs = {"Sheet1": pd.read_csv(filepath)} if ext == ".csv" else pd.read_excel(filepath, sheet_name=None)
+
+    import io as _io
+
+    # Normalise to a seekable buffer or path string
+    if isinstance(source, (bytes, bytearray)):
+        buf = _io.BytesIO(source)
+        ext = ".bin"          # unknown — will try excel first
+    elif isinstance(source, str):
+        if not os.path.exists(source):
+            raise FileNotFoundError(f"File not found: {source}")
+        buf = source          # pass path directly to pandas
+        ext = os.path.splitext(source)[1].lower()
+    else:
+        # BytesIO / UploadedFile (has .name attribute)
+        name = getattr(source, "name", "")
+        ext  = os.path.splitext(name)[1].lower()
+        source.seek(0)
+        buf = source
+
+    def _read_csv(b):
+        """Try ';' separator first; fall back to ',' if result is 1 column."""
+        if isinstance(b, str):
+            df = pd.read_csv(b, sep=";")
+            if len(df.columns) == 1:
+                df = pd.read_csv(b, sep=",")
+        else:
+            raw = b.read() if hasattr(b, "read") else b
+            b_copy = _io.BytesIO(raw if isinstance(raw, (bytes, bytearray)) else raw.getvalue())
+            df = pd.read_csv(b_copy, sep=";")
+            if len(df.columns) == 1:
+                b_copy2 = _io.BytesIO(raw if isinstance(raw, (bytes, bytearray)) else raw.getvalue())
+                df = pd.read_csv(b_copy2, sep=",")
+        return {"Sheet1": df}
+
+    if ext == ".csv":
+        dfs = _read_csv(buf)
+    elif ext in (".xlsx", ".xls"):
+        dfs = pd.read_excel(buf, sheet_name=None)
+    else:
+        # Unknown extension — try Excel first, then CSV
+        try:
+            dfs = pd.read_excel(buf, sheet_name=None)
+        except Exception:
+            if hasattr(buf, "seek"):
+                buf.seek(0)
+            dfs = _read_csv(buf)
+
     lines = []
     for sheet_name, df in dfs.items():
         lines.append(f"## Sheet: {sheet_name}")
         lines.append(f"Rows: {len(df)}  |  Columns: {', '.join(str(c) for c in df.columns)}")
         lines.append("")
-        lines.append(df.head(500).to_string(index=False))
-        if len(df) > 500:
-            lines.append(f"\n[... {len(df)-500} more rows omitted ...]")
+        lines.append(df.to_string(index=False))
         lines.append("")
     return "\n".join(lines)
 
 
 def run(
     client: anthropic.Anthropic,
-    excel_path: str,
+    excel_source,          # str path OR BytesIO/UploadedFile
     company_name: str = "",
     manual_context: str = "",
     show_output: bool = True,
@@ -153,7 +204,7 @@ def run(
     on_thinking=None,
     use_web_search=None,
 ) -> str:
-    excel_text = _read_excel(excel_path)
+    excel_text = _read_excel(excel_source)
     subject = f" per {company_name}" if company_name else ""
     user_msg = (
         f"Esegui l'analisi AML transazioni e rischio geografico{subject}.\n\n"

@@ -33,6 +33,8 @@ Produci il report finale di rischio AML per il fascicolo cliente.
    - Tutte <= 2                      → BASSO
    - Altrimenti                      → MEDIO
 
+Livelli di evidenza: ATTENZIONE = basso rischio, ANOMALIA = rischio medio, CRITICO = rischio alto.
+
 4. PRINCIPALI EVIDENZE CONSOLIDATE — aggrega i principaliEvidenze di tutti gli agenti,
    elimina i duplicati, ordina per livello di rischio decrescente.
    Per ogni evidenza: descrizione sintetica + normativa di riferimento + livello.
@@ -85,6 +87,21 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido. Nessun testo prima o dopo. N
 }"""
 
 
+def _summarize_findings(parsed: dict) -> dict:
+    """Extract only the fields needed by the Final Valuation Agent."""
+    narrativa = (parsed.get("narrativa") or parsed.get("narrativaCompleta")
+                 or parsed.get("sintesiEsecutiva") or "")
+    return {
+        k: v for k, v in {
+            "rischioComplessivo":  parsed.get("rischioComplessivo") or parsed.get("customerRiskRating"),
+            "principaliEvidenze":  parsed.get("principaliEvidenze", []),
+            "raccomandazione":     parsed.get("raccomandazione"),
+            "narrativa":           narrativa[:600] if narrativa else None,
+            "flags":               parsed.get("flags") or None,
+        }.items() if v is not None
+    }
+
+
 def run(
     client: anthropic.Anthropic,
     company_name: str,
@@ -110,7 +127,16 @@ def run(
     if not parsed_findings:
         parsed_findings = {"note": "Nessun output dagli agenti disponibile."}
 
-    findings_json = json.dumps(parsed_findings, ensure_ascii=False, indent=2)
+    # Reduce token footprint: summarise each agent's output
+    reduced = {
+        agent: _summarize_findings(v) if isinstance(v, dict) else v
+        for agent, v in parsed_findings.items()
+    }
+    full_json    = json.dumps(parsed_findings, ensure_ascii=False, indent=2)
+    reduced_json = json.dumps(reduced,         ensure_ascii=False, indent=2)
+    # Use full JSON only if it fits comfortably within model context
+    findings_json = full_json if len(full_json) / 4 < 8000 else reduced_json
+
     user_msg = (
         f"Genera la valutazione finale del rischio AML per:\n\n"
         f"Azienda: {company_name}\n\n"

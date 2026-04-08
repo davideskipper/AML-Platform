@@ -56,7 +56,7 @@ def run_agent(
         with client.messages.stream(
             model="claude-sonnet-4-6",
             max_tokens=max_tokens,
-            thinking={"type": "enabled", "budget_tokens": 2048},
+            thinking={"type": "enabled", "budget_tokens": 8000},
             system=system_prompt,
             tools=tools,
             messages=messages,

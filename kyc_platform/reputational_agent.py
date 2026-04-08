@@ -41,6 +41,8 @@ ANALISI STAMPA E COMUNICATI:
 RICERCA WEB: Effettua ricerche mirate per trovare notizie recenti non coperte dai documenti.
 Priorità: notizie degli ultimi 2 anni. Limita le ricerche alle più rilevanti.
 
+Livelli di evidenza: ATTENZIONE = basso rischio, ANOMALIA = rischio medio, CRITICO = rischio alto.
+
 FLAG AUTOMATICI:
 - Reati presupposto AML anche se non definitivi
 - Misure di prevenzione antimafia (anche solo proposte)
@@ -73,7 +75,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido. Nessun testo prima o dopo. N
     {
       "evidenza": "Descrizione sintetica dell'elemento di attenzione o anomalia rilevata",
       "normativa": "Riferimento normativo specifico (es. Art.20 D.Lgs.231/2007, UIF Indic.n.42/2023, FATF Rec.10)",
-      "livello": "ATTENZIONE (elemento da monitorare, basso rischio → verde) | ANOMALIA (comportamento sospetto, rischio medio → giallo) | CRITICO (red flag grave, rischio alto → rosso)"
+      "livello": "ATTENZIONE|ANOMALIA|CRITICO"
     }
   ],
   "rischioComplessivo": "LOW|MEDIUM|HIGH|CRITICAL",

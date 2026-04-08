@@ -35,6 +35,8 @@ Se PEP identificato, segnala obbligatoriamente:
 - Obbligo di monitoraggio continuativo rafforzato
 - Verifica origine dei fondi e del patrimonio obbligatoria
 
+Livelli di evidenza: ATTENZIONE = basso rischio, ANOMALIA = rischio medio, CRITICO = rischio alto.
+
 FLAG AUTOMATICI:
 - UBO non identificabile o struttura opaca (più di 3 livelli societari)
 - Nominee shareholders o amministratori
@@ -69,7 +71,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido. Nessun testo prima o dopo. N
     {
       "evidenza": "Descrizione sintetica dell'elemento di attenzione o anomalia rilevata",
       "normativa": "Riferimento normativo specifico (es. Art.20 D.Lgs.231/2007, UIF Indic.n.42/2023, FATF Rec.10)",
-      "livello": "ATTENZIONE (elemento da monitorare, basso rischio → verde) | ANOMALIA (comportamento sospetto, rischio medio → giallo) | CRITICO (red flag grave, rischio alto → rosso)"
+      "livello": "ATTENZIONE|ANOMALIA|CRITICO"
     }
   ],
   "rischioComplessivo": "LOW|MEDIUM|HIGH|CRITICAL",
