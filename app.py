@@ -142,16 +142,17 @@ st.markdown(f"""
   .aml-pulse {{ animation: aml-pulse 1.5s ease-in-out infinite !important; }}
 
   /* ── Sidebar nav: transparent button overlaid on label row ── */
-  #aml-sb-marker ~ div[data-testid="stButton"] {{
-    margin-top: -40px !important; position: relative !important; z-index: 5 !important;
+  /* #aml-sb-marker lives inside stMarkdown; use :has() to target sibling stButtons */
+  [data-testid="stMarkdown"]:has(#aml-sb-marker) ~ [data-testid="stButton"] {{
+    margin-top: -38px !important; position: relative !important; z-index: 5 !important;
   }}
-  #aml-sb-marker ~ div[data-testid="stButton"] > button {{
+  [data-testid="stMarkdown"]:has(#aml-sb-marker) ~ [data-testid="stButton"] > button {{
     background: transparent !important; border: none !important; box-shadow: none !important;
-    height: 40px !important; min-height: 0 !important; padding: 0 !important;
+    height: 38px !important; min-height: 0 !important; padding: 0 !important;
     opacity: 0 !important; cursor: pointer !important; width: 100% !important;
     transform: none !important;
   }}
-  #aml-sb-marker ~ div[data-testid="stButton"] > button:hover {{
+  [data-testid="stMarkdown"]:has(#aml-sb-marker) ~ [data-testid="stButton"] > button:hover {{
     background: transparent !important; transform: none !important; box-shadow: none !important;
   }}
 </style>
@@ -395,7 +396,6 @@ def run_section(key, client, on_token=None, on_thinking=None):
                                                 on_thinking=on_thinking, use_web_search=use_web)
         elif key == "transaction":
             raw = st.session_state.get("excel_raw_bytes") or st.session_state.get("excel_path")
-            if not raw: raise ValueError("Nessun file Excel/CSV caricato.")
             result = transaction_agent.run(client, raw, company, manual_ctx,
                                            show_output=False, on_token=on_token,
                                            on_thinking=on_thinking)
