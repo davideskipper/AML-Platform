@@ -220,7 +220,6 @@ DEFAULTS = {
     "agent_log": [],
     "active_section": "registry",
     "run_queue": [],
-    "agent_run_now": False,
     "crit_panel_section": None,
     "crit_overrides": {},
     "knowledge_base": "",
@@ -1343,24 +1342,14 @@ def render_analysis():
     render_header()
     client = get_client()
 
-    # Two-phase agent execution:
-    # Phase 1 (prepare): render the skeleton so old upload content is cleared, then rerun.
-    # Phase 2 (run):     old content is gone — now actually run the agent.
-    run_now   = st.session_state.get("agent_run_now", False)
-    has_queue = bool(st.session_state.get("run_queue"))
-
+    # Pop the next agent from the queue and run it directly.
+    # The step-transition rerun from mode_config already cleared old widgets,
+    # so no extra "skeleton" Phase 1 rerun is needed.
     queued_key = None
-    if has_queue:
-        if run_now:
-            # Phase 2: pop and execute
-            queued_key = st.session_state["run_queue"][0]
-            st.session_state["run_queue"] = st.session_state["run_queue"][1:]
-            st.session_state.active_section = queued_key
-            st.session_state.agent_run_now = False
-        else:
-            # Phase 1: just peek — don't pop yet
-            queued_key = st.session_state["run_queue"][0]
-            st.session_state.active_section = queued_key
+    if st.session_state.get("run_queue"):
+        queued_key = st.session_state["run_queue"][0]
+        st.session_state["run_queue"] = st.session_state["run_queue"][1:]
+        st.session_state.active_section = queued_key
 
     # ── Global criticality indicator ─────────────────────────────
     # Count active (non-chiuse) CRITICO + ANOMALIA across all done sections
@@ -1424,11 +1413,8 @@ def render_analysis():
                 f'<div style="font-size:0.75rem;color:{TEXT_SEC};">Analisi in corso — attendere…</div>'
                 f'</div></div></div>',
                 unsafe_allow_html=True)
-            if run_now:
-                # Phase 2: old page fully cleared — run the agent
-                _run_with_stream(queued_key, client)
-                return
-            # Phase 1: fall through — let the full render finish first
+            _run_with_stream(queued_key, client)
+            return
 
         else:
             # Criticality badge for active section (opens right panel)
@@ -1479,11 +1465,6 @@ def render_analysis():
                 st.session_state.crit_panel_section = None
                 st.rerun()
 
-    # Phase 1: full render is now complete — ALL old widgets have been cleared.
-    # Trigger Phase 2 to actually run the agent.
-    if queued_key and not run_now:
-        st.session_state.agent_run_now = True
-        st.rerun()
 
 
 # ── STEP 5: FINAL VALUATION ───────────────────────────────────────
