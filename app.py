@@ -442,9 +442,9 @@ def _logo_html(height: int = 38) -> str:
 # ── Step Navigation Bar ───────────────────────────────────────────
 _STEP_ORDER = ["upload", "analysis", "final"]
 _STEP_LABELS = {
-    "upload":   "① Documenti",
-    "analysis": "② Analisi",
-    "final":    "③ Valutazione",
+    "upload":   "① Carica Documenti",
+    "analysis": "② Analisi Nota Parere",
+    "final":    "③ Valutazione Finale",
 }
 
 def render_step_nav(current_step_id: str):
