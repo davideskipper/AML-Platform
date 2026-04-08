@@ -440,12 +440,11 @@ def _logo_html(height: int = 38) -> str:
 
 
 # ── Step Navigation Bar ───────────────────────────────────────────
-_STEP_ORDER = ["upload", "mode_config", "analysis", "final"]
+_STEP_ORDER = ["upload", "analysis", "final"]
 _STEP_LABELS = {
-    "upload":      "① Documenti",
-    "mode_config": "② Modalità",
-    "analysis":    "③ Analisi",
-    "final":       "④ Valutazione",
+    "upload":   "① Documenti",
+    "analysis": "② Analisi",
+    "final":    "③ Valutazione",
 }
 
 def render_step_nav(current_step_id: str):
@@ -899,8 +898,37 @@ def render_upload():
                 st.session_state.step = "setup"
                 st.rerun()
         with nav_r:
-            if st.button("Continua →", key="upload_next", use_container_width=True):
-                st.session_state.step = "mode_config"
+            if st.button("▶ Avvia Analisi", key="upload_next", use_container_width=True):
+                _fd_list  = st.session_state.uploaded_files_data
+                _fa       = st.session_state.file_assignments
+                _sec_docs, _sec_names = {}, {}
+                for _sec in MAIN_SECTIONS:
+                    _sk = _sec["key"]
+                    _asgn = [fd for fd in _fd_list if _fa.get(fd["name"]) == _sk]
+                    if not _asgn:
+                        continue
+                    if _sk == "transaction":
+                        _fd = _asgn[0]; _raw = _fd.get("raw_bytes")
+                        import io as _io
+                        _buf = _io.BytesIO(_raw) if _raw else _io.BytesIO(
+                            _fd["content_text"].encode("utf-8", errors="replace"))
+                        _buf.name = _fd["name"]
+                        st.session_state.excel_raw_bytes = _buf
+                        st.session_state.excel_name      = _fd["name"]
+                        _sec_names[_sk] = [_fd["name"]]
+                    else:
+                        _sec_docs[_sk]  = "\n\n".join(
+                            f"=== {fd['name']} ===\n{fd['content_text']}" for fd in _asgn)
+                        _sec_names[_sk] = [fd["name"] for fd in _asgn]
+                st.session_state.section_docs      = _sec_docs
+                st.session_state.section_doc_names = _sec_names
+                # All sections start with no mode set — user chooses per tab
+                st.session_state.run_queue         = []
+                st.session_state.active_section    = "registry"
+                st.session_state.uploaded_files_data = []
+                st.session_state.file_assignments    = {}
+                st.session_state.upload_hash         = ""
+                st.session_state.step = "analysis"
                 st.rerun()
 
 
@@ -1362,21 +1390,27 @@ def _render_section_content(key: str, client):
                 st.session_state.edited_content[key] = edited
                 st.session_state.kyc_state.add_result(key, edited)
 
-    # ── Agent mode: empty ─────────────────────────────────────────
+    # ── Agent mode: empty — user picks agent or manual ───────────────
     elif status == "empty":
         st.markdown(
-            f'<div style="text-align:center;padding:48px 0;background:#fff;'
-            f'border:1px solid {BORDER};border-radius:10px;margin-bottom:12px;">'
-            f'<div style="font-size:3rem;opacity:0.12;">{sec["icon"]}</div>'
+            f'<div style="text-align:center;padding:36px 0 20px;background:#fff;'
+            f'border:1px solid {BORDER};border-radius:10px;margin-bottom:16px;">'
+            f'<div style="font-size:3rem;opacity:0.10;">{sec["icon"]}</div>'
             f'<div style="font-size:0.85rem;color:{TEXT_SEC};margin-top:10px;font-weight:500;">'
-            f'In attesa di analisi</div>'
+            f'Sezione non ancora analizzata</div>'
             f'<div style="font-size:0.75rem;color:{TEXT_SEC};opacity:0.7;margin-top:4px;">'
             f'{sec["desc"]}</div>'
             f'</div>', unsafe_allow_html=True)
-        if st.button(f"▶ Avvia {sec['label']}", key=f"run_{key}", use_container_width=True):
-            st.session_state.section_modes[key] = "agent"
-            st.session_state.run_queue = [key]
-            st.rerun()
+        btn_a, btn_m = st.columns(2)
+        with btn_a:
+            if st.button(f"▶ Avvia Agente", key=f"run_{key}", use_container_width=True):
+                st.session_state.section_modes[key] = "agent"
+                st.session_state.run_queue = [key]
+                st.rerun()
+        with btn_m:
+            if st.button(f"✍️ Inserisci Manuale", key=f"manual_start_{key}", use_container_width=True):
+                st.session_state.section_modes[key] = "manual"
+                st.rerun()
 
 
 # Flag color coding for right panel
@@ -1794,8 +1828,6 @@ elif step == "setup":
     render_setup()
 elif step == "upload":
     render_upload()
-elif step == "mode_config":
-    render_mode_config()
 elif step == "analysis":
     render_analysis()
 elif step == "final":
