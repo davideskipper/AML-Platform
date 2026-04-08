@@ -1221,22 +1221,65 @@ def _render_section_content(key: str, client):
                     + sintesi.replace("\n","<br>") + '</div>',
                     unsafe_allow_html=True)
 
-                # Card 2 — Proposta di azione (only if we have content)
+                # Card 2 — Proposta di azione: raccomandazione + conclusione narrativa
+                _racc_raw = parsed.get("raccomandazione","")
+                _racc_str = ""
+                if isinstance(_racc_raw, dict):
+                    _rp = [x for x in [_racc_raw.get("accettazione",""),
+                                        _racc_raw.get("livelloAdeguataVerifica",""),
+                                        _racc_raw.get("frequenzaMonitoraggio","")] if x]
+                    _racc_str = " · ".join(_rp) if _rp else ""
+                elif isinstance(_racc_raw, str):
+                    _racc_str = _racc_raw.strip()
+
+                # Map recommendation codes to descriptive Italian text
+                _racc_map = {
+                    "PROCEED":                 ("Accettazione",          "#15803D", "#DCFCE7",
+                        "Profilo di rischio conforme alle soglie di accettazione. Si raccomanda adeguata verifica ordinaria con aggiornamento periodico del fascicolo."),
+                    "ENHANCED_MONITORING":     ("Monitoraggio Rafforzato","#92400E", "#FFFBEB",
+                        "Il profilo presenta elementi di attenzione che richiedono sorveglianza continuativa. Si raccomanda revisione semestrale del fascicolo, aggiornamento della documentazione e segnalazione interna al responsabile AML."),
+                    "ESCALATE_TO_COMPLIANCE":  ("Escalation Compliance",  "#B91C1C", "#FEE2E2",
+                        "Rilevate criticità significative. Il fascicolo deve essere trasmesso al Responsabile AML/Compliance per valutazione approfondita prima di qualsiasi decisione operativa."),
+                    "RIFIUTO":                 ("Rifiuto Relazione",      "#6B21A8", "#F3E8FF",
+                        "Il profilo di rischio è incompatibile con la policy di accettazione. Si raccomanda il rifiuto dell'instaurazione o la cessazione del rapporto con eventuale valutazione di segnalazione alle autorità competenti."),
+                }
+                _racc_key = _racc_str.upper().replace(" ","_") if _racc_str else ""
+                _racc_info = _racc_map.get(_racc_key)
+
+                # Build proposta content
+                _proposta_parts = []
+                if _racc_info:
+                    _rl, _rc_fg, _rc_bg, _rdesc = _racc_info
+                    _proposta_parts.append(
+                        f'<div style="display:inline-block;background:{_rc_bg};color:{_rc_fg};'
+                        f'font-size:0.72rem;font-weight:700;padding:3px 12px;border-radius:20px;'
+                        f'margin-bottom:10px;">{_rl}</div>'
+                        f'<div style="font-size:0.875rem;color:{TEXT};line-height:1.8;">{_rdesc}</div>'
+                    )
                 if proposta:
+                    sep = '<div style="height:1px;background:#E5E7EB;margin:10px 0;"></div>' if _proposta_parts else ""
+                    _proposta_parts.append(
+                        sep + f'<div style="font-size:0.875rem;color:{TEXT};line-height:1.85;">'
+                        + proposta.replace("\n","<br>") + '</div>'
+                    )
+
+                if _proposta_parts:
                     st.markdown(
                         f'<div style="font-size:0.62rem;font-weight:700;letter-spacing:1px;'
                         f'color:{TEXT_SEC};text-transform:uppercase;margin-bottom:5px;">'
                         f'Proposta di azione</div>'
                         f'<div style="background:#F8F9FA;border:1px solid {BORDER};'
                         f'border-left:4px solid #1E2328;border-radius:0 8px 8px 0;'
-                        f'padding:16px 20px;font-size:0.875rem;'
-                        f'line-height:1.85;color:{TEXT};margin-bottom:16px;">'
-                        + proposta.replace("\n","<br>") + '</div>',
+                        f'padding:16px 20px;margin-bottom:16px;">'
+                        + "".join(_proposta_parts) + '</div>',
                         unsafe_allow_html=True)
 
-            # Flags only (evidenze table removed from section view — shown in right panel)
+            # AML flags — sorted: CRITICAL → HIGH → MEDIUM → LOW
             flags = parsed.get("flags", [])
             if flags:
+                _flag_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
+                flags = sorted(flags, key=lambda f: _flag_order.get(
+                    (f.get("rischio","") or "").upper(), 4))
                 st.markdown(
                     f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
                     f'color:{TEXT_SEC};margin:6px 0 8px;text-transform:uppercase;">Flag AML</div>',
@@ -1375,60 +1418,6 @@ def _render_right_panel(queued_key=None):
             f'<span style="font-size:0.78rem;color:{TEXT};flex:1;">{sec["icon"]} {sec["label"]}</span>'
             + badge +
             f'</div>',
-            unsafe_allow_html=True)
-
-    st.markdown(
-        f'<div style="height:1px;background:{BORDER};margin:12px 0 10px;"></div>',
-        unsafe_allow_html=True)
-
-    # ── AML Flag feed ─────────────────────────────────────────────
-    # Color coding: CRITICAL=Viola, HIGH=Rosso, MEDIUM=Giallo, LOW=Grigio
-    all_flags = []
-    for sec in MAIN_SECTIONS:
-        content = get_content(sec["key"])
-        parsed  = parse_json_result(content) if content else None
-        if not parsed:
-            continue
-        for fl in parsed.get("flags", []):
-            rischio = (fl.get("rischio", "") or "").upper()
-            all_flags.append({
-                "sec":    sec["label"],
-                "tipo":   fl.get("tipo", ""),
-                "desc":   fl.get("descrizione", ""),
-                "rischio": rischio,
-            })
-
-    # Sort: CRITICAL first, then HIGH, MEDIUM, LOW
-    _order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
-    all_flags.sort(key=lambda f: _order.get(f["rischio"], 4))
-
-    if all_flags:
-        st.markdown(
-            f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
-            f'color:{TEXT_SEC};text-transform:uppercase;margin-bottom:6px;">Flag AML</div>',
-            unsafe_allow_html=True)
-        for fl in all_flags:
-            bg_f, fg_f, bd_f = _FLAG_COLORS.get(fl["rischio"], _DEFAULT_FLAG_COLOR)
-            tipo = fl["tipo"][:40] + ("…" if len(fl["tipo"]) > 40 else "")
-            desc = fl["desc"][:80] + ("…" if len(fl["desc"]) > 80 else "")
-            st.markdown(
-                f'<div style="background:{bg_f};border-left:3px solid {bd_f};'
-                f'border-radius:0 5px 5px 0;padding:6px 9px;margin-bottom:4px;">'
-                f'<div style="font-size:0.58rem;font-weight:700;color:{TEXT_SEC};'
-                f'margin-bottom:1px;text-transform:uppercase;">{fl["sec"]}</div>'
-                f'<div style="font-size:0.72rem;font-weight:600;color:{fg_f};line-height:1.3;">{tipo}</div>'
-                + (f'<div style="font-size:0.68rem;color:{TEXT_SEC};margin-top:1px;">{desc}</div>' if desc else "")
-                + '</div>',
-                unsafe_allow_html=True)
-    elif done > 0:
-        st.markdown(
-            f'<div style="text-align:center;padding:14px 0;color:#1E2328;font-size:0.78rem;">'
-            f'✓ Nessun flag AML rilevato</div>',
-            unsafe_allow_html=True)
-    else:
-        st.markdown(
-            f'<div style="text-align:center;padding:14px 0;color:{TEXT_SEC};font-size:0.8rem;">'
-            f'Analisi in attesa…</div>',
             unsafe_allow_html=True)
 
     # ── Final valuation shortcut ──────────────────────────────────
