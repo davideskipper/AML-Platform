@@ -1784,33 +1784,57 @@ def render_final_valuation():
                     + narrativa.replace("\n","<br>") + '</div>',
                     unsafe_allow_html=True)
 
-            # ── Flag AML ─────────────────────────────────────────
-            if flags:
+            # ── Flag AML — riepilogo completo da tutte le sezioni ────
+            _lvl_order = {"CRITICO": 0, "ANOMALIA": 1, "ATTENZIONE": 2}
+            _all_evidenze = []
+            for _sec in MAIN_SECTIONS:
+                _sc = get_content(_sec["key"])
+                _sp = parse_json_result(_sc) if _sc else None
+                if not _sp:
+                    continue
+                for _ev in _sp.get("principaliEvidenze", []):
+                    _lvl = (_ev.get("livello","") or "").upper()
+                    _all_evidenze.append({
+                        "sezione":   _sec["full_label"],
+                        "sec_icon":  _sec["icon"],
+                        "livello":   _lvl,
+                        "evidenza":  _ev.get("evidenza",""),
+                        "normativa": _ev.get("normativa",""),
+                        "_ord":      _lvl_order.get(_lvl, 3),
+                    })
+            _all_evidenze.sort(key=lambda x: x["_ord"])
+
+            if _all_evidenze:
                 st.markdown(
                     f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
                     f'color:{TEXT_SEC};margin:0 0 8px;text-transform:uppercase;">Flag AML</div>',
                     unsafe_allow_html=True)
-                _flag_cfg = {
-                    "CRITICAL": ("#F3E8FF","#7C3AED","#7C3AED"),
-                    "HIGH":     ("#FEE2E2","#B91C1C","#DC2626"),
-                    "MEDIUM":   ("#FFFBEB","#92400E","#D97706"),
-                    "LOW":      ("#F3F4F6","#6B7280","#9CA3AF"),
-                }
-                for fl in flags:
-                    rischio = (fl.get("rischio","") or "").upper()
-                    bg_f, fg_f, bd_f = _flag_cfg.get(rischio, ("#F3F4F6","#6B7280","#9CA3AF"))
-                    tipo = fl.get("tipo","")
-                    desc = fl.get("descrizione","")
-                    norm = fl.get("riferimentoNormativo","") or fl.get("indicatoreUIF","")
+                for _ev in _all_evidenze:
+                    _l = _ev["livello"]
+                    if _l == "CRITICO":
+                        _bg, _fg, _bd = "#FEE2E2", "#DC2626", "#DC2626"
+                        _dot = "🔴"
+                    elif _l in ("ANOMALIA", "ATTENZIONE"):
+                        _bg, _fg, _bd = "#FFFBEB", "#D97706", "#D97706"
+                        _dot = "🟡"
+                    else:
+                        _bg, _fg, _bd = "#F3F4F6", "#6B7280", "#9CA3AF"
+                        _dot = "⚪"
+                    _norm_html = (f'<div style="font-size:0.68rem;color:{TEXT_SEC};margin-top:3px;">📎 {_ev["normativa"]}</div>'
+                                  if _ev["normativa"] else "")
                     st.markdown(
                         f'<div style="display:flex;align-items:flex-start;gap:10px;'
-                        f'background:{bg_f};border:1px solid {BORDER};border-left:3px solid {bd_f};'
-                        f'border-radius:0 6px 6px 0;padding:8px 12px;margin-bottom:5px;">'
+                        f'background:{_bg};border:1px solid {BORDER};border-left:3px solid {_bd};'
+                        f'border-radius:0 6px 6px 0;padding:9px 12px;margin-bottom:5px;">'
+                        f'<div style="padding-top:2px;font-size:0.75rem;">{_dot}</div>'
                         f'<div style="flex:1;">'
-                        f'<span style="font-size:0.8rem;font-weight:600;color:{fg_f};">{tipo}</span>'
-                        + (f'<span style="font-size:0.78rem;color:{TEXT_SEC};"> — {desc}</span>' if desc else '')
-                        + (f'<div style="font-size:0.68rem;color:{TEXT_SEC};margin-top:2px;">📎 {norm}</div>' if norm else '')
-                        + f'</div></div>',
+                        f'<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">'
+                        f'<span style="font-size:0.78rem;font-weight:600;color:{_fg};">{_ev["evidenza"]}</span>'
+                        f'</div>'
+                        f'<div style="font-size:0.67rem;color:{TEXT_SEC};">'
+                        f'{_ev["sec_icon"]} {_ev["sezione"]}</div>'
+                        + _norm_html +
+                        f'</div></div>',
                         unsafe_allow_html=True)
 
     st.markdown(f'<div style="height:16px;"></div>', unsafe_allow_html=True)
