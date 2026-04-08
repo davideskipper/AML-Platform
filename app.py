@@ -1586,22 +1586,25 @@ def render_analysis():
         _p = parse_json_result(_c) if _c else None
         if not _p:
             continue
-        for _fl in _p.get("flags", []):
-            _r = (_fl.get("rischio","") or "").upper()
-            if _r in ("CRITICAL", "HIGH", "CRITICO", "ALTO"):
-                _fl_counts["CRITICO"]    += 1
-            elif _r in ("MEDIUM", "MEDIO", "ATTENZIONE", "ANOMALIA"):
-                _fl_counts["ATTENZIONE"] += 1
-            elif _r in ("LOW", "BASSO"):
-                _fl_counts["MANCANTE"]   += 1
-        for _ev in _p.get("principaliEvidenze", []):
-            _l = (_ev.get("livello","") or "").upper()
-            if _l == "CRITICO":
-                _fl_counts["CRITICO"]    += 1
-            elif _l in ("ANOMALIA", "ATTENZIONE"):
-                _fl_counts["ATTENZIONE"] += 1
-            else:
-                _fl_counts["MANCANTE"]   += 1
+        _flags_list = _p.get("flags") or []
+        if _flags_list:
+            for _fl in _flags_list:
+                _r = (_fl.get("rischio","") or "").upper()
+                if _r in ("CRITICAL", "HIGH", "CRITICO", "ALTO"):
+                    _fl_counts["CRITICO"]    += 1
+                elif _r in ("MEDIUM", "MEDIO", "ATTENZIONE", "ANOMALIA"):
+                    _fl_counts["ATTENZIONE"] += 1
+                elif _r in ("LOW", "BASSO"):
+                    _fl_counts["MANCANTE"]   += 1
+        else:
+            for _ev in _p.get("principaliEvidenze", []):
+                _l = (_ev.get("livello","") or "").upper()
+                if _l == "CRITICO":
+                    _fl_counts["CRITICO"]    += 1
+                elif _l in ("ANOMALIA", "ATTENZIONE"):
+                    _fl_counts["ATTENZIONE"] += 1
+                else:
+                    _fl_counts["MANCANTE"]   += 1
 
     _badge_cfg = [
         ("CRITICO",    "#DC2626", "#FEE2E2", "Critici"),
