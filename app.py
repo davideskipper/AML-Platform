@@ -1072,7 +1072,7 @@ def _run_with_stream(key: str, client):
         if parts:
             stream_box.markdown(
                 f'<div style="background:#0F172A;border-radius:8px;'
-                f'padding:20px 24px;width:100%;">'
+                f'padding:20px 24px;width:100%;max-height:320px;overflow-y:auto;">'
                 + "".join(parts) + '</div>',
                 unsafe_allow_html=True)
 
