@@ -230,6 +230,7 @@ DEFAULTS = {
     "running_agent": None,
     "all_docs": "",
     "all_doc_names": [],
+    "just_completed": None,
 }
 for k, v in DEFAULTS.items():
     if k not in st.session_state:
@@ -1100,6 +1101,7 @@ def _run_with_stream(key: str, client):
 
     try:
         run_section(key, client, on_token=on_token, on_thinking=on_thinking)
+        st.session_state.just_completed = key
         st.rerun()
     except Exception as e:
         status_box.empty()
@@ -1592,6 +1594,8 @@ def render_analysis():
             st.rerun()
 
     # ── Main content (single column) ─────────────────────────────────
+    just_completed = st.session_state.get("just_completed")
+
     if queued_key:
         sec = next(s for s in ALL_SECTIONS if s["key"] == queued_key)
 
@@ -1611,6 +1615,22 @@ def render_analysis():
             unsafe_allow_html=True)
 
         _run_with_stream(queued_key, client)
+
+    elif just_completed:
+        # ── Just-completed: show result inline, not hidden in a tab ──
+        st.session_state.just_completed = None
+        sec = next((s for s in MAIN_SECTIONS if s["key"] == just_completed), None)
+        if sec:
+            st.markdown(
+                f'<div style="background:#F0FDF4;border:1px solid #86EFAC;'
+                f'border-radius:8px;padding:8px 14px;margin-bottom:14px;'
+                f'font-size:0.8rem;color:#15803D;font-weight:600;">'
+                f'✓ {sec["icon"]} {sec["full_label"]} — analisi completata.</div>',
+                unsafe_allow_html=True)
+            _render_section_content(just_completed, client)
+            st.markdown(f'<div style="height:8px;"></div>', unsafe_allow_html=True)
+            if st.button("Torna a tutte le sezioni", key="back_to_tabs_after_run"):
+                st.rerun()
 
     else:
         # ── Idle mode: CTA + tabs ─────────────────────────────────
