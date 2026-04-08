@@ -396,6 +396,11 @@ def run_section(key, client, on_token=None, on_thinking=None):
                                                 on_thinking=on_thinking, use_web_search=use_web)
         elif key == "transaction":
             raw = st.session_state.get("excel_raw_bytes") or st.session_state.get("excel_path")
+            # If raw bytes have been consumed, try re-creating from section docs text
+            if raw is None and docs_text:
+                import io as _bio
+                raw = _bio.BytesIO(docs_text.encode("utf-8", errors="replace"))
+                raw.name = "transazioni.csv"
             result = transaction_agent.run(client, raw, company, manual_ctx,
                                            show_output=False, on_token=on_token,
                                            on_thinking=on_thinking)
@@ -485,11 +490,40 @@ def render_step_nav(current_step_id: str):
 
 
 # ── Header ────────────────────────────────────────────────────────
+def _try_extract_company_name() -> str:
+    """Try to extract the company name from registry or other agent results."""
+    import re as _re
+    for key in ("registry", "ubo_pep", "reputational"):
+        content = get_content(key)
+        if not content:
+            continue
+        parsed = parse_json_result(content)
+        if parsed:
+            narr = (parsed.get("narrativa") or parsed.get("narrativaCompleta") or "")
+            # Look for patterns like "Società XYZ S.r.l.", "ABC S.p.A.", "XYZ Ltd"
+            m = _re.search(
+                r'\b([A-Z][A-Za-zÀ-ÿ &\'\-\.]+(?:\s+(?:S\.r\.l\.|S\.p\.A\.|S\.n\.c\.|'
+                r'S\.a\.s\.|S\.r\.l\.S\.|Ltd\.?|Limited|GmbH|S\.A\.|Srl|Spa|SAS|LLC))?)\b',
+                narr)
+            if m:
+                candidate = m.group(1).strip()
+                if 4 <= len(candidate) <= 60:
+                    return candidate
+    return ""
+
+
 def render_header():
     state = st.session_state.kyc_state
+
+    # Auto-fill company name from agent results if still placeholder
+    if state.case.company_name in ("", "Controparte N/D"):
+        extracted = _try_extract_company_name()
+        if extracted:
+            state.case.company_name = extracted
+
     h_left, h_right = st.columns([7, 1])
     with h_left:
-        if st.session_state.step == "analysis" and state.case.company_name:
+        if st.session_state.step in ("analysis", "final"):
             done, total = main_progress()
             pct  = int(done / total * 100)
             rc   = GREEN if done == total else ACCENT
@@ -734,7 +768,7 @@ def render_setup():
                 st.error("Configura ANTHROPIC_API_KEY nei Secrets.")
             else:
                 s = st.session_state.kyc_state
-                s.case.company_name = company.strip() or "Controparte N/D"
+                s.case.company_name = company.strip()
                 s.case.country      = country.strip()
                 s.case.case_id      = case_id
                 log_event("Sistema", f"Caso aperto: {s.case.company_name} ({country})", "super")
@@ -1039,7 +1073,7 @@ def _run_with_stream(key: str, client):
         if parts:
             stream_box.markdown(
                 f'<div style="background:#0F172A;border-radius:8px;'
-                f'padding:16px 18px;max-height:420px;overflow-y:auto;">'
+                f'padding:20px 24px;width:100%;">'
                 + "".join(parts) + '</div>',
                 unsafe_allow_html=True)
 
@@ -1065,9 +1099,12 @@ def _run_with_stream(key: str, client):
 
     try:
         run_section(key, client, on_token=on_token, on_thinking=on_thinking)
+        st.rerun()
     except Exception as e:
-        st.error(str(e))
-    st.rerun()
+        status_box.empty()
+        stream_box.empty()
+        st.error(f"❌ Errore agente **{key}**: {e}")
+        st.session_state.pop("running_agent", None)
 
 
 
@@ -1470,7 +1507,7 @@ def render_analysis():
         # Top-right: "Nuovo caso" button
         _, btn_c = st.columns([5, 1])
         with btn_c:
-            if st.button("✕ Nuovo", key="new_case_top", use_container_width=True):
+            if st.button("Nuovo", key="new_case_top", use_container_width=True):
                 for k in list(st.session_state.keys()):
                     del st.session_state[k]
                 st.rerun()
