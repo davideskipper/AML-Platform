@@ -17,7 +17,7 @@ from kyc_platform import (
 from kyc_platform.utils import validate_agent_output
 
 st.set_page_config(
-    page_title="AML IntelliGent | Bain & Company",
+    page_title="AML IntelliGent Platform | Bain & Company",
     page_icon="🔍", layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -505,7 +505,7 @@ def render_header():
                 f'display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
                 + _logo_html(30) +
                 f'<span style="color:{BORDER};font-size:1.2rem;margin:0 2px;">|</span>'
-                f'<span style="font-size:0.72rem;color:{TEXT_SEC};font-weight:500;letter-spacing:0.5px;">AML IntelliGent · KYC/CDD</span>'
+                f'<span style="font-size:0.72rem;color:{TEXT_SEC};font-weight:500;letter-spacing:0.5px;">AML IntelliGent Platform · KYC/CDD</span>'
                 f'<span style="color:{BORDER};font-size:1.2rem;margin:0 2px;">|</span>'
                 f'<span style="font-size:0.9rem;font-weight:700;color:{TEXT};">{state.case.company_name}</span>'
                 + (f'<span style="font-size:0.72rem;color:{TEXT_SEC};">{state.case.case_id}</span>' if state.case.case_id else '')
@@ -989,7 +989,9 @@ def render_mode_config():
                              if st.session_state.section_modes.get(s["key"]) == "agent"]
                 st.session_state.run_queue = run_queue
                 st.session_state.active_section = "registry"
-                st.session_state.step = "analysis"
+                # Use transit step to force a blank DOM frame before analysis,
+                # which clears all stale mode_config widgets from the browser.
+                st.session_state.step = "transit"
                 # Clear upload data so it cannot ghost in the analysis page
                 st.session_state.uploaded_files_data = []
                 st.session_state.file_assignments    = {}
@@ -1755,20 +1757,25 @@ def render_final_valuation():
 
 
 # ── ROUTER ───────────────────────────────────────────────────────
-# Each step uses a container with a unique key. When the key changes
-# (step transition), React unmounts the old DOM subtree entirely and
-# mounts a fresh one — no ghost widgets from previous pages.
 step = st.session_state.step
-with st.container(key=f"page__{step}"):
-    if step == "setup":
-        render_setup()
-    elif step == "upload":
-        render_upload()
-    elif step == "mode_config":
-        render_mode_config()
-    elif step == "analysis":
-        render_analysis()
-    elif step == "final":
-        render_final_valuation()
-    else:
-        render_setup()
+
+if step == "transit":
+    # Blank frame: sends a near-empty delta to the browser, clearing all
+    # stale DOM nodes from the previous page (mode_config widgets etc.).
+    # Then immediately reruns to the real analysis page.
+    st.markdown('<div style="display:none" id="aml-transit"></div>',
+                unsafe_allow_html=True)
+    st.session_state.step = "analysis"
+    st.rerun()
+elif step == "setup":
+    render_setup()
+elif step == "upload":
+    render_upload()
+elif step == "mode_config":
+    render_mode_config()
+elif step == "analysis":
+    render_analysis()
+elif step == "final":
+    render_final_valuation()
+else:
+    render_setup()
