@@ -1789,11 +1789,19 @@ def render_final_valuation():
 step = st.session_state.step
 
 if step == "transit":
-    # Blank frame: sends a near-empty delta to the browser, clearing all
-    # stale DOM nodes from the previous page (mode_config widgets etc.).
-    # Then immediately reruns to the real analysis page.
-    st.markdown('<div style="display:none" id="aml-transit"></div>',
-                unsafe_allow_html=True)
+    # Render a visible loading frame and sleep so the browser has time to
+    # apply the full DOM clear before the analysis page arrives.
+    # Without the sleep, st.rerun() fires before the browser processes the
+    # blank frame, leaving mode_config ghost widgets in the right column.
+    import time as _time
+    st.markdown(
+        f'<div style="display:flex;justify-content:center;align-items:center;'
+        f'height:55vh;flex-direction:column;gap:14px;">'
+        f'<span class="aml-spin" style="font-size:2rem;color:#1E2328;">⚙</span>'
+        f'<div style="font-size:0.88rem;color:#6B7280;font-weight:500;">Avvio analisi…</div>'
+        f'</div>',
+        unsafe_allow_html=True)
+    _time.sleep(0.45)
     st.session_state.step = "analysis"
     st.rerun()
 elif step == "setup":
