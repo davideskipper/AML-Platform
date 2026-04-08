@@ -4,7 +4,7 @@ Bain & Company Style — KYC / CDD Module
 """
 
 import base64
-import io, json, os, tempfile
+import io, json, os, re, tempfile
 from datetime import datetime
 import streamlit as st
 import anthropic
@@ -54,6 +54,8 @@ st.markdown(f"""
   [data-testid="stFileUploader"] {{
     background:#f9f9f9 !important; border:1px dashed #ccc !important; border-radius:4px; }}
   .stRadio label {{ color:#333 !important; }}
+  @keyframes spin {{ from {{ transform: rotate(0deg); }} to {{ transform: rotate(360deg); }} }}
+  .aml-spin {{ display:inline-block; animation: spin 1s linear infinite; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -103,24 +105,44 @@ RISK_COLORS = {
 
 # ── Session state ─────────────────────────────────────────────────
 DEFAULTS = {
-    "step": "setup", "kyc_state": None,
+    "step": "setup",
+    "kyc_state": None,
+    "uploaded_files_data": [],
+    "file_assignments": {},
+    "section_modes": {},
+    "section_web": {},
+    "section_docs": {},
+    "section_doc_names": {},
+    "section_notes": {},
+    "excel_path": None,
+    "excel_name": None,
+    "edited_content": {},
+    "agent_log": [],
     "active_section": "registry",
-    "edited_content": {}, "agent_log": [],
-    "section_modes": {}, "section_docs": {},
-    "section_doc_names": {}, "section_notes": {},
-    "excel_path": None, "excel_name": None,
+    "run_queue": [],
+    "crit_panel_section": None,
+    "crit_overrides": {},
+    "knowledge_base": "",
+    "kb_doc_names": [],
+    "final_mode": None,
+    "upload_hash": "",
     "running_agent": None,
-    "knowledge_base": "", "kb_doc_names": [],
-    "all_docs": "", "all_doc_names": [],
+    "all_docs": "",
+    "all_doc_names": [],
 }
 for k, v in DEFAULTS.items():
     if k not in st.session_state:
         st.session_state[k] = v
+
 if st.session_state.kyc_state is None:
     st.session_state.kyc_state = SessionState()
+
 for sec in ALL_SECTIONS:
     if sec["key"] not in st.session_state.section_modes:
         st.session_state.section_modes[sec["key"]] = "agent"
+    if sec["key"] not in st.session_state.section_web:
+        st.session_state.section_web[sec["key"]] = False
+
 
 # ── Helpers ───────────────────────────────────────────────────────
 def get_api_key():
@@ -189,15 +211,12 @@ def extract_text_from_file(uploaded_file) -> str:
 
 def parse_json_result(text: str):
     if not text: return None
-    import re
     decoder = json.JSONDecoder()
 
     def _try(s: str):
         s = s.strip()
-        # Try direct parse
         try: return json.loads(s)
         except Exception: pass
-        # Find first '{' and use raw_decode (handles preamble/postamble correctly)
         idx = s.find("{")
         while idx != -1:
             try:
@@ -207,10 +226,8 @@ def parse_json_result(text: str):
             idx = s.find("{", idx + 1)
         return None
 
-    # Pass 1: raw text
     result = _try(text)
     if result: return result
-    # Pass 2: strip markdown code fences
     stripped = re.sub(r"```(?:json)?\s*", "", text)
     return _try(stripped)
 
@@ -221,11 +238,11 @@ def run_section(key, client, on_token=None, on_thinking=None):
     state   = st.session_state.kyc_state
     company = state.case.company_name
     country = state.case.country
-    # Use section-specific docs if present, otherwise fall back to the shared pool
     docs_text  = (st.session_state.section_docs.get(key, "")
                   or st.session_state.get("all_docs", ""))
     notes_text = st.session_state.section_notes.get(key, "")
     kb_text    = st.session_state.knowledge_base
+    use_web    = st.session_state.section_web.get(key, False) or not bool(docs_text)
     parts = []
     if kb_text:
         parts.append(f"BASE DOCUMENTALE DI RIFERIMENTO (NORMATIVA):\n\n{kb_text}")
@@ -234,10 +251,9 @@ def run_section(key, client, on_token=None, on_thinking=None):
     if notes_text:
         parts.append(f"NOTE ANALISTA:\n{notes_text}")
     manual_ctx = "\n\n---\n\n".join(parts)
-    use_web = not bool(docs_text)
     sec = next(s for s in ALL_SECTIONS if s["key"] == key)
     st.session_state.running_agent = key
-    log_event(sec["label"], f"Avvio ({'documenti' if docs_text else 'web search' if use_web else 'note'})...")
+    log_event(sec["label"], f"Avvio ({'web search' if use_web else 'documenti'})...")
     try:
         if key == "registry":
             result = registry_agent.run(client, company, country, manual_ctx,
@@ -279,7 +295,6 @@ def run_section(key, client, on_token=None, on_thinking=None):
 
 # ── Logo ─────────────────────────────────────────────────────────
 def _logo_html(height: int = 38) -> str:
-    """Return an <img> tag with the Bain logo as base64, or fallback text."""
     for fname in ("assets/bain_logo.png", "assets/bain_logo.jpg",
                   "assets/bain_logo.svg", "assets/bain_logo.webp"):
         if os.path.exists(fname):
@@ -289,9 +304,52 @@ def _logo_html(height: int = 38) -> str:
                 b64 = base64.b64encode(f.read()).decode()
             return (f'<img src="data:{mime};base64,{b64}" '
                     f'style="height:{height}px;vertical-align:middle;">')
-    # Fallback — styled text
     return ('<span style="font-size:0.95rem;font-weight:900;letter-spacing:3px;'
             f'color:{RED};">BAIN &amp; COMPANY</span>')
+
+
+# ── Step Navigation Bar ───────────────────────────────────────────
+_STEP_ORDER = ["upload", "mode_config", "analysis", "final"]
+_STEP_LABELS = {
+    "upload":      "① Documenti",
+    "mode_config": "② Modalità",
+    "analysis":    "③ Analisi",
+    "final":       "④ Valutazione",
+}
+
+def render_step_nav(current_step_id: str):
+    try:
+        current_idx = _STEP_ORDER.index(current_step_id)
+    except ValueError:
+        current_idx = -1
+
+    parts = []
+    for i, step_id in enumerate(_STEP_ORDER):
+        label = _STEP_LABELS[step_id]
+        if i < current_idx:
+            # Past step — grey tick
+            parts.append(
+                f'<span style="color:#999;font-size:0.82rem;">✔ {label}</span>'
+            )
+        elif i == current_idx:
+            # Active step — bold red
+            parts.append(
+                f'<span style="color:{RED};font-size:0.82rem;font-weight:700;">{label}</span>'
+            )
+        else:
+            # Future step — light grey
+            parts.append(
+                f'<span style="color:#ccc;font-size:0.82rem;">{label}</span>'
+            )
+        if i < len(_STEP_ORDER) - 1:
+            parts.append('<span style="color:#ddd;margin:0 8px;font-size:0.82rem;">→</span>')
+
+    st.markdown(
+        '<div style="display:flex;align-items:center;flex-wrap:wrap;'
+        'padding:6px 0 10px;margin-bottom:4px;">'
+        + "".join(parts) + "</div>",
+        unsafe_allow_html=True,
+    )
 
 
 # ── Header ────────────────────────────────────────────────────────
@@ -303,26 +361,136 @@ def render_header():
             done, total = main_progress()
             rc = "#22aa55" if done == total else RED
             st.markdown(
-                '<div style="padding:6px 0 10px;border-bottom:2px solid '+RED+';margin-bottom:10px;">'
-                +_logo_html(34)+
+                '<div style="padding:6px 0 10px;border-bottom:2px solid ' + RED + ';margin-bottom:10px;">'
+                + _logo_html(34) +
                 '<span style="color:#ddd;margin:0 12px;">|</span>'
                 '<span style="font-size:0.78rem;color:#888;">AML IntelliGent Platform · KYC/CDD</span>'
                 '<span style="color:#ddd;margin:0 10px;">|</span>'
-                '<span style="color:#1a1a1a;font-size:0.9rem;font-weight:600;">'+state.case.company_name+'</span>'
-                '<span style="color:#aaa;font-size:0.72rem;margin-left:8px;">'+(state.case.case_id or '')+'</span>'
-                '<span style="background:'+rc+';color:#fff;font-size:0.62rem;padding:2px 8px;'
-                'border-radius:10px;margin-left:10px;">'+str(done)+'/'+str(total)+'</span>'
+                '<span style="color:#1a1a1a;font-size:0.9rem;font-weight:600;">' + state.case.company_name + '</span>'
+                '<span style="color:#aaa;font-size:0.72rem;margin-left:8px;">' + (state.case.case_id or '') + '</span>'
+                '<span style="background:' + rc + ';color:#fff;font-size:0.62rem;padding:2px 8px;'
+                'border-radius:10px;margin-left:10px;">' + str(done) + '/' + str(total) + '</span>'
                 '</div>', unsafe_allow_html=True)
         else:
             st.markdown(
-                '<div style="padding:6px 0 10px;border-bottom:2px solid '+RED+';margin-bottom:10px;">'
-                +_logo_html(34)+
+                '<div style="padding:6px 0 10px;border-bottom:2px solid ' + RED + ';margin-bottom:10px;">'
+                + _logo_html(34) +
                 '<span style="color:#ddd;margin:0 12px;">|</span>'
                 '<span style="font-size:0.78rem;color:#888;">AML IntelliGent Platform · KYC/CDD</span>'
                 '</div>', unsafe_allow_html=True)
     with h_right:
-        st.markdown('<div style="text-align:right;padding-top:4px;font-size:0.65rem;color:#bbb;">claude-opus-4-6</div>',
+        st.markdown('<div style="text-align:right;padding-top:4px;font-size:0.65rem;color:#bbb;">claude-sonnet-4-6</div>',
                     unsafe_allow_html=True)
+    # Show step nav for all steps except setup
+    if st.session_state.step not in ("setup", ""):
+        render_step_nav(st.session_state.step)
+
+
+# ── render_prose_result ───────────────────────────────────────────
+def render_prose_result(key: str, parsed: dict):
+    """Displays agent result as professional prose — no raw JSON."""
+    risk      = parsed.get("rischioComplessivo","") or parsed.get("customerRiskRating","")
+    narrativa = (parsed.get("narrativa") or parsed.get("narrativaCompleta")
+                 or parsed.get("sintesiEsecutiva","") or "")
+    evidenze  = parsed.get("principaliEvidenze", [])
+    flags     = parsed.get("flags", [])
+
+    if risk:
+        rc = get_risk_color(risk)
+        racc = parsed.get("raccomandazione","")
+        racc_str = ""
+        if isinstance(racc, dict):
+            acc  = racc.get("accettazione","")
+            adv  = racc.get("livelloAdeguataVerifica","")
+            freq = racc.get("frequenzaMonitoraggio","")
+            parts_r = [x for x in [acc, adv, freq] if x]
+            if parts_r: racc_str = " &nbsp;·&nbsp; ".join(parts_r)
+        elif isinstance(racc, str) and racc:
+            racc_str = racc
+        st.markdown(
+            '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px;">'
+            '<span style="background:' + rc + ';color:#fff;font-size:0.82rem;font-weight:700;'
+            'padding:5px 18px;border-radius:20px;">⬤ RISCHIO: ' + risk + '</span>'
+            + (f'<span style="font-size:0.76rem;color:#777;">{racc_str}</span>' if racc_str else '')
+            + '</div>', unsafe_allow_html=True)
+
+    # Risk matrix — only for final_valuation
+    if key == "final_valuation":
+        mx = parsed.get("matriceRischio")
+        if mx:
+            labels = [("identitaStruttura","Identità/Struttura"),("reputazionale","Reputazionale"),
+                      ("economico","Economico"),("transazionale","Transazionale"),("geografico","Geografico")]
+            cols = st.columns(5)
+            for i, (dim, lbl) in enumerate(labels):
+                val  = mx.get(dim,{})
+                sc   = int(val.get("score",0)) if isinstance(val,dict) else 0
+                bc   = RED if sc >= 4 else "#f59e0b" if sc == 3 else "#22aa55"
+                motiv = val.get("motivazione","") if isinstance(val,dict) else ""
+                with cols[i]:
+                    st.markdown(
+                        '<div style="text-align:center;background:#f8f8f8;border-radius:6px;'
+                        'padding:10px 4px;border:1px solid #eee;" title="' + motiv + '">'
+                        '<div style="font-size:0.58rem;color:#999;margin-bottom:3px;">' + lbl + '</div>'
+                        '<div style="font-size:1.5rem;font-weight:900;color:' + bc + ';">' + str(sc)
+                        + '<span style="font-size:0.55rem;color:#ccc;">/5</span></div>'
+                        '<div style="margin:4px 8px 0;height:3px;background:#eee;border-radius:2px;">'
+                        '<div style="width:' + str(sc*20) + '%;height:100%;background:' + bc + ';border-radius:2px;"></div>'
+                        '</div></div>', unsafe_allow_html=True)
+            st.markdown("")
+
+    if narrativa:
+        st.markdown(
+            '<div style="font-size:0.62rem;font-weight:700;letter-spacing:1.5px;color:#777;'
+            'margin:12px 0 6px;">ANALISI</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div style="background:#fff;border:1px solid #e8e8e8;'
+            'padding:16px 20px;border-radius:6px;font-size:0.87rem;'
+            'line-height:1.8;color:#1a1a1a;margin-bottom:16px;">'
+            + narrativa.replace("\n", "<br>") + '</div>', unsafe_allow_html=True)
+
+    if evidenze:
+        st.markdown(
+            '<div style="font-size:0.62rem;font-weight:700;letter-spacing:1.5px;color:#555;'
+            'margin:8px 0 8px;">PRINCIPALI EVIDENZE DI ATTENZIONE</div>', unsafe_allow_html=True)
+        level_styles = {
+            "CRITICO":    ("#fef2f2","#dc2626","🔴"),
+            "ANOMALIA":   ("#fffbeb","#d97706","🟡"),
+            "ATTENZIONE": ("#f0fdf4","#16a34a","🟢"),
+        }
+        for ev in evidenze:
+            lvl  = (ev.get("livello") or "ATTENZIONE").upper()
+            etxt = ev.get("evidenza","")
+            ntxt = ev.get("normativa","")
+            bg_e, col_e, ico_e = level_styles.get(lvl, level_styles["ATTENZIONE"])
+            st.markdown(
+                '<div style="background:' + bg_e + ';border-left:3px solid ' + col_e + ';'
+                'border-radius:0 5px 5px 0;padding:8px 12px;margin-bottom:6px;">'
+                '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'
+                '<span style="font-size:0.8rem;color:#1a1a1a;line-height:1.5;">'
+                '<span style="color:' + col_e + ';margin-right:5px;">' + ico_e + '</span>' + etxt + '</span>'
+                '<span style="font-size:0.6rem;font-weight:700;color:' + col_e + ';white-space:nowrap;'
+                'padding:1px 6px;border-radius:8px;border:1px solid ' + col_e + ';">' + lvl + '</span></div>'
+                + (f'<div style="font-size:0.68rem;color:#888;margin-top:4px;margin-left:16px;">📎 {ntxt}</div>'
+                   if ntxt else '')
+                + '</div>', unsafe_allow_html=True)
+
+    if flags:
+        st.markdown(
+            '<div style="font-size:0.62rem;font-weight:700;letter-spacing:1.5px;color:#555;'
+            'margin:8px 0 6px;">FLAG AML</div>', unsafe_allow_html=True)
+        for fl in flags:
+            frc  = get_risk_color(fl.get("rischio",""))
+            tipo = fl.get("tipo","")
+            desc = fl.get("descrizione","")
+            norm = fl.get("riferimentoNormativo","") or fl.get("indicatoreUIF","")
+            st.markdown(
+                '<div style="border-left:3px solid ' + frc + ';padding:5px 10px;margin-bottom:4px;'
+                'background:#fff;border-radius:0 4px 4px 0;">'
+                '<span style="font-size:0.78rem;font-weight:600;">' + tipo + '</span>'
+                + (f'<span style="font-size:0.76rem;color:#555;"> — {desc}</span>' if desc else '')
+                + (f'<span style="font-size:0.66rem;color:#bbb;margin-left:6px;">📎 {norm}</span>' if norm else '')
+                + '</div>', unsafe_allow_html=True)
+
 
 # ── STEP 1: SETUP ────────────────────────────────────────────────
 def render_setup():
@@ -364,7 +532,7 @@ def render_setup():
         elif st.session_state.kb_doc_names:
             st.info("📚 " + " · ".join(st.session_state.kb_doc_names))
         st.markdown("---")
-        if st.button("Continua →  Configura Sezioni", use_container_width=True):
+        if st.button("Continua →  Carica Documenti", use_container_width=True):
             if not company.strip() or not country.strip():
                 st.error("Ragione Sociale e Paese sono obbligatori.")
             elif not get_api_key():
@@ -376,249 +544,242 @@ def render_setup():
                 s.case.sector       = sector.strip()
                 s.case.case_id      = case_id.strip() or f"AML-{datetime.now().strftime('%Y%m%d-%H%M')}"
                 log_event("Sistema", f"Caso aperto: {company} ({country})", "super")
+                st.session_state.step = "upload"
+                st.rerun()
+
+
+# ── STEP 2: UPLOAD ────────────────────────────────────────────────
+def _auto_detect_section(filename: str) -> str:
+    """Return section key if filename starts with 0?N[space/_/-/.] for N=1..5, else ''."""
+    lower = filename.lower()
+    for i, sec in enumerate(MAIN_SECTIONS, 1):
+        if re.match(r'^0?' + str(i) + r'[\s_\-\.]', lower):
+            return sec["key"]
+    return ""
+
+def render_upload():
+    render_header()
+    _, col, _ = st.columns([0.5, 5, 0.5])
+    with col:
+        st.markdown("### 📎 Carica i documenti della controparte")
+        st.markdown(
+            '<div style="font-size:0.78rem;color:#888;margin-bottom:12px;">'
+            'Nomina i file con il prefisso della sezione per l\'assegnazione automatica: '
+            '<b>01_</b> Struttura · <b>02_</b> UBO/PEP · <b>03_</b> Reputational · '
+            '<b>04_</b> Economic · <b>05_</b> Transactional</div>',
+            unsafe_allow_html=True)
+
+        uploaded = st.file_uploader(
+            "Documenti controparte",
+            type=["pdf", "docx", "txt", "md", "csv", "xlsx", "xls"],
+            accept_multiple_files=True,
+            key="upload_step_files",
+            label_visibility="collapsed")
+
+        if uploaded:
+            new_hash = "_".join(f"{f.name}_{f.size}" for f in uploaded)
+            if new_hash != st.session_state.upload_hash:
+                files_data = []
+                assignments = {}
+                for f in uploaded:
+                    f.seek(0)
+                    ext = os.path.splitext(f.name)[1].lower()
+                    content_text = extract_text_from_file(f)
+                    files_data.append({
+                        "name": f.name,
+                        "content_text": content_text,
+                        "ext": ext,
+                        "size": f.size,
+                    })
+                    # Preserve existing assignment if present, else auto-detect
+                    existing = st.session_state.file_assignments.get(f.name)
+                    if existing is not None:
+                        assignments[f.name] = existing
+                    else:
+                        assignments[f.name] = _auto_detect_section(f.name)
+                st.session_state.uploaded_files_data = files_data
+                st.session_state.file_assignments = assignments
+                st.session_state.upload_hash = new_hash
+                st.rerun()
+
+        # Assignment table
+        files_data = st.session_state.uploaded_files_data
+        if files_data:
+            st.markdown(
+                '<div style="font-size:0.8rem;font-weight:700;color:#1a1a1a;'
+                'margin:16px 0 8px;">Assegnazione sezioni</div>',
+                unsafe_allow_html=True)
+
+            section_options = [("", "— Non assegnato —")] + [
+                (s["key"], f'{s["number"]} · {s["full_label"]}') for s in MAIN_SECTIONS
+            ]
+            option_labels = [lbl for _, lbl in section_options]
+            option_keys   = [k for k, _ in section_options]
+
+            for fd in files_data:
+                fname = fd["name"]
+                disp  = fname if len(fname) <= 40 else fname[:37] + "..."
+                row_l, row_r = st.columns([2, 3])
+                with row_l:
+                    st.markdown(
+                        f'<div style="font-size:0.82rem;padding:8px 0;color:#1a1a1a;">'
+                        f'📄 {disp}</div>',
+                        unsafe_allow_html=True)
+                with row_r:
+                    current_key = st.session_state.file_assignments.get(fname, "")
+                    try:
+                        idx = option_keys.index(current_key)
+                    except ValueError:
+                        idx = 0
+                    chosen = st.selectbox(
+                        f"assign_{fname}",
+                        options=option_labels,
+                        index=idx,
+                        key=f"assign_{fname}",
+                        label_visibility="collapsed")
+                    chosen_key = option_keys[option_labels.index(chosen)]
+                    if chosen_key != st.session_state.file_assignments.get(fname):
+                        st.session_state.file_assignments[fname] = chosen_key
+
+        st.markdown("---")
+        nav_l, nav_r = st.columns([1, 1])
+        with nav_l:
+            if st.button("← Indietro", key="upload_back", use_container_width=True):
+                st.session_state.step = "setup"
+                st.rerun()
+        with nav_r:
+            disabled = len(files_data) == 0
+            if st.button("Continua →", key="upload_next",
+                         use_container_width=True,
+                         disabled=disabled):
+                st.session_state.step = "mode_config"
+                st.rerun()
+
+
+# ── STEP 3: MODE CONFIG ───────────────────────────────────────────
+def render_mode_config():
+    render_header()
+    _, col, _ = st.columns([0.5, 5, 0.5])
+    with col:
+        st.markdown("### ⚙️ Configura le modalità di analisi")
+        st.markdown(
+            '<div style="font-size:0.78rem;color:#888;margin-bottom:16px;">'
+            'Scegli se ogni sezione deve essere analizzata dall\'agente AI o inserita manualmente.</div>',
+            unsafe_allow_html=True)
+
+        files_data    = st.session_state.uploaded_files_data
+        file_assigns  = st.session_state.file_assignments
+
+        for sec in MAIN_SECTIONS:
+            key = sec["key"]
+            # Files assigned to this section
+            assigned_files = [fd["name"] for fd in files_data
+                              if file_assigns.get(fd["name"]) == key]
+
+            # Card
+            st.markdown(
+                f'<div style="background:#f9f9f9;border:1px solid #e8e8e8;border-radius:8px;'
+                f'padding:14px 18px;margin-bottom:10px;">'
+                f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+                f'<span style="font-size:1.1rem;">{sec["icon"]}</span>'
+                f'<span style="font-size:0.7rem;color:#bbb;font-weight:700;">{sec["number"]}</span>'
+                f'<span style="font-size:0.92rem;font-weight:700;color:#1a1a1a;">{sec["full_label"]}</span>'
+                f'</div>',
+                unsafe_allow_html=True)
+
+            col_mode, col_web, col_files = st.columns([2, 1.5, 2.5])
+
+            with col_mode:
+                current_mode = st.session_state.section_modes.get(key, "agent")
+                mode_idx = 0 if current_mode == "agent" else 1
+                chosen = st.radio(
+                    "Modalità",
+                    options=["🤖 Agente", "✍️ Manuale"],
+                    index=mode_idx,
+                    key=f"mode_{key}",
+                    horizontal=True,
+                    label_visibility="collapsed")
+                new_mode = "agent" if chosen == "🤖 Agente" else "manual"
+                st.session_state.section_modes[key] = new_mode
+
+            with col_web:
+                if st.session_state.section_modes.get(key) == "agent":
+                    web_val = st.session_state.section_web.get(key, False)
+                    new_web = st.checkbox("🌐 Web search", value=web_val, key=f"web_{key}")
+                    st.session_state.section_web[key] = new_web
+
+            with col_files:
+                if assigned_files:
+                    tags = "".join(
+                        f'<span style="display:inline-block;background:#f0fff4;border:1px solid #bbf7d0;'
+                        f'border-radius:10px;padding:2px 8px;font-size:0.68rem;color:#166534;margin:2px;">'
+                        f'📄 {n[:28]}</span>'
+                        for n in assigned_files)
+                    st.markdown(f'<div style="padding-top:4px;">{tags}</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(
+                        '<span style="font-size:0.72rem;color:#bbb;">Nessun documento assegnato</span>',
+                        unsafe_allow_html=True)
+
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown("---")
+        nav_l, nav_r = st.columns([1, 1])
+        with nav_l:
+            if st.button("← Indietro", key="mode_back", use_container_width=True):
+                st.session_state.step = "upload"
+                st.rerun()
+        with nav_r:
+            if st.button("▶ Avvia Analisi", key="mode_next", use_container_width=True):
+                # Build section_docs and section_doc_names
+                files_data   = st.session_state.uploaded_files_data
+                file_assigns = st.session_state.file_assignments
+                section_docs     = {}
+                section_doc_names = {}
+
+                for sec in MAIN_SECTIONS:
+                    skey = sec["key"]
+                    assigned = [fd for fd in files_data if file_assigns.get(fd["name"]) == skey]
+                    if not assigned:
+                        continue
+                    if skey == "transaction":
+                        # Save first assigned file to tempfile
+                        fd = assigned[0]
+                        raw_bytes = None
+                        # We need the raw file — re-read from uploaded_files_data content
+                        # content_text was extracted; for transaction we need raw bytes
+                        # Try to find the uploaded file in the uploader widget
+                        # Fallback: store content_text as temp file
+                        import tempfile as _tf
+                        ext = fd["ext"]
+                        with _tf.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+                            tmp.write(fd["content_text"].encode("utf-8", errors="replace"))
+                            st.session_state.excel_path = tmp.name
+                        st.session_state.excel_name = fd["name"]
+                        section_doc_names[skey] = [fd["name"]]
+                    else:
+                        texts = [f"=== {fd['name']} ===\n{fd['content_text']}" for fd in assigned]
+                        names = [fd["name"] for fd in assigned]
+                        section_docs[skey]      = "\n\n".join(texts)
+                        section_doc_names[skey] = names
+
+                st.session_state.section_docs     = section_docs
+                st.session_state.section_doc_names = section_doc_names
+
+                # Build run_queue — only agent-mode sections
+                run_queue = [s["key"] for s in MAIN_SECTIONS
+                             if st.session_state.section_modes.get(s["key"]) == "agent"]
+                st.session_state.run_queue = run_queue
+                st.session_state.active_section = "registry"
                 st.session_state.step = "analysis"
                 st.rerun()
 
-# ── FILE ROUTING ─────────────────────────────────────────────────
 
-def _route_uploaded_files(uploaded_files):
-    """Route files to sections based on filename prefix: 01_, 1_, 01-, 1-, etc."""
-    import re
-    routing = {sec["key"]: [] for sec in MAIN_SECTIONS}
-    unmatched = []
-    for f in uploaded_files:
-        name = f.name.lower()
-        matched = False
-        for i, sec in enumerate(MAIN_SECTIONS, 1):
-            if re.match(r'^0?' + str(i) + r'[\s_\-\.]', name):
-                routing[sec["key"]].append(f)
-                matched = True
-                break
-        if not matched:
-            unmatched.append(f)
-    return routing, unmatched
-
-
-# ── SECTION RESULT CARD ───────────────────────────────────────────
-
-def render_prose_result(key: str, parsed: dict):
-    """Displays agent result as professional prose — no raw JSON."""
-    risk      = parsed.get("rischioComplessivo","") or parsed.get("customerRiskRating","")
-    narrativa = (parsed.get("narrativa") or parsed.get("narrativaCompleta")
-                 or parsed.get("sintesiEsecutiva","") or "")
-    evidenze  = parsed.get("principaliEvidenze", [])
-    flags     = parsed.get("flags", [])
-
-    if risk:
-        rc = get_risk_color(risk)
-        racc = parsed.get("raccomandazione","")
-        racc_str = ""
-        if isinstance(racc, dict):
-            acc = racc.get("accettazione","")
-            adv = racc.get("livelloAdeguataVerifica","")
-            freq = racc.get("frequenzaMonitoraggio","")
-            parts_r = [x for x in [acc, adv, freq] if x]
-            if parts_r: racc_str = " &nbsp;·&nbsp; ".join(parts_r)
-        elif isinstance(racc, str) and racc:
-            racc_str = racc
-        st.markdown(
-            '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px;">'
-            '<span style="background:'+rc+';color:#fff;font-size:0.82rem;font-weight:700;'
-            'padding:5px 18px;border-radius:20px;">⬤ RISCHIO: '+risk+'</span>'
-            +(f'<span style="font-size:0.76rem;color:#777;">{racc_str}</span>' if racc_str else '')
-            +'</div>', unsafe_allow_html=True)
-
-    mx = parsed.get("matriceRischio")
-    if mx:
-        labels = [("identitaStruttura","Identità/Struttura"),("reputazionale","Reputazionale"),
-                  ("economico","Economico"),("transazionale","Transazionale"),("geografico","Geografico")]
-        cols = st.columns(5)
-        for i, (dim, lbl) in enumerate(labels):
-            val  = mx.get(dim,{})
-            sc   = int(val.get("score",0)) if isinstance(val,dict) else 0
-            bc   = RED if sc >= 4 else "#f59e0b" if sc == 3 else "#22aa55"
-            motiv = val.get("motivazione","") if isinstance(val,dict) else ""
-            with cols[i]:
-                st.markdown(
-                    '<div style="text-align:center;background:#f8f8f8;border-radius:6px;'
-                    'padding:10px 4px;border:1px solid #eee;" title="'+motiv+'">'
-                    '<div style="font-size:0.58rem;color:#999;margin-bottom:3px;">'+lbl+'</div>'
-                    '<div style="font-size:1.5rem;font-weight:900;color:'+bc+';">'+str(sc)
-                    +'<span style="font-size:0.55rem;color:#ccc;">/5</span></div>'
-                    '<div style="margin:4px 8px 0;height:3px;background:#eee;border-radius:2px;">'
-                    '<div style="width:'+str(sc*20)+'%;height:100%;background:'+bc+';border-radius:2px;"></div>'
-                    '</div></div>', unsafe_allow_html=True)
-        st.markdown("")
-
-    if narrativa:
-        ru = (risk or "").upper()
-        if ru in ("CRITICAL","CRITICO","ALTO","HIGH"):
-            border_c,bg_c,label_c,label_txt = "#ef4444","#fff8f8","#ef4444","ANALISI — CRITICITÀ RILEVATE"
-        elif ru in ("MEDIO-ALTO","MEDIUM"):
-            border_c,bg_c,label_c,label_txt = "#f59e0b","#fffdf5","#f59e0b","ANALISI — DA APPROFONDIRE"
-        else:
-            border_c,bg_c,label_c,label_txt = "#22aa55","#f8fff8","#22aa55","ANALISI — PROFILO NELLA NORMA"
-        st.markdown(
-            '<div style="font-size:0.62rem;font-weight:700;letter-spacing:1.5px;color:'+label_c
-            +';margin:12px 0 6px;">'+label_txt+'</div>', unsafe_allow_html=True)
-        st.markdown(
-            '<div style="background:'+bg_c+';border-left:4px solid '+border_c+';'
-            'padding:16px 20px;border-radius:0 6px 6px 0;font-size:0.87rem;'
-            'line-height:1.75;color:#1a1a1a;margin-bottom:16px;">'
-            + narrativa.replace("\n","<br>") + '</div>', unsafe_allow_html=True)
-
-    if evidenze:
-        st.markdown(
-            '<div style="font-size:0.62rem;font-weight:700;letter-spacing:1.5px;color:#555;'
-            'margin:8px 0 8px;">PRINCIPALI EVIDENZE DI ATTENZIONE</div>', unsafe_allow_html=True)
-        level_styles = {
-            "CRITICO":    ("#fef2f2","#dc2626","🔴"),
-            "ANOMALIA":   ("#fffbeb","#d97706","🟡"),
-            "ATTENZIONE": ("#f0fdf4","#16a34a","🟢"),
-        }
-        for ev in evidenze:
-            lvl  = (ev.get("livello") or "ATTENZIONE").upper()
-            etxt = ev.get("evidenza","")
-            ntxt = ev.get("normativa","")
-            bg_e,col_e,ico_e = level_styles.get(lvl, level_styles["ATTENZIONE"])
-            st.markdown(
-                '<div style="background:'+bg_e+';border-left:3px solid '+col_e+';'
-                'border-radius:0 5px 5px 0;padding:8px 12px;margin-bottom:6px;">'
-                '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'
-                '<span style="font-size:0.8rem;color:#1a1a1a;line-height:1.5;">'
-                '<span style="color:'+col_e+';margin-right:5px;">'+ico_e+'</span>'+etxt+'</span>'
-                '<span style="font-size:0.6rem;font-weight:700;color:'+col_e+';white-space:nowrap;'
-                'padding:1px 6px;border-radius:8px;border:1px solid '+col_e+';">'+lvl+'</span></div>'
-                +(f'<div style="font-size:0.68rem;color:#888;margin-top:4px;margin-left:16px;">📎 {ntxt}</div>'
-                  if ntxt else '')
-                +'</div>', unsafe_allow_html=True)
-
-    if flags:
-        st.markdown(
-            '<div style="font-size:0.62rem;font-weight:700;letter-spacing:1.5px;color:#555;'
-            'margin:8px 0 6px;">FLAG AML</div>', unsafe_allow_html=True)
-        for fl in flags:
-            frc  = get_risk_color(fl.get("rischio",""))
-            tipo = fl.get("tipo",""); desc = fl.get("descrizione","")
-            norm = fl.get("riferimentoNormativo","") or fl.get("indicatoreUIF","")
-            st.markdown(
-                '<div style="border-left:3px solid '+frc+';padding:5px 10px;margin-bottom:4px;'
-                'background:#fff;border-radius:0 4px 4px 0;">'
-                '<span style="font-size:0.78rem;font-weight:600;">'+tipo+'</span>'
-                +(f'<span style="font-size:0.76rem;color:#555;"> — {desc}</span>' if desc else '')
-                +(f'<span style="font-size:0.66rem;color:#bbb;margin-left:6px;">📎 {norm}</span>' if norm else '')
-                +'</div>', unsafe_allow_html=True)
-
-
-def _render_section_result(sec: dict, client):
-    """Section card: header + assigned docs + run button + result."""
-    key     = sec["key"]
-    status  = sec_status(key)
-    content = get_content(key)
-    parsed  = parse_json_result(content) if content else None
-    risk    = (parsed.get("rischioComplessivo","") or parsed.get("customerRiskRating","")) if parsed else ""
-    rc      = get_risk_color(risk)
-    running = st.session_state.running_agent == key
-
-    # ── Header ────────────────────────────────────────────────────
-    dot   = "⏳" if running else ("●" if status == "completed" else "○")
-    dot_c = "#f59e0b" if running else (rc if status == "completed" else "#d0d0d0")
-    bl_c  = "#f59e0b" if running else (rc if status == "completed" else "#eee")
-    st.markdown(
-        f'<div style="border-left:4px solid {bl_c};padding:6px 0 4px 14px;margin-bottom:10px;">'
-        f'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-        f'<span style="color:{dot_c};font-size:0.75rem;">{dot}</span>'
-        f'<span style="font-size:0.6rem;color:#bbb;font-weight:700;">{sec["number"]}</span>'
-        f'<span style="font-size:1.0rem;font-weight:700;color:#1a1a1a;">{sec["icon"]} {sec["full_label"]}</span>'
-        + (f'<span style="background:{rc};color:#fff;font-size:0.62rem;font-weight:700;'
-           f'padding:2px 10px;border-radius:10px;">{risk}</span>' if risk else '')
-        + f'</div>'
-        f'<div style="font-size:0.73rem;color:#aaa;padding-left:22px;margin-top:2px;">{sec["desc"]}</div>'
-        f'</div>',
-        unsafe_allow_html=True)
-
-    # ── Assigned docs ─────────────────────────────────────────────
-    loaded = st.session_state.section_doc_names.get(key, [])
-    if key == "transaction" and st.session_state.excel_name:
-        loaded = [st.session_state.excel_name]
-    if loaded:
-        tags = "".join(
-            f'<span style="display:inline-block;background:#f0fff4;border:1px solid #bbf7d0;'
-            f'border-radius:10px;padding:2px 8px;font-size:0.68rem;color:#166534;margin:2px;">📄 {n}</span>'
-            for n in loaded)
-        st.markdown(f'<div style="margin-bottom:8px;">{tags}</div>', unsafe_allow_html=True)
-
-    # ── Result ────────────────────────────────────────────────────
-    if status == "completed" and content:
-        if parsed:
-            render_prose_result(key, parsed)
-        else:
-            edited = st.text_area("", value=content, height=300,
-                                  key=f"edit_{key}", label_visibility="collapsed")
-            if edited != content:
-                st.session_state.edited_content[key] = edited
-                st.session_state.kyc_state.add_result(key, edited)
-    elif status == "empty" and not running:
-        st.markdown(
-            f'<div style="text-align:center;padding:20px 0;">'
-            f'<div style="font-size:2.5rem;">{sec["icon"]}</div>'
-            f'<div style="font-size:0.8rem;color:#ccc;margin-top:6px;">'
-            f'In attesa dei documenti</div></div>',
-            unsafe_allow_html=True)
-
-    st.markdown('<hr style="margin:20px 0;border-color:#f0f0f0;">', unsafe_allow_html=True)
-
-
-def _render_final_valuation_card(client):
-    key     = "final_valuation"
-    status  = sec_status(key)
-    content = get_content(key)
-    parsed  = parse_json_result(content) if content else None
-    done, total = main_progress()
-    fv      = FINAL_SECTION
-    crr     = parsed.get("customerRiskRating","") if parsed else ""
-    crr_c   = get_risk_color(crr)
-    running = st.session_state.running_agent == key
-
-    dot   = "⏳" if running else ("●" if status == "completed" else "⚡")
-    dot_c = "#f59e0b" if running else (crr_c if status == "completed" else (RED if done == total else "#d0d0d0"))
-    bl_c  = "#f59e0b" if running else (crr_c if status == "completed" else (RED if done == total else "#eee"))
-
-    st.markdown(
-        f'<div style="border-left:4px solid {bl_c};padding:6px 0 4px 14px;margin-bottom:10px;">'
-        f'<div style="display:flex;align-items:center;gap:8px;">'
-        f'<span style="color:{dot_c};font-size:0.85rem;">{dot}</span>'
-        f'<span style="font-size:0.6rem;color:#bbb;font-weight:700;">{fv["number"]}</span>'
-        f'<span style="font-size:1.0rem;font-weight:700;color:#1a1a1a;">{fv["icon"]} {fv["full_label"]}</span>'
-        + (f'<span style="background:{crr_c};color:#fff;font-size:0.62rem;font-weight:700;'
-           f'padding:2px 10px;border-radius:10px;">{crr}</span>' if crr else '')
-        + f'</div>'
-        f'<div style="font-size:0.73rem;color:#aaa;padding-left:22px;margin-top:2px;">{fv["desc"]}</div>'
-        f'</div>',
-        unsafe_allow_html=True)
-
-    if done < total and status != "completed":
-        st.markdown(
-            f'<div style="font-size:0.8rem;color:#aaa;padding:8px 0 16px 22px;">'
-            f'Completa le {total} sezioni ({done}/{total}) per generare la valutazione finale.</div>',
-            unsafe_allow_html=True)
-        return
-
-    c1, _, _ = st.columns([2, 1, 3])
-    with c1:
-        lbl = "⚡  Genera Customer Risk Rating" if status == "empty" else "⚡  Ri-genera"
-        if st.button(lbl, key="run_fv", use_container_width=True):
-            _run_with_stream(key, client)
-            return
-
-    if status == "completed" and content and parsed:
-        render_prose_result(key, parsed)
-
-
-# ── STREAMING ────────────────────────────────────────────────────
+# ── STREAMING helper ──────────────────────────────────────────────
 def _run_with_stream(key: str, client):
     if not client:
-        st.error("API Key non configurata nei Secrets."); return
+        st.error("API Key non configurata nei Secrets.")
+        return
 
     status_box = st.empty()
     stream_box = st.empty()
@@ -631,13 +792,13 @@ def _run_with_stream(key: str, client):
             parts.append(
                 '<div style="font-size:0.68rem;color:#aaa;font-style:italic;'
                 'margin-bottom:6px;border-left:2px solid #ddd;padding-left:8px;">'
-                '🧠 ' + th.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+                '🧠 ' + th.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                 + '</div>')
         if buf["text"]:
             disp = buf["text"][-3000:] if len(buf["text"]) > 3000 else buf["text"]
             parts.append(
                 '<div style="font-family:monospace;font-size:0.7rem;white-space:pre-wrap;">'
-                + disp.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+                + disp.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                 + '</div>')
         if parts:
             stream_box.markdown(
@@ -669,265 +830,500 @@ def _run_with_stream(key: str, client):
     st.rerun()
 
 
-def _render_exec_bar(current_key: str, remaining_queue: list):
-    """Top bar shown during agent execution: all agents as cells with spinner on active."""
+# ── Analysis sidebar ──────────────────────────────────────────────
+def _render_analysis_sidebar(queued_key=None):
+    queue     = st.session_state.get("run_queue", [])
     done_keys = [s["key"] for s in MAIN_SECTIONS if sec_status(s["key"]) == "completed"]
-    cells = ""
+
+    # Agent status chips (shown when queue is non-empty or an agent just ran)
+    if queued_key or queue:
+        chips = ""
+        for sec in MAIN_SECTIONS:
+            k = sec["key"]
+            if k == queued_key:
+                chips += (
+                    f'<span class="aml-spin" style="display:inline-block;font-size:0.85rem;'
+                    f'border:1px solid {RED};border-radius:12px;padding:2px 8px;margin:2px;'
+                    f'color:{RED};">⚙ {sec["label"]}</span>')
+            elif k in queue:
+                chips += (
+                    f'<span style="display:inline-block;font-size:0.75rem;'
+                    f'border:1px solid #f59e0b;border-radius:12px;padding:2px 8px;margin:2px;'
+                    f'color:#f59e0b;">⏳ {sec["label"]}</span>')
+            elif k in done_keys:
+                chips += (
+                    f'<span style="display:inline-block;font-size:0.75rem;'
+                    f'border:1px solid #22aa55;border-radius:12px;padding:2px 8px;margin:2px;'
+                    f'color:#22aa55;">✓ {sec["label"]}</span>')
+        if chips:
+            st.markdown(
+                f'<div style="margin-bottom:12px;line-height:2.2;">{chips}</div>',
+                unsafe_allow_html=True)
+
+    # Sections list
+    active_key = st.session_state.get("active_section", "registry")
     for sec in MAIN_SECTIONS:
-        k = sec["key"]
-        if k == current_key:
-            # Active — spinner
-            cells += (
-                f'<div style="flex:1;display:flex;flex-direction:column;align-items:center;'
-                f'gap:5px;background:#2d1a1a;border-radius:8px;padding:12px 6px;margin:0 3px;'
-                f'border:1px solid {RED};">'
-                f'<span class="aml-spin" style="font-size:1rem;color:{RED};">⚙</span>'
-                f'<span style="font-size:1.2rem;">{sec["icon"]}</span>'
-                f'<span style="font-size:0.58rem;color:#ff9999;font-weight:700;text-align:center;'
-                f'line-height:1.3;">{sec["label"]}</span>'
-                f'</div>')
-        elif k in remaining_queue:
-            # Queued
-            cells += (
-                f'<div style="flex:1;display:flex;flex-direction:column;align-items:center;'
-                f'gap:5px;background:#1e1e1e;border-radius:8px;padding:12px 6px;margin:0 3px;'
-                f'border:1px solid #333;">'
-                f'<span style="font-size:1rem;color:#444;">⏳</span>'
-                f'<span style="font-size:1.2rem;opacity:0.35;">{sec["icon"]}</span>'
-                f'<span style="font-size:0.58rem;color:#444;text-align:center;line-height:1.3;">'
-                f'{sec["label"]}</span>'
-                f'</div>')
-        elif k in done_keys:
-            # Done
-            rc = get_risk_color((parse_json_result(get_content(k)) or {}).get("rischioComplessivo",""))
-            cells += (
-                f'<div style="flex:1;display:flex;flex-direction:column;align-items:center;'
-                f'gap:5px;background:#1a2a1a;border-radius:8px;padding:12px 6px;margin:0 3px;'
-                f'border:1px solid #2a5a2a;">'
-                f'<span style="font-size:1rem;color:#22aa55;">✓</span>'
-                f'<span style="font-size:1.2rem;">{sec["icon"]}</span>'
-                f'<span style="font-size:0.58rem;color:#55aa55;text-align:center;line-height:1.3;">'
-                f'{sec["label"]}</span>'
-                f'</div>')
+        k       = sec["key"]
+        status  = sec_status(k)
+        content = get_content(k)
+        parsed  = parse_json_result(content) if content else None
+        risk    = (parsed.get("rischioComplessivo","") or parsed.get("customerRiskRating","")) if parsed else ""
+        rc      = get_risk_color(risk)
+        is_active = (k == active_key)
+
+        if status == "completed":
+            dot = "●"; dot_c = rc
+        elif k == queued_key:
+            dot = "⏳"; dot_c = "#f59e0b"
         else:
-            # Not in run
-            cells += (
-                f'<div style="flex:1;display:flex;flex-direction:column;align-items:center;'
-                f'gap:5px;background:#1a1a1a;border-radius:8px;padding:12px 6px;margin:0 3px;'
-                f'border:1px solid #222;">'
-                f'<span style="font-size:1rem;color:#333;">—</span>'
-                f'<span style="font-size:1.2rem;opacity:0.2;">{sec["icon"]}</span>'
-                f'<span style="font-size:0.58rem;color:#333;text-align:center;line-height:1.3;">'
-                f'{sec["label"]}</span>'
-                f'</div>')
+            dot = "○"; dot_c = "#d0d0d0"
+
+        border_style = f"border-left:3px solid {RED};background:#fff9f9;" if is_active else "border-left:3px solid transparent;background:transparent;"
+        risk_badge = (
+            f'<span style="background:{rc};color:#fff;font-size:0.55rem;font-weight:700;'
+            f'padding:1px 6px;border-radius:8px;margin-left:4px;">{risk}</span>'
+            if risk else "")
+
+        st.markdown(
+            f'<div style="{border_style}padding:7px 8px;border-radius:0 4px 4px 0;'
+            f'margin-bottom:2px;cursor:pointer;">'
+            f'<span style="color:{dot_c};font-size:0.65rem;margin-right:5px;">{dot}</span>'
+            f'<span style="font-size:0.68rem;color:#bbb;margin-right:4px;">{sec["number"]}</span>'
+            f'<span style="font-size:0.82rem;color:#1a1a1a;">{sec["icon"]} {sec["label"]}</span>'
+            f'{risk_badge}'
+            f'</div>',
+            unsafe_allow_html=True)
+
+        if st.button("‎", key=f"sb_{k}", use_container_width=True,
+                     help=sec["full_label"]):
+            st.session_state.active_section = k
+            st.rerun()
+
+    st.markdown('<hr style="margin:12px 0;border-color:#f0f0f0;">', unsafe_allow_html=True)
+
+    # Controls
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("✕ Nuovo", key="new_case_sb", use_container_width=True, help="Nuovo caso"):
+            for k in list(st.session_state.keys()):
+                del st.session_state[k]
+            st.rerun()
+    with c2:
+        if st.button("⚙ Setup", key="go_setup_sb", use_container_width=True, help="Setup"):
+            st.session_state.step = "setup"
+            st.rerun()
+
+
+# ── Criticality panel ─────────────────────────────────────────────
+def _render_crit_panel(key: str):
+    content = get_content(key)
+    parsed  = parse_json_result(content) if content else None
+    if not parsed:
+        st.markdown('<div style="color:#aaa;font-size:0.8rem;padding:8px;">Nessun risultato disponibile.</div>',
+                    unsafe_allow_html=True)
+        return
+
+    evidenze  = parsed.get("principaliEvidenze", [])
+    overrides = st.session_state.crit_overrides.get(key, {})
+
+    critics  = [(i, ev) for i, ev in enumerate(evidenze)
+                if (ev.get("livello","") or "").upper().startswith("CRITICO")]
+    anomalie = [(i, ev) for i, ev in enumerate(evidenze)
+                if (ev.get("livello","") or "").upper().startswith("ANOMALIA")]
+
+    def _render_group(group, header_html):
+        if not group:
+            return
+        st.markdown(header_html, unsafe_allow_html=True)
+        for idx, ev in group:
+            ov = overrides.get(idx, {})
+            is_closed = (ov.get("status","") or "").lower() == "chiuso"
+            etxt  = ev.get("evidenza","")
+            ntxt  = ev.get("normativa","")
+            prop  = ev.get("proposta","") or etxt
+            lvl   = (ev.get("livello","") or "").upper()
+            bg_c  = "#fef2f2" if lvl.startswith("CRITICO") else "#fffbeb"
+            brd_c = "#dc2626"  if lvl.startswith("CRITICO") else "#d97706"
+            opacity = "opacity:0.5;" if is_closed else ""
+
+            st.markdown(
+                f'<div style="background:{bg_c};border-left:3px solid {brd_c};'
+                f'border-radius:0 5px 5px 0;padding:10px 12px;margin-bottom:8px;{opacity}">'
+                f'<div style="font-size:0.8rem;color:#1a1a1a;font-weight:600;margin-bottom:4px;">{etxt}</div>'
+                f'<div style="font-size:0.75rem;color:#555;margin-bottom:4px;">Proposta: {prop}</div>'
+                + (f'<div style="font-size:0.67rem;color:#999;">📎 {ntxt}</div>' if ntxt else '')
+                + (f'<div style="font-size:0.67rem;color:{brd_c};font-weight:700;margin-top:4px;">'
+                   f'Stato: {ov.get("status","—")}</div>' if ov else '')
+                + f'</div>',
+                unsafe_allow_html=True)
+
+            # Edit status button
+            edit_key = f"crit_edit_{key}_{idx}"
+            if st.button(f"Modifica stato ▾", key=f"crit_btn_{key}_{idx}"):
+                st.session_state[edit_key] = not st.session_state.get(edit_key, False)
+                st.rerun()
+
+            if st.session_state.get(edit_key, False):
+                with st.form(key=f"crit_form_{key}_{idx}"):
+                    cur_status = ov.get("status","Confermato")
+                    cur_motiv  = ov.get("motivation","")
+                    status_opts = ["Confermato","In revisione","Chiuso"]
+                    try:
+                        s_idx = status_opts.index(cur_status)
+                    except ValueError:
+                        s_idx = 0
+                    new_status = st.radio("Status", status_opts, index=s_idx,
+                                          horizontal=True, key=f"crit_radio_{key}_{idx}")
+                    new_motiv  = st.text_input("Motivazione", value=cur_motiv,
+                                               key=f"crit_motiv_{key}_{idx}")
+                    if st.form_submit_button("💾 Salva"):
+                        if key not in st.session_state.crit_overrides:
+                            st.session_state.crit_overrides[key] = {}
+                        st.session_state.crit_overrides[key][idx] = {
+                            "status": new_status, "motivation": new_motiv}
+                        st.session_state[edit_key] = False
+                        st.rerun()
+
+    _render_group(critics,
+        '<div style="font-size:0.75rem;font-weight:700;color:#dc2626;margin:8px 0 6px;">🔴 Criticità</div>')
+    _render_group(anomalie,
+        '<div style="font-size:0.75rem;font-weight:700;color:#d97706;margin:8px 0 6px;">🟡 Attenzione</div>')
+
+    if not critics and not anomalie:
+        st.markdown('<div style="color:#aaa;font-size:0.8rem;padding:8px;">Nessuna criticità rilevata.</div>',
+                    unsafe_allow_html=True)
+
+
+# ── Section content ───────────────────────────────────────────────
+def _render_section_content(key: str, client, stream_slot=None):
+    sec     = next(s for s in MAIN_SECTIONS if s["key"] == key)
+    status  = sec_status(key)
+    content = get_content(key)
+    parsed  = parse_json_result(content) if content else None
+    mode    = st.session_state.section_modes.get(key, "agent")
+
+    # Header row
+    risk = ""
+    if parsed:
+        risk = parsed.get("rischioComplessivo","") or parsed.get("customerRiskRating","")
+    rc = get_risk_color(risk)
+    risk_badge = (
+        f'<span style="background:{rc};color:#fff;font-size:0.65rem;font-weight:700;'
+        f'padding:3px 12px;border-radius:14px;margin-left:8px;">{risk}</span>'
+        if risk else "")
+
     st.markdown(
-        f'<div style="background:#111;border-radius:10px;padding:16px 18px;margin-bottom:20px;">'
-        f'<div style="font-size:0.55rem;letter-spacing:2px;color:#555;font-weight:700;margin-bottom:12px;">'
-        f'ESECUZIONE IN CORSO</div>'
-        f'<div style="display:flex;gap:0;">{cells}</div>'
+        f'<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;'
+        f'border-bottom:1px solid #f0f0f0;padding-bottom:10px;margin-bottom:14px;">'
+        f'<span style="font-size:1.3rem;">{sec["icon"]}</span>'
+        f'<span style="font-size:0.65rem;color:#bbb;font-weight:700;">{sec["number"]}</span>'
+        f'<span style="font-size:1.0rem;font-weight:700;color:#1a1a1a;">{sec["full_label"]}</span>'
+        f'{risk_badge}'
         f'</div>',
         unsafe_allow_html=True)
 
+    # Top-right criticality badges
+    if parsed:
+        evidenze  = parsed.get("principaliEvidenze", [])
+        overrides = st.session_state.crit_overrides.get(key, {})
+        n_crit = sum(1 for i, ev in enumerate(evidenze)
+                     if (ev.get("livello","") or "").upper().startswith("CRITICO")
+                     and (overrides.get(i,{}).get("status","") or "").lower() != "chiuso")
+        n_anom = sum(1 for i, ev in enumerate(evidenze)
+                     if (ev.get("livello","") or "").upper().startswith("ANOMALIA")
+                     and (overrides.get(i,{}).get("status","") or "").lower() != "chiuso")
 
-def _render_agent_dialog(pending_keys: list):
-    """Modal-style dialog to select which sections to run agents for."""
-    st.markdown(
-        '<div style="background:#fff;border:2px solid '+RED+';border-radius:12px;'
-        'padding:24px 28px;max-width:640px;margin:20px auto;'
-        'box-shadow:0 8px 40px rgba(0,0,0,0.10);">'
-        '<div style="font-size:1.05rem;font-weight:700;color:#1a1a1a;margin-bottom:4px;">'
-        '📋 Seleziona i moduli di analisi</div>'
-        '<div style="font-size:0.78rem;color:#888;margin-bottom:20px;">'
-        'Scegli per quali sezioni attivare l\'agente AI</div>',
-        unsafe_allow_html=True)
+        badge_cols = st.columns([4, 1, 1])
+        with badge_cols[1]:
+            if n_crit > 0:
+                if st.button(f"🔴 {n_crit}", key=f"crit_badge_{key}", help="Criticità"):
+                    cps = st.session_state.crit_panel_section
+                    st.session_state.crit_panel_section = None if cps == key else key
+                    st.rerun()
+        with badge_cols[2]:
+            if n_anom > 0:
+                if st.button(f"🟡 {n_anom}", key=f"anom_badge_{key}", help="Anomalie"):
+                    cps = st.session_state.crit_panel_section
+                    st.session_state.crit_panel_section = None if cps == key else key
+                    st.rerun()
 
-    selected = {}
-    for sec in MAIN_SECTIONS:
-        k = sec["key"]
-        if k not in pending_keys:
-            continue
-        docs = st.session_state.section_doc_names.get(k, [])
-        if k == "transaction" and st.session_state.excel_name:
-            docs = [st.session_state.excel_name]
-        doc_str = " · ".join(docs[:2]) + ("…" if len(docs) > 2 else "")
-        label = f"{sec['number']} {sec['icon']} {sec['full_label']}"
-        if doc_str:
-            label += f"  —  {doc_str}"
-        selected[k] = st.checkbox(label, value=True, key=f"dlg_{k}")
+    # Assigned docs tags
+    loaded = st.session_state.section_doc_names.get(key, [])
+    if key == "transaction" and st.session_state.excel_name:
+        loaded = [st.session_state.excel_name]
+    if loaded:
+        tags = "".join(
+            f'<span style="display:inline-block;background:#f0fff4;border:1px solid #bbf7d0;'
+            f'border-radius:10px;padding:2px 8px;font-size:0.68rem;color:#166534;margin:2px;">📄 {n}</span>'
+            for n in loaded)
+        st.markdown(f'<div style="margin-bottom:10px;">{tags}</div>', unsafe_allow_html=True)
 
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown("")
-
-    c1, c2, _ = st.columns([1.2, 1, 2])
-    with c1:
-        if st.button("⚡  Avvia Analisi", key="dlg_start", use_container_width=True):
-            queue = [k for k in pending_keys if selected.get(k, False)]
-            st.session_state["run_queue"]        = queue
-            st.session_state["show_agent_dialog"] = False
-            st.session_state["pending_queue"]     = []
+    # Manual mode
+    if mode == "manual":
+        manual_key = f"manual_text_{key}"
+        val = st.session_state.get(manual_key, content or "")
+        new_val = st.text_area(
+            "Inserisci analisi manuale",
+            value=val,
+            height=300,
+            key=f"manual_ta_{key}",
+            label_visibility="collapsed")
+        if new_val != val:
+            st.session_state[manual_key] = new_val
+        if st.button("💾 Salva", key=f"manual_save_{key}"):
+            st.session_state.edited_content[key] = new_val
+            st.session_state.kyc_state.add_result(key, new_val)
             st.rerun()
-    with c2:
-        if st.button("✕  Annulla", key="dlg_cancel", use_container_width=True):
-            st.session_state["show_agent_dialog"] = False
-            st.rerun()
+        return
+
+    # Agent mode — show result
+    if status == "completed" and content:
+        if parsed:
+            # Section synthesis — clean white box, no color borders
+            narrativa = (parsed.get("narrativa") or parsed.get("narrativaCompleta")
+                         or parsed.get("sintesiEsecutiva","") or "")
+            if narrativa:
+                st.markdown(
+                    '<div style="background:#fff;border:1px solid #e8e8e8;'
+                    'padding:16px 20px;border-radius:6px;font-size:0.87rem;'
+                    'line-height:1.8;color:#1a1a1a;margin-bottom:12px;">'
+                    + narrativa.replace("\n","<br>") + '</div>',
+                    unsafe_allow_html=True)
+
+            # Edit toggle
+            edit_toggle_key = f"show_edit_{key}"
+            if st.button("✏️ Modifica manualmente", key=f"edit_toggle_{key}"):
+                st.session_state[edit_toggle_key] = not st.session_state.get(edit_toggle_key, False)
+                st.rerun()
+
+            if st.session_state.get(edit_toggle_key, False):
+                edited = st.text_area(
+                    "Contenuto",
+                    value=content,
+                    height=300,
+                    key=f"edit_ta_{key}",
+                    label_visibility="collapsed")
+                if st.button("💾 Salva", key=f"edit_save_{key}"):
+                    st.session_state.edited_content[key] = edited
+                    st.session_state.kyc_state.add_result(key, edited)
+                    st.session_state[edit_toggle_key] = False
+                    st.rerun()
+        else:
+            # Raw text result
+            edited = st.text_area("", value=content, height=300,
+                                  key=f"edit_{key}", label_visibility="collapsed")
+            if edited != content:
+                st.session_state.edited_content[key] = edited
+                st.session_state.kyc_state.add_result(key, edited)
+
+        # Re-run button
+        if st.button(f"🔄 Ri-analizza", key=f"rerun_{key}"):
+            _run_with_stream(key, client)
+            return
+
+    elif status == "empty":
+        if mode == "agent":
+            st.markdown(
+                f'<div style="text-align:center;padding:24px 0;">'
+                f'<div style="font-size:2.5rem;">{sec["icon"]}</div>'
+                f'<div style="font-size:0.82rem;color:#ccc;margin-top:8px;">In attesa di analisi</div>'
+                f'</div>', unsafe_allow_html=True)
+            if st.button(f"▶ Avvia agente", key=f"run_{key}"):
+                _run_with_stream(key, client)
+                return
 
 
-# ── ANALYSIS PAGE ────────────────────────────────────────────────
+# ── STEP 4: ANALYSIS ─────────────────────────────────────────────
 def render_analysis():
     render_header()
-    client  = get_client()
-    state   = st.session_state.kyc_state
-    done, total = main_progress()
+    client = get_client()
 
-    # ── Agent selection dialog ────────────────────────────────────
-    if st.session_state.get("show_agent_dialog"):
-        _render_agent_dialog(st.session_state.get("pending_queue", []))
-        return
+    # Process run queue — pop next item before rendering
+    queued_key = None
+    if st.session_state.get("run_queue"):
+        queued_key = st.session_state["run_queue"][0]
+        st.session_state["run_queue"] = st.session_state["run_queue"][1:]
+        st.session_state.active_section = queued_key
 
-    # ── Process run queue (one agent at a time, with streaming) ───
-    queue = st.session_state.get("run_queue", [])
-    if queue:
-        next_key = queue[0]
-        st.session_state["run_queue"] = queue[1:]
-        remaining = queue[1:]
-        _render_exec_bar(next_key, remaining)
-        _run_with_stream(next_key, client)
-        return
+    # Determine layout
+    crit_panel_open = st.session_state.get("crit_panel_section")
 
-    # ── Top bar ───────────────────────────────────────────────────
-    fv_parsed = parse_json_result(get_content("final_valuation"))
-    crr       = fv_parsed.get("customerRiskRating","") if fv_parsed else ""
-    crr_c     = get_risk_color(crr)
-    segs = ""
-    for i in range(total):
-        c = RED if i < done else "#eee"
-        segs += f'<div style="flex:1;height:5px;background:{c};border-radius:3px;margin:0 1px;"></div>'
+    if crit_panel_open:
+        cols = st.columns([1.6, 3.5, 2.2])
+        col_sidebar, col_content, col_crit = cols
+    else:
+        cols = st.columns([1.6, 5.2])
+        col_sidebar, col_content = cols
+        col_crit = None
 
-    tb_l, tb_r = st.columns([4, 1])
-    with tb_l:
-        st.markdown(
-            f'<div style="padding:4px 0 12px;">'
-            f'<span style="font-size:1.05rem;font-weight:700;color:#1a1a1a;">{state.case.company_name}</span>'
-            f'<span style="color:#ddd;margin:0 8px;">|</span>'
-            f'<span style="font-size:0.8rem;color:#aaa;">{state.case.country}</span>'
-            + (f'<span style="color:#ddd;margin:0 8px;">|</span>'
-               f'<span style="font-size:0.75rem;color:#aaa;">{state.case.case_id}</span>'
-               if state.case.case_id else '')
-            + (f' <span style="background:{crr_c};color:#fff;font-size:0.7rem;font-weight:700;'
-               f'padding:3px 14px;border-radius:12px;margin-left:8px;">{crr}</span>'
-               if crr else '')
-            + f'<div style="display:flex;align-items:center;gap:6px;margin-top:6px;">'
-            f'<div style="display:flex;gap:2px;width:120px;">{segs}</div>'
-            f'<span style="font-size:0.65rem;color:#999;">{done}/{total} sezioni</span></div>'
-            f'</div>',
-            unsafe_allow_html=True)
-    with tb_r:
-        st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("✕", key="new_case", use_container_width=True, help="Nuovo caso"):
-                for k in list(st.session_state.keys()): del st.session_state[k]
+    with col_sidebar:
+        _render_analysis_sidebar(queued_key=queued_key)
+
+    with col_content:
+        active_key = st.session_state.get("active_section", "registry")
+
+        if queued_key:
+            # Show streaming for the queued key
+            sec = next(s for s in ALL_SECTIONS if s["key"] == queued_key)
+            st.markdown(
+                f'<div style="font-size:0.9rem;font-weight:700;margin-bottom:12px;">'
+                f'<span class="aml-spin" style="display:inline-block;">⚙</span>'
+                f' {sec["icon"]} {sec["full_label"]} — analisi in corso…</div>',
+                unsafe_allow_html=True)
+            _run_with_stream(queued_key, client)
+            return
+        else:
+            _render_section_content(active_key, client)
+
+        st.markdown('<hr style="margin:20px 0;border-color:#f0f0f0;">', unsafe_allow_html=True)
+
+        # Bottom navigation
+        done, total = main_progress()
+        if done == total:
+            if st.button("💾 Salva e Procedi alla Valutazione Finale →",
+                         key="go_final", use_container_width=True):
+                st.session_state.step = "final"
                 st.rerun()
-        with c2:
-            if st.button("⚙", key="go_setup", use_container_width=True, help="Setup"):
-                st.session_state.step = "setup"; st.rerun()
 
-    # ── Single upload area ────────────────────────────────────────
-    st.markdown(
-        '<div style="background:#f9f9f9;border:1px dashed #ddd;border-radius:8px;'
-        'padding:16px 20px;margin-bottom:20px;">'
-        '<div style="font-size:0.82rem;font-weight:700;color:#1a1a1a;margin-bottom:4px;">'
-        '📎 Carica i documenti della controparte</div>'
-        '<div style="font-size:0.73rem;color:#999;margin-bottom:10px;">'
-        'Nomina i file con il prefisso della sezione: <b>01_</b> Struttura · <b>02_</b> UBO/PEP · '
-        '<b>03_</b> Reputational · <b>04_</b> Economic · <b>05_</b> Transactional</div>',
-        unsafe_allow_html=True)
+    if col_crit:
+        with col_crit:
+            st.markdown(
+                f'<div style="font-size:0.9rem;font-weight:700;color:#1a1a1a;'
+                f'border-bottom:1px solid #f0f0f0;padding-bottom:8px;margin-bottom:12px;">'
+                f'Criticità &amp; Attenzioni</div>',
+                unsafe_allow_html=True)
+            if crit_panel_open:
+                _render_crit_panel(crit_panel_open)
+            if st.button("✕ Chiudi", key="close_crit_panel"):
+                st.session_state.crit_panel_section = None
+                st.rerun()
 
-    upls = st.file_uploader(
-        "Documenti",
-        type=["pdf", "docx", "txt", "md", "csv", "xlsx", "xls"],
-        accept_multiple_files=True,
-        key="main_upload",
-        label_visibility="collapsed")
 
-    if upls:
-        fid = "_".join(f"{f.name}_{f.size}" for f in upls)
-        if fid != st.session_state.get("main_upload_id"):
-            st.session_state["main_upload_id"] = fid
-            routing, unmatched = _route_uploaded_files(upls)
+# ── STEP 5: FINAL VALUATION ───────────────────────────────────────
+def render_final_valuation():
+    render_header()
+    _, col, _ = st.columns([0.3, 5.4, 0.3])
+    with col:
+        st.markdown("### ⚡ Valutazione Finale")
 
-            # Store files per section
-            queue = []
+        # Mode selector
+        current_final_mode = st.session_state.final_mode or "manual"
+        mode_map = {"✍️ A mano": "manual", "🤖 Super Agent": "agent"}
+        mode_labels = list(mode_map.keys())
+        mode_idx = 1 if current_final_mode == "agent" else 0
+        chosen_label = st.radio(
+            "Modalità valutazione",
+            mode_labels,
+            index=mode_idx,
+            horizontal=True,
+            key="final_mode_radio",
+            label_visibility="collapsed")
+        st.session_state.final_mode = mode_map[chosen_label]
+
+        st.markdown("---")
+
+        client = get_client()
+        key = "final_valuation"
+
+        if st.session_state.final_mode == "manual":
+            # Manual narrative
+            existing = get_content(key) or ""
+            manual_narrative = st.text_area(
+                "Narrativa di valutazione",
+                value=existing,
+                height=280,
+                key="final_manual_text",
+                placeholder="Inserisci la valutazione finale della controparte…")
+            st.markdown("**Profilo di rischio**")
+            risk_opts = ["Confermato", "Innalzamento", "Abbassamento", "Modifica"]
+            risk_choice = st.radio("Profilo di rischio", risk_opts,
+                                   horizontal=True, key="final_risk_radio",
+                                   label_visibility="collapsed")
+            if st.button("💾 Salva Valutazione", key="final_manual_save", use_container_width=True):
+                narrative_full = f"[{risk_choice}]\n\n{manual_narrative}"
+                st.session_state.edited_content[key] = narrative_full
+                st.session_state.kyc_state.add_result(key, narrative_full)
+                st.success("Valutazione salvata.")
+
+        else:
+            # Super Agent mode
+            content = get_content(key)
+            parsed  = parse_json_result(content) if content else None
+
+            # Collect findings from all sections
+            all_findings = []
+            overrides    = st.session_state.crit_overrides
             for sec in MAIN_SECTIONS:
-                key = sec["key"]
-                files = routing[key]
-                if not files:
+                sk = sec["key"]
+                sc = get_content(sk)
+                sp = parse_json_result(sc) if sc else None
+                if not sp:
                     continue
-                if key == "transaction":
-                    f = files[0]
-                    f.seek(0)
-                    ext = os.path.splitext(f.name)[1].lower()
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
-                        tmp.write(f.read())
-                        st.session_state.excel_path = tmp.name
-                        st.session_state.excel_name = f.name
-                    st.session_state.section_doc_names[key] = [f.name]
-                else:
-                    texts, names = [], []
-                    for f in files:
-                        texts.append(f"=== {f.name} ===\n{extract_text_from_file(f)}")
-                        names.append(f.name)
-                    st.session_state.section_docs[key] = "\n\n".join(texts)
-                    st.session_state.section_doc_names[key] = names
-                queue.append(key)
+                for idx, ev in enumerate(sp.get("principaliEvidenze",[])):
+                    lvl = (ev.get("livello","") or "").upper()
+                    if lvl not in ("CRITICO","ANOMALIA"):
+                        continue
+                    ov_status = (overrides.get(sk,{}).get(idx,{}).get("status","") or "").lower()
+                    if ov_status == "chiuso":
+                        continue
+                    all_findings.append({
+                        "sezione": sec["full_label"],
+                        "livello": lvl,
+                        "evidenza": ev.get("evidenza",""),
+                        "normativa": ev.get("normativa",""),
+                    })
 
-            if queue:
-                st.session_state["pending_queue"]     = queue
-                st.session_state["show_agent_dialog"] = True
+            st.markdown(
+                f'<div style="font-size:0.8rem;color:#888;margin-bottom:12px;">'
+                f'{len(all_findings)} evidenze attive raccolte dalle sezioni di analisi.</div>',
+                unsafe_allow_html=True)
 
+            if st.button("▶ Avvia Super Agent", key="run_super_agent", use_container_width=True):
+                _run_with_stream(key, client)
+                return
+
+            if parsed:
+                render_prose_result(key, parsed)
+
+                # Editable narrative below
+                st.markdown("---")
+                st.markdown("**Modifica narrativa**")
+                narrativa = (parsed.get("narrativa") or parsed.get("narrativaCompleta")
+                             or parsed.get("sintesiEsecutiva","") or "")
+                edited_narrative = st.text_area(
+                    "Narrativa",
+                    value=narrativa,
+                    height=200,
+                    key="final_agent_edit",
+                    label_visibility="collapsed")
+
+                risk_profile_opts = ["Confermato", "Innalzamento", "Abbassamento", "Modifica"]
+                risk_profile = st.radio("Profilo di rischio", risk_profile_opts,
+                                        horizontal=True, key="final_agent_risk",
+                                        label_visibility="collapsed")
+                if st.button("💾 Salva modifiche", key="final_agent_save"):
+                    new_content = content.replace(narrativa, edited_narrative) if narrativa else content
+                    st.session_state.edited_content[key] = new_content
+                    st.session_state.kyc_state.add_result(key, new_content)
+                    st.success("Modifiche salvate.")
+
+        st.markdown("---")
+        if st.button("← Torna all'analisi", key="back_to_analysis"):
+            st.session_state.step = "analysis"
             st.rerun()
-
-        # Show routing summary
-        routing_done, _ = _route_uploaded_files(upls)
-        rows = ""
-        for f in upls:
-            import re
-            assigned = None
-            for i, sec in enumerate(MAIN_SECTIONS, 1):
-                if re.match(r'^0?' + str(i) + r'[\s_\-\.]', f.name.lower()):
-                    assigned = sec
-                    break
-            if assigned:
-                rows += (f'<div style="font-size:0.72rem;padding:2px 0;">'
-                         f'<span style="color:#166534;">✅</span> '
-                         f'<span style="color:#555;">{f.name}</span>'
-                         f' <span style="color:#aaa;">→</span> '
-                         f'<span style="color:#1a1a1a;font-weight:600;">'
-                         f'{assigned["number"]} {assigned["label"]}</span></div>')
-            else:
-                rows += (f'<div style="font-size:0.72rem;padding:2px 0;">'
-                         f'<span style="color:#d97706;">⚠️</span> '
-                         f'<span style="color:#999;">{f.name}</span>'
-                         f' <span style="color:#d97706;font-size:0.68rem;">— prefisso non riconosciuto</span>'
-                         f'</div>')
-        if rows:
-            st.markdown(f'<div style="margin-top:10px;">{rows}</div>', unsafe_allow_html=True)
-
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('<hr style="margin:0 0 20px;border-color:#f0f0f0;">', unsafe_allow_html=True)
-
-    # ── All 5 sections ────────────────────────────────────────────
-    for sec in MAIN_SECTIONS:
-        _render_section_result(sec, client)
-
-    # ── Final Valuation ───────────────────────────────────────────
-    _render_final_valuation_card(client)
-
-    st.markdown('<hr style="margin:24px 0 8px;border-color:#f0f0f0;">', unsafe_allow_html=True)
 
 
 # ── ROUTER ───────────────────────────────────────────────────────
-if st.session_state.step == "setup":
+step = st.session_state.step
+if step == "setup":
     render_setup()
-else:
+elif step == "upload":
+    render_upload()
+elif step == "mode_config":
+    render_mode_config()
+elif step == "analysis":
     render_analysis()
+elif step == "final":
+    render_final_valuation()
+else:
+    render_setup()
