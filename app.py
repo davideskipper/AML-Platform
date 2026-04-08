@@ -327,11 +327,12 @@ def _logo_html(height: int = 38) -> str:
 
 
 # ── Step Navigation Bar ───────────────────────────────────────────
-_STEP_ORDER = ["upload", "analysis", "final"]
+_STEP_ORDER = ["upload", "mode_config", "analysis", "final"]
 _STEP_LABELS = {
-    "upload":   "① Documenti",
-    "analysis": "② Analisi",
-    "final":    "③ Valutazione",
+    "upload":      "① Documenti",
+    "mode_config": "② Modalità",
+    "analysis":    "③ Analisi",
+    "final":       "④ Valutazione",
 }
 
 def render_step_nav(current_step_id: str):
@@ -672,59 +673,10 @@ def render_upload():
                 st.rerun()
         with nav_r:
             disabled = len(files_data) == 0
-            if st.button("▶ Avvia Analisi", key="upload_next",
+            if st.button("Continua →", key="upload_next",
                          use_container_width=True,
                          disabled=disabled):
-                # Build section_docs, section_doc_names and run_queue
-                _files_data  = st.session_state.uploaded_files_data
-                _file_assigns = st.session_state.file_assignments
-                section_docs      = {}
-                section_doc_names = {}
-
-                for sec in MAIN_SECTIONS:
-                    skey     = sec["key"]
-                    assigned = [fd for fd in _files_data
-                                if _file_assigns.get(fd["name"]) == skey]
-                    if not assigned:
-                        continue
-                    if skey == "transaction":
-                        fd  = assigned[0]
-                        ext = fd["ext"]
-                        raw = fd.get("raw_bytes")
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
-                            if raw:
-                                tmp.write(raw)
-                            else:
-                                tmp.write(fd["content_text"].encode("utf-8", errors="replace"))
-                            st.session_state.excel_path = tmp.name
-                        st.session_state.excel_name = fd["name"]
-                        section_doc_names[skey] = [fd["name"]]
-                    else:
-                        texts = [f"=== {fd['name']} ===\n{fd['content_text']}" for fd in assigned]
-                        names = [fd["name"] for fd in assigned]
-                        section_docs[skey]      = "\n\n".join(texts)
-                        section_doc_names[skey] = names
-
-                st.session_state.section_docs      = section_docs
-                st.session_state.section_doc_names = section_doc_names
-
-                # Default: agent mode for assigned sections, no web search
-                for sec in MAIN_SECTIONS:
-                    if sec["key"] not in st.session_state.section_modes:
-                        st.session_state.section_modes[sec["key"]] = "agent"
-
-                run_queue = [s["key"] for s in MAIN_SECTIONS
-                             if any(_file_assigns.get(fd["name"]) == s["key"]
-                                    for fd in _files_data)
-                             and st.session_state.section_modes.get(s["key"]) == "agent"]
-
-                st.session_state.run_queue     = run_queue
-                st.session_state.active_section = "registry"
-                st.session_state.step           = "analysis"
-                # Clear upload data so it cannot ghost in the analysis page
-                st.session_state.uploaded_files_data = []
-                st.session_state.file_assignments    = {}
-                st.session_state.upload_hash         = ""
+                st.session_state.step = "mode_config"
                 st.rerun()
 
 
@@ -835,12 +787,16 @@ def render_mode_config():
                 st.session_state.section_docs     = section_docs
                 st.session_state.section_doc_names = section_doc_names
 
-                # Build run_queue — only agent-mode sections
+                # Build run_queue — only agent-mode sections that have docs
                 run_queue = [s["key"] for s in MAIN_SECTIONS
                              if st.session_state.section_modes.get(s["key"]) == "agent"]
                 st.session_state.run_queue = run_queue
                 st.session_state.active_section = "registry"
                 st.session_state.step = "analysis"
+                # Clear upload data so it cannot ghost in the analysis page
+                st.session_state.uploaded_files_data = []
+                st.session_state.file_assignments    = {}
+                st.session_state.upload_hash         = ""
                 st.rerun()
 
 
@@ -1359,7 +1315,9 @@ if step == "setup":
     render_setup()
 elif step == "upload":
     render_upload()
-elif step in ("mode_config", "analysis"):
+elif step == "mode_config":
+    render_mode_config()
+elif step == "analysis":
     render_analysis()
 elif step == "final":
     render_final_valuation()
