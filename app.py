@@ -584,12 +584,18 @@ def render_upload():
                 for f in uploaded:
                     f.seek(0)
                     ext = os.path.splitext(f.name)[1].lower()
+                    # Keep raw bytes for Excel/CSV so the agent can read the real file
+                    raw_bytes = None
+                    if ext in (".xlsx", ".xls", ".csv"):
+                        raw_bytes = f.read()
+                        f.seek(0)
                     content_text = extract_text_from_file(f)
                     files_data.append({
                         "name": f.name,
                         "content_text": content_text,
                         "ext": ext,
                         "size": f.size,
+                        "raw_bytes": raw_bytes,
                     })
                     # Preserve existing assignment if present, else auto-detect
                     existing = st.session_state.file_assignments.get(f.name)
@@ -743,17 +749,14 @@ def render_mode_config():
                     if not assigned:
                         continue
                     if skey == "transaction":
-                        # Save first assigned file to tempfile
-                        fd = assigned[0]
-                        raw_bytes = None
-                        # We need the raw file — re-read from uploaded_files_data content
-                        # content_text was extracted; for transaction we need raw bytes
-                        # Try to find the uploaded file in the uploader widget
-                        # Fallback: store content_text as temp file
-                        import tempfile as _tf
+                        fd  = assigned[0]
                         ext = fd["ext"]
-                        with _tf.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
-                            tmp.write(fd["content_text"].encode("utf-8", errors="replace"))
+                        raw = fd.get("raw_bytes")
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+                            if raw:
+                                tmp.write(raw)          # real binary Excel/CSV
+                            else:
+                                tmp.write(fd["content_text"].encode("utf-8", errors="replace"))
                             st.session_state.excel_path = tmp.name
                         st.session_state.excel_name = fd["name"]
                         section_doc_names[skey] = [fd["name"]]
@@ -832,86 +835,54 @@ def _run_with_stream(key: str, client):
 
 # ── Analysis sidebar ──────────────────────────────────────────────
 def _render_analysis_sidebar(queued_key=None):
-    queue     = st.session_state.get("run_queue", [])
-    done_keys = [s["key"] for s in MAIN_SECTIONS if sec_status(s["key"]) == "completed"]
-
-    # Agent status chips (shown when queue is non-empty or an agent just ran)
-    if queued_key or queue:
-        chips = ""
-        for sec in MAIN_SECTIONS:
-            k = sec["key"]
-            if k == queued_key:
-                chips += (
-                    f'<span class="aml-spin" style="display:inline-block;font-size:0.85rem;'
-                    f'border:1px solid {RED};border-radius:12px;padding:2px 8px;margin:2px;'
-                    f'color:{RED};">⚙ {sec["label"]}</span>')
-            elif k in queue:
-                chips += (
-                    f'<span style="display:inline-block;font-size:0.75rem;'
-                    f'border:1px solid #f59e0b;border-radius:12px;padding:2px 8px;margin:2px;'
-                    f'color:#f59e0b;">⏳ {sec["label"]}</span>')
-            elif k in done_keys:
-                chips += (
-                    f'<span style="display:inline-block;font-size:0.75rem;'
-                    f'border:1px solid #22aa55;border-radius:12px;padding:2px 8px;margin:2px;'
-                    f'color:#22aa55;">✓ {sec["label"]}</span>')
-        if chips:
-            st.markdown(
-                f'<div style="margin-bottom:12px;line-height:2.2;">{chips}</div>',
-                unsafe_allow_html=True)
-
-    # Sections list
+    queue      = st.session_state.get("run_queue", [])
     active_key = st.session_state.get("active_section", "registry")
+
     for sec in MAIN_SECTIONS:
-        k       = sec["key"]
-        status  = sec_status(k)
-        content = get_content(k)
-        parsed  = parse_json_result(content) if content else None
-        risk    = (parsed.get("rischioComplessivo","") or parsed.get("customerRiskRating","")) if parsed else ""
-        rc      = get_risk_color(risk)
+        k         = sec["key"]
+        status    = sec_status(k)
         is_active = (k == active_key)
+        is_running = (k == queued_key)
 
+        # Colours: green = done, grey = pending/running
         if status == "completed":
-            dot = "●"; dot_c = rc
-        elif k == queued_key:
-            dot = "⏳"; dot_c = "#f59e0b"
+            dot_c     = "#22aa55"
+            label_c   = "#1a1a1a"
+            dot       = "●"
+        elif is_running:
+            dot_c     = "#aaa"
+            label_c   = "#777"
+            dot       = "⚙"   # will spin via CSS
         else:
-            dot = "○"; dot_c = "#d0d0d0"
+            dot_c     = "#d0d0d0"
+            label_c   = "#aaa"
+            dot       = "○"
 
-        border_style = f"border-left:3px solid {RED};background:#fff9f9;" if is_active else "border-left:3px solid transparent;background:transparent;"
-        risk_badge = (
-            f'<span style="background:{rc};color:#fff;font-size:0.55rem;font-weight:700;'
-            f'padding:1px 6px;border-radius:8px;margin-left:4px;">{risk}</span>'
-            if risk else "")
+        dot_class = 'class="aml-spin"' if is_running else ''
+        border    = f"border-left:3px solid {RED};background:#fff9f9;" if is_active else "border-left:3px solid transparent;"
 
         st.markdown(
-            f'<div style="{border_style}padding:7px 8px;border-radius:0 4px 4px 0;'
-            f'margin-bottom:2px;cursor:pointer;">'
-            f'<span style="color:{dot_c};font-size:0.65rem;margin-right:5px;">{dot}</span>'
-            f'<span style="font-size:0.68rem;color:#bbb;margin-right:4px;">{sec["number"]}</span>'
-            f'<span style="font-size:0.82rem;color:#1a1a1a;">{sec["icon"]} {sec["label"]}</span>'
-            f'{risk_badge}'
+            f'<div style="{border}padding:8px 8px 8px 10px;border-radius:0 4px 4px 0;margin-bottom:2px;">'
+            f'<span {dot_class} style="color:{dot_c};font-size:0.65rem;margin-right:6px;">{dot}</span>'
+            f'<span style="font-size:0.82rem;font-weight:{"700" if is_active else "400"};color:{label_c};">'
+            f'{sec["icon"]} {sec["label"]}</span>'
             f'</div>',
             unsafe_allow_html=True)
 
-        if st.button("‎", key=f"sb_{k}", use_container_width=True,
-                     help=sec["full_label"]):
+        if st.button("‎", key=f"sb_{k}", use_container_width=True, help=sec["full_label"]):
             st.session_state.active_section = k
             st.rerun()
 
-    st.markdown('<hr style="margin:12px 0;border-color:#f0f0f0;">', unsafe_allow_html=True)
+    st.markdown('<hr style="margin:10px 0;border-color:#f0f0f0;">', unsafe_allow_html=True)
 
-    # Controls
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("✕ Nuovo", key="new_case_sb", use_container_width=True, help="Nuovo caso"):
-            for k in list(st.session_state.keys()):
-                del st.session_state[k]
+        if st.button("✕ Nuovo", key="new_case_sb", use_container_width=True):
+            for k in list(st.session_state.keys()): del st.session_state[k]
             st.rerun()
     with c2:
-        if st.button("⚙ Setup", key="go_setup_sb", use_container_width=True, help="Setup"):
-            st.session_state.step = "setup"
-            st.rerun()
+        if st.button("⚙", key="go_setup_sb", use_container_width=True, help="Setup"):
+            st.session_state.step = "setup"; st.rerun()
 
 
 # ── Criticality panel ─────────────────────────────────────────────
@@ -995,142 +966,75 @@ def _render_crit_panel(key: str):
 
 
 # ── Section content ───────────────────────────────────────────────
-def _render_section_content(key: str, client, stream_slot=None):
+def _render_section_content(key: str, client):
     sec     = next(s for s in MAIN_SECTIONS if s["key"] == key)
     status  = sec_status(key)
     content = get_content(key)
     parsed  = parse_json_result(content) if content else None
     mode    = st.session_state.section_modes.get(key, "agent")
 
-    # Header row
-    risk = ""
-    if parsed:
-        risk = parsed.get("rischioComplessivo","") or parsed.get("customerRiskRating","")
-    rc = get_risk_color(risk)
-    risk_badge = (
-        f'<span style="background:{rc};color:#fff;font-size:0.65rem;font-weight:700;'
-        f'padding:3px 12px;border-radius:14px;margin-left:8px;">{risk}</span>'
-        if risk else "")
-
+    # ── Section title (clean, no badges) ──────────────────────────
     st.markdown(
-        f'<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;'
-        f'border-bottom:1px solid #f0f0f0;padding-bottom:10px;margin-bottom:14px;">'
-        f'<span style="font-size:1.3rem;">{sec["icon"]}</span>'
-        f'<span style="font-size:0.65rem;color:#bbb;font-weight:700;">{sec["number"]}</span>'
-        f'<span style="font-size:1.0rem;font-weight:700;color:#1a1a1a;">{sec["full_label"]}</span>'
-        f'{risk_badge}'
+        f'<div style="border-bottom:1px solid #f0f0f0;padding-bottom:10px;margin-bottom:16px;">'
+        f'<span style="font-size:0.6rem;color:#bbb;font-weight:700;letter-spacing:1px;">{sec["number"]}</span>'
+        f'<span style="font-size:1.05rem;font-weight:700;color:#1a1a1a;margin-left:8px;">'
+        f'{sec["icon"]} {sec["full_label"]}</span>'
         f'</div>',
         unsafe_allow_html=True)
 
-    # Top-right criticality badges
-    if parsed:
-        evidenze  = parsed.get("principaliEvidenze", [])
-        overrides = st.session_state.crit_overrides.get(key, {})
-        n_crit = sum(1 for i, ev in enumerate(evidenze)
-                     if (ev.get("livello","") or "").upper().startswith("CRITICO")
-                     and (overrides.get(i,{}).get("status","") or "").lower() != "chiuso")
-        n_anom = sum(1 for i, ev in enumerate(evidenze)
-                     if (ev.get("livello","") or "").upper().startswith("ANOMALIA")
-                     and (overrides.get(i,{}).get("status","") or "").lower() != "chiuso")
-
-        badge_cols = st.columns([4, 1, 1])
-        with badge_cols[1]:
-            if n_crit > 0:
-                if st.button(f"🔴 {n_crit}", key=f"crit_badge_{key}", help="Criticità"):
-                    cps = st.session_state.crit_panel_section
-                    st.session_state.crit_panel_section = None if cps == key else key
-                    st.rerun()
-        with badge_cols[2]:
-            if n_anom > 0:
-                if st.button(f"🟡 {n_anom}", key=f"anom_badge_{key}", help="Anomalie"):
-                    cps = st.session_state.crit_panel_section
-                    st.session_state.crit_panel_section = None if cps == key else key
-                    st.rerun()
-
-    # Assigned docs tags
-    loaded = st.session_state.section_doc_names.get(key, [])
-    if key == "transaction" and st.session_state.excel_name:
-        loaded = [st.session_state.excel_name]
-    if loaded:
-        tags = "".join(
-            f'<span style="display:inline-block;background:#f0fff4;border:1px solid #bbf7d0;'
-            f'border-radius:10px;padding:2px 8px;font-size:0.68rem;color:#166534;margin:2px;">📄 {n}</span>'
-            for n in loaded)
-        st.markdown(f'<div style="margin-bottom:10px;">{tags}</div>', unsafe_allow_html=True)
-
-    # Manual mode
+    # ── Manual mode ───────────────────────────────────────────────
     if mode == "manual":
-        manual_key = f"manual_text_{key}"
-        val = st.session_state.get(manual_key, content or "")
-        new_val = st.text_area(
-            "Inserisci analisi manuale",
-            value=val,
-            height=300,
-            key=f"manual_ta_{key}",
-            label_visibility="collapsed")
-        if new_val != val:
-            st.session_state[manual_key] = new_val
+        val = st.session_state.get(f"manual_text_{key}", content or "")
+        new_val = st.text_area("Analisi manuale", value=val, height=300,
+                               key=f"manual_ta_{key}", label_visibility="collapsed")
         if st.button("💾 Salva", key=f"manual_save_{key}"):
             st.session_state.edited_content[key] = new_val
             st.session_state.kyc_state.add_result(key, new_val)
             st.rerun()
         return
 
-    # Agent mode — show result
+    # ── Agent mode: result ────────────────────────────────────────
     if status == "completed" and content:
         if parsed:
-            # Section synthesis — clean white box, no color borders
             narrativa = (parsed.get("narrativa") or parsed.get("narrativaCompleta")
                          or parsed.get("sintesiEsecutiva","") or "")
             if narrativa:
                 st.markdown(
-                    '<div style="background:#fff;border:1px solid #e8e8e8;'
-                    'padding:16px 20px;border-radius:6px;font-size:0.87rem;'
-                    'line-height:1.8;color:#1a1a1a;margin-bottom:12px;">'
+                    '<div style="background:#fff;border:1px solid #ebebeb;'
+                    'padding:18px 22px;border-radius:6px;font-size:0.87rem;'
+                    'line-height:1.85;color:#1a1a1a;">'
                     + narrativa.replace("\n","<br>") + '</div>',
                     unsafe_allow_html=True)
 
             # Edit toggle
-            edit_toggle_key = f"show_edit_{key}"
-            if st.button("✏️ Modifica manualmente", key=f"edit_toggle_{key}"):
-                st.session_state[edit_toggle_key] = not st.session_state.get(edit_toggle_key, False)
+            etk = f"show_edit_{key}"
+            st.markdown("<div style='margin-top:10px;'></div>", unsafe_allow_html=True)
+            if st.button("✏️ Modifica", key=f"edit_toggle_{key}"):
+                st.session_state[etk] = not st.session_state.get(etk, False)
                 st.rerun()
-
-            if st.session_state.get(edit_toggle_key, False):
-                edited = st.text_area(
-                    "Contenuto",
-                    value=content,
-                    height=300,
-                    key=f"edit_ta_{key}",
-                    label_visibility="collapsed")
+            if st.session_state.get(etk, False):
+                edited = st.text_area("", value=content, height=300,
+                                      key=f"edit_ta_{key}", label_visibility="collapsed")
                 if st.button("💾 Salva", key=f"edit_save_{key}"):
                     st.session_state.edited_content[key] = edited
                     st.session_state.kyc_state.add_result(key, edited)
-                    st.session_state[edit_toggle_key] = False
+                    st.session_state[etk] = False
                     st.rerun()
         else:
-            # Raw text result
             edited = st.text_area("", value=content, height=300,
                                   key=f"edit_{key}", label_visibility="collapsed")
             if edited != content:
                 st.session_state.edited_content[key] = edited
                 st.session_state.kyc_state.add_result(key, edited)
 
-        # Re-run button
-        if st.button(f"🔄 Ri-analizza", key=f"rerun_{key}"):
-            _run_with_stream(key, client)
-            return
-
     elif status == "empty":
-        if mode == "agent":
-            st.markdown(
-                f'<div style="text-align:center;padding:24px 0;">'
-                f'<div style="font-size:2.5rem;">{sec["icon"]}</div>'
-                f'<div style="font-size:0.82rem;color:#ccc;margin-top:8px;">In attesa di analisi</div>'
-                f'</div>', unsafe_allow_html=True)
-            if st.button(f"▶ Avvia agente", key=f"run_{key}"):
-                _run_with_stream(key, client)
-                return
+        st.markdown(
+            f'<div style="text-align:center;padding:40px 0;">'
+            f'<div style="font-size:3rem;opacity:0.15;">{sec["icon"]}</div>'
+            f'<div style="font-size:0.8rem;color:#ccc;margin-top:10px;">In attesa di analisi</div>'
+            f'</div>', unsafe_allow_html=True)
+        if st.button("▶ Avvia agente", key=f"run_{key}"):
+            _run_with_stream(key, client)
 
 
 # ── STEP 4: ANALYSIS ─────────────────────────────────────────────
@@ -1145,15 +1049,46 @@ def render_analysis():
         st.session_state["run_queue"] = st.session_state["run_queue"][1:]
         st.session_state.active_section = queued_key
 
-    # Determine layout
+    # ── Global criticality indicator ─────────────────────────────
+    # Count active (non-chiuse) CRITICO + ANOMALIA across all done sections
+    total_crit = total_anom = 0
+    for sec in MAIN_SECTIONS:
+        sk = sec["key"]
+        sc = get_content(sk)
+        sp = parse_json_result(sc) if sc else None
+        if not sp:
+            continue
+        ov = st.session_state.crit_overrides.get(sk, {})
+        for i, ev in enumerate(sp.get("principaliEvidenze", [])):
+            lvl = (ev.get("livello","") or "").upper()
+            if (ov.get(i, {}).get("status","") or "").lower() == "chiuso":
+                continue
+            if lvl.startswith("CRITICO"):
+                total_crit += 1
+            elif lvl.startswith("ANOMALIA"):
+                total_anom += 1
+
+    # Show indicator row (right-aligned above columns)
+    ind_parts = []
+    if total_crit:
+        ind_parts.append(f'<span style="background:#fef2f2;color:#dc2626;font-size:0.75rem;font-weight:700;'
+                         f'padding:4px 12px;border-radius:12px;border:1px solid #fecaca;">🔴 {total_crit} criticità</span>')
+    if total_anom:
+        ind_parts.append(f'<span style="background:#fffbeb;color:#d97706;font-size:0.75rem;font-weight:700;'
+                         f'padding:4px 12px;border-radius:12px;border:1px solid #fde68a;">🟡 {total_anom} attenzioni</span>')
+    if ind_parts:
+        st.markdown(
+            f'<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px;">'
+            + "".join(ind_parts) + '</div>',
+            unsafe_allow_html=True)
+
+    # ── Layout ────────────────────────────────────────────────────
     crit_panel_open = st.session_state.get("crit_panel_section")
 
     if crit_panel_open:
-        cols = st.columns([1.6, 3.5, 2.2])
-        col_sidebar, col_content, col_crit = cols
+        col_sidebar, col_content, col_crit = st.columns([1.6, 3.5, 2.2])
     else:
-        cols = st.columns([1.6, 5.2])
-        col_sidebar, col_content = cols
+        col_sidebar, col_content = st.columns([1.6, 5.2])
         col_crit = None
 
     with col_sidebar:
@@ -1163,21 +1098,38 @@ def render_analysis():
         active_key = st.session_state.get("active_section", "registry")
 
         if queued_key:
-            # Show streaming for the queued key
             sec = next(s for s in ALL_SECTIONS if s["key"] == queued_key)
             st.markdown(
-                f'<div style="font-size:0.9rem;font-weight:700;margin-bottom:12px;">'
-                f'<span class="aml-spin" style="display:inline-block;">⚙</span>'
-                f' {sec["icon"]} {sec["full_label"]} — analisi in corso…</div>',
+                f'<div style="font-size:0.88rem;font-weight:600;color:#777;margin-bottom:14px;">'
+                f'<span class="aml-spin" style="display:inline-block;margin-right:6px;">⚙</span>'
+                f'{sec["icon"]} {sec["full_label"]} — analisi in corso…</div>',
                 unsafe_allow_html=True)
             _run_with_stream(queued_key, client)
             return
-        else:
-            _render_section_content(active_key, client)
+
+        # Criticality badge for active section (opens right panel)
+        if parsed_active := parse_json_result(get_content(active_key)):
+            ov_a = st.session_state.crit_overrides.get(active_key, {})
+            n_c = sum(1 for i,ev in enumerate(parsed_active.get("principaliEvidenze",[]))
+                      if (ev.get("livello","") or "").upper().startswith("CRITICO")
+                      and (ov_a.get(i,{}).get("status","") or "").lower() != "chiuso")
+            n_a = sum(1 for i,ev in enumerate(parsed_active.get("principaliEvidenze",[]))
+                      if (ev.get("livello","") or "").upper().startswith("ANOMALIA")
+                      and (ov_a.get(i,{}).get("status","") or "").lower() != "chiuso")
+            if n_c or n_a:
+                bc1, bc2, _ = st.columns([1, 1, 6])
+                with bc1:
+                    if n_c and st.button(f"🔴 {n_c}", key=f"cb_{active_key}"):
+                        st.session_state.crit_panel_section = None if crit_panel_open == active_key else active_key
+                        st.rerun()
+                with bc2:
+                    if n_a and st.button(f"🟡 {n_a}", key=f"ab_{active_key}"):
+                        st.session_state.crit_panel_section = None if crit_panel_open == active_key else active_key
+                        st.rerun()
+
+        _render_section_content(active_key, client)
 
         st.markdown('<hr style="margin:20px 0;border-color:#f0f0f0;">', unsafe_allow_html=True)
-
-        # Bottom navigation
         done, total = main_progress()
         if done == total:
             if st.button("💾 Salva e Procedi alla Valutazione Finale →",
@@ -1188,12 +1140,11 @@ def render_analysis():
     if col_crit:
         with col_crit:
             st.markdown(
-                f'<div style="font-size:0.9rem;font-weight:700;color:#1a1a1a;'
-                f'border-bottom:1px solid #f0f0f0;padding-bottom:8px;margin-bottom:12px;">'
-                f'Criticità &amp; Attenzioni</div>',
+                '<div style="font-size:0.85rem;font-weight:700;color:#1a1a1a;'
+                'border-bottom:1px solid #f0f0f0;padding-bottom:8px;margin-bottom:12px;">'
+                'Criticità &amp; Attenzioni</div>',
                 unsafe_allow_html=True)
-            if crit_panel_open:
-                _render_crit_panel(crit_panel_open)
+            _render_crit_panel(crit_panel_open)
             if st.button("✕ Chiudi", key="close_crit_panel"):
                 st.session_state.crit_panel_section = None
                 st.rerun()
