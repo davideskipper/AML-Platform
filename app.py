@@ -1594,6 +1594,14 @@ def render_analysis():
                 _fl_counts["ATTENZIONE"] += 1
             elif _r in ("LOW", "BASSO"):
                 _fl_counts["MANCANTE"]   += 1
+        for _ev in _p.get("principaliEvidenze", []):
+            _l = (_ev.get("livello","") or "").upper()
+            if _l == "CRITICO":
+                _fl_counts["CRITICO"]    += 1
+            elif _l in ("ANOMALIA", "ATTENZIONE"):
+                _fl_counts["ATTENZIONE"] += 1
+            else:
+                _fl_counts["MANCANTE"]   += 1
 
     _badge_cfg = [
         ("CRITICO",    "#DC2626", "#FEE2E2", "Critici"),
