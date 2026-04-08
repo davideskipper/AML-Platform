@@ -1218,7 +1218,11 @@ def _render_section_content(key: str, client):
         val = st.session_state.get(f"manual_text_{key}", content or "")
         new_val = st.text_area("Analisi manuale", value=val, height=300,
                                key=f"manual_ta_{key}", label_visibility="collapsed")
-        btn_s, btn_r, _ = st.columns([1, 1, 2])
+        btn_back, btn_s, btn_r = st.columns([1, 1, 1])
+        with btn_back:
+            if st.button("Indietro", key=f"manual_back_{key}", use_container_width=True):
+                st.session_state.section_modes[key] = None
+                st.rerun()
         with btn_s:
             if st.button("Salva", key=f"manual_save_{key}", use_container_width=True):
                 st.session_state.edited_content[key] = new_val
@@ -1324,37 +1328,44 @@ def _render_section_content(key: str, client):
                         + "".join(_proposta_parts) + '</div>',
                         unsafe_allow_html=True)
 
-            # AML flags — sorted: CRITICAL → HIGH → MEDIUM → LOW
+            # AML flags — 3 categories: Critico (red) · Attenzione (yellow) · Info mancanti (grey)
             flags = parsed.get("flags", [])
             if flags:
-                _flag_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
-                flags = sorted(flags, key=lambda f: _flag_order.get(
-                    (f.get("rischio","") or "").upper(), 4))
+                def _flag_rank(f):
+                    r = (f.get("rischio","") or "").upper()
+                    if r in ("CRITICAL","HIGH","CRITICO","ALTO"): return 0
+                    if r in ("MEDIUM","MEDIO","ATTENZIONE","ANOMALIA"): return 1
+                    return 2
+                flags = sorted(flags, key=_flag_rank)
                 st.markdown(
                     f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
                     f'color:{TEXT_SEC};margin:6px 0 8px;text-transform:uppercase;">Flag AML</div>',
                     unsafe_allow_html=True)
-                _flag_cfg = {
-                    "CRITICAL": ("#F3E8FF", "#7C3AED", "#7C3AED"),
-                    "HIGH":     ("#FEE2E2", "#B91C1C", "#DC2626"),
-                    "MEDIUM":   ("#FFFBEB", "#92400E", "#D97706"),
-                    "LOW":      ("#F3F4F6", "#6B7280", "#9CA3AF"),
-                }
+                def _flag_style(rischio):
+                    r = rischio.upper()
+                    if r in ("CRITICAL","HIGH","CRITICO","ALTO"):
+                        return "#FEE2E2", "#DC2626", "#DC2626", "Punto critico"
+                    if r in ("MEDIUM","MEDIO","ATTENZIONE","ANOMALIA"):
+                        return "#FFFBEB", "#D97706", "#D97706", "Punto di attenzione"
+                    return "#F3F4F6", "#6B7280", "#9CA3AF", "Info mancante"
                 for fl in flags:
                     rischio = (fl.get("rischio","") or "").upper()
-                    bg_f, fg_f, bd_f = _flag_cfg.get(rischio, ("#F3F4F6","#6B7280","#9CA3AF"))
+                    bg_f, fg_f, bd_f, cat_label = _flag_style(rischio)
                     tipo = fl.get("tipo","")
                     desc = fl.get("descrizione","")
                     norm = fl.get("riferimentoNormativo","") or fl.get("indicatoreUIF","")
                     st.markdown(
-                        f'<div style="display:flex;align-items:flex-start;gap:10px;'
-                        f'background:{bg_f};border:1px solid {BORDER};border-left:3px solid {bd_f};'
-                        f'border-radius:0 6px 6px 0;padding:8px 12px;margin-bottom:5px;">'
-                        f'<div style="flex:1;">'
-                        f'<span style="font-size:0.8rem;font-weight:600;color:{fg_f};">{tipo}</span>'
-                        + (f'<span style="font-size:0.78rem;color:{TEXT_SEC};"> — {desc}</span>' if desc else '')
-                        + (f'<div style="font-size:0.68rem;color:{TEXT_SEC};margin-top:2px;">📎 {norm}</div>' if norm else '')
-                        + f'</div></div>',
+                        f'<div style="background:{bg_f};border:1px solid {BORDER};'
+                        f'border-left:3px solid {bd_f};border-radius:0 6px 6px 0;'
+                        f'padding:8px 12px;margin-bottom:5px;">'
+                        f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">'
+                        f'<span style="font-size:0.62rem;font-weight:700;color:{fg_f};'
+                        f'background:{bd_f}22;padding:1px 7px;border-radius:20px;">{cat_label}</span>'
+                        f'<span style="font-size:0.82rem;font-weight:600;color:{fg_f};">{tipo}</span>'
+                        f'</div>'
+                        + (f'<div style="font-size:0.8rem;color:{TEXT};line-height:1.5;">{desc}</div>' if desc else '')
+                        + (f'<div style="font-size:0.68rem;color:{TEXT_SEC};margin-top:3px;">{norm}</div>' if norm else '')
+                        + f'</div>',
                         unsafe_allow_html=True)
 
             # Action row: re-run + edit JSON
@@ -1396,18 +1407,14 @@ def _render_section_content(key: str, client):
             f'<div style="font-size:0.75rem;color:{TEXT_SEC};opacity:0.7;margin-top:4px;">'
             f'{sec["desc"]}</div>'
             f'</div>', unsafe_allow_html=True)
-        btn_back, btn_a, btn_m = st.columns(3)
-        with btn_back:
-            if st.button("Indietro", key=f"back_upload_{key}", use_container_width=True):
-                st.session_state.step = "upload"
-                st.rerun()
+        btn_a, btn_m = st.columns(2)
         with btn_a:
             if st.button("Avvia Agente", key=f"run_{key}", use_container_width=True):
                 st.session_state.section_modes[key] = "agent"
                 st.session_state.run_queue = [key]
                 st.rerun()
         with btn_m:
-            if st.button("Inserisci Manuale", key=f"manual_start_{key}", use_container_width=True):
+            if st.button("Inserisci Valutazione Manuale", key=f"manual_start_{key}", use_container_width=True):
                 st.session_state.section_modes[key] = "manual"
                 st.rerun()
 
@@ -1528,31 +1535,36 @@ def render_analysis():
             f'{brd}white-space:nowrap;">'
             + icon_html + s["label"] + '</span>')
 
-    # ── Count principaliEvidenze by livello across completed sections ──
-    # Source: only principaliEvidenze (authoritative per-agent output).
-    # Levels: CRITICO (purple) · ANOMALIA (red) · ATTENZIONE (yellow).
-    _ev_counts = {"CRITICO": 0, "ANOMALIA": 0, "ATTENZIONE": 0}
+    # ── Count AML flags across completed sections — 3 categories ────
+    # CRITICO (red)  = normative/risk impact
+    # ATTENZIONE (yellow) = needs investigation
+    # MANCANTE (grey) = missing information
+    _fl_counts = {"CRITICO": 0, "ATTENZIONE": 0, "MANCANTE": 0}
     for _s in MAIN_SECTIONS:
         _c = get_content(_s["key"])
         _p = parse_json_result(_c) if _c else None
         if not _p:
             continue
-        for _ev in _p.get("principaliEvidenze", []):
-            _lv = (_ev.get("livello") or "").upper()
-            if _lv in _ev_counts:
-                _ev_counts[_lv] += 1
+        for _fl in _p.get("flags", []):
+            _r = (_fl.get("rischio","") or "").upper()
+            if _r in ("CRITICAL", "HIGH", "CRITICO", "ALTO"):
+                _fl_counts["CRITICO"]    += 1
+            elif _r in ("MEDIUM", "MEDIO", "ATTENZIONE", "ANOMALIA"):
+                _fl_counts["ATTENZIONE"] += 1
+            elif _r in ("LOW", "BASSO"):
+                _fl_counts["MANCANTE"]   += 1
 
     _badge_cfg = [
-        ("CRITICO",    "#7C3AED", "#F3E8FF", "Critici"),
-        ("ANOMALIA",   "#DC2626", "#FEE2E2", "Anomalie"),
+        ("CRITICO",    "#DC2626", "#FEE2E2", "Critici"),
         ("ATTENZIONE", "#D97706", "#FFFBEB", "Attenzioni"),
+        ("MANCANTE",   "#6B7280", "#F3F4F6", "Info mancanti"),
     ]
     _badges_html = "".join(
         f'<span style="display:inline-flex;align-items:center;gap:4px;'
         f'background:{_bg};color:{_fg};font-size:0.68rem;font-weight:700;'
         f'padding:3px 9px;border-radius:20px;white-space:nowrap;">'
-        f'<span style="font-size:0.6rem;">●</span>{_ev_counts[_k]} {_lbl}</span>'
-        for _k, _fg, _bg, _lbl in _badge_cfg if _ev_counts[_k] > 0
+        f'<span style="font-size:0.6rem;">●</span>{_fl_counts[_k]} {_lbl}</span>'
+        for _k, _fg, _bg, _lbl in _badge_cfg if _fl_counts[_k] > 0
     )
 
     top_l, top_m, top_r = st.columns([3.5, 1.5, 1])
