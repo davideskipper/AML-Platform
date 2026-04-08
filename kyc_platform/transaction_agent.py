@@ -173,19 +173,38 @@ def _read_excel(source) -> str:
         buf = source
 
     def _read_csv(b):
-        """Try ';' separator first; fall back to ',' if result is 1 column."""
+        """Try multiple separators and encodings to parse CSV robustly.
+        Separator: ';' first, fall back to ','.
+        Encoding: utf-8-sig → latin-1 → cp1252 (covers Italian bank exports).
+        """
+        _ENCODINGS = ["utf-8-sig", "latin-1", "cp1252"]
+
+        def _try_csv(data, sep):
+            for enc in _ENCODINGS:
+                try:
+                    buf_c = _io.BytesIO(data) if isinstance(data, (bytes, bytearray)) else _io.BytesIO(data.getvalue())
+                    return pd.read_csv(buf_c, sep=sep, encoding=enc)
+                except (UnicodeDecodeError, Exception):
+                    continue
+            raise RuntimeError("Impossibile decodificare il CSV con le codifiche supportate (utf-8, latin-1, cp1252).")
+
         if isinstance(b, str):
-            df = pd.read_csv(b, sep=";")
-            if len(df.columns) == 1:
-                df = pd.read_csv(b, sep=",")
+            for enc in _ENCODINGS:
+                try:
+                    df = pd.read_csv(b, sep=";", encoding=enc)
+                    if len(df.columns) == 1:
+                        df = pd.read_csv(b, sep=",", encoding=enc)
+                    return {"Sheet1": df}
+                except (UnicodeDecodeError, Exception):
+                    continue
+            raise RuntimeError("Impossibile leggere il CSV.")
         else:
             raw = b.read() if hasattr(b, "read") else b
-            b_copy = _io.BytesIO(raw if isinstance(raw, (bytes, bytearray)) else raw.getvalue())
-            df = pd.read_csv(b_copy, sep=";")
+            raw = raw if isinstance(raw, (bytes, bytearray)) else raw.getvalue()
+            df = _try_csv(raw, ";")
             if len(df.columns) == 1:
-                b_copy2 = _io.BytesIO(raw if isinstance(raw, (bytes, bytearray)) else raw.getvalue())
-                df = pd.read_csv(b_copy2, sep=",")
-        return {"Sheet1": df}
+                df = _try_csv(raw, ",")
+            return {"Sheet1": df}
 
     if ext == ".csv":
         dfs = _read_csv(buf)
