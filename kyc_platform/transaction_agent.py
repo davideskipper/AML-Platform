@@ -92,6 +92,15 @@ OUTPUT: Restituisci esclusivamente un oggetto JSON valido:
 Rispondi ESCLUSIVAMENTE con un oggetto JSON valido. Nessun testo prima o dopo. Nessun markdown, nessun code block. Il tuo output deve iniziare con { e terminare con }.
 
 {
+  "rischioComplessivo": "LOW|MEDIUM|HIGH|CRITICAL",
+  "narrativa": "Sintesi discorsiva professionale di 10-14 righe per il compliance officer. Struttura: (1) profilo sintetico della controparte, (2) elementi positivi/conformi, (3) anomalie e criticità con richiamo diretto alla normativa applicabile (D.Lgs.231/2007, FATF Recommendations, provvedimenti UIF, Reg. UE 2015/847). Concludi con il razionale del livello di rischio assegnato. Tono formale, linguaggio tecnico AML.",
+  "principaliEvidenze": [
+    {
+      "evidenza": "Descrizione sintetica dell'anomalia o elemento di attenzione",
+      "normativa": "Riferimento normativo specifico (es. UIF Indic. n.42/2023, Art.35 D.Lgs.231/2007, FATF Rec.10)",
+      "livello": "ATTENZIONE|ANOMALIA|CRITICO"
+    }
+  ],
   "dashboard": {
     "periodoAnalizzato": "",
     "totaleEntrate": 0,
@@ -127,15 +136,6 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido. Nessun testo prima o dopo. N
   "dettaglioTransazioneSegnalabile": "",
   "valutazioneOperativita": "COERENTE|ANOMALIE_MINORI|ANOMALIE_SIGNIFICATIVE|OPERATIVITA_SOSPETTA",
   "bozzaMotivazioneSOS": "",
-  "principaliEvidenze": [
-    {
-      "evidenza": "Descrizione sintetica dell'anomalia o elemento di attenzione",
-      "normativa": "Riferimento normativo specifico (es. UIF Indic. n.42/2023, Art.35 D.Lgs.231/2007, FATF Rec.10)",
-      "livello": "ATTENZIONE|ANOMALIA|CRITICO"
-    }
-  ],
-  "rischioComplessivo": "LOW|MEDIUM|HIGH|CRITICAL",
-  "narrativa": "Sintesi discorsiva professionale di 10-14 righe per il compliance officer. Struttura: (1) profilo sintetico della controparte, (2) elementi positivi/conformi, (3) anomalie e criticità con richiamo diretto alla normativa applicabile (D.Lgs.231/2007, FATF Recommendations, provvedimenti UIF, Reg. UE 2015/847). Concludi con il razionale del livello di rischio assegnato. Tono formale, linguaggio tecnico AML.",
   "note": ""
 }"""
 

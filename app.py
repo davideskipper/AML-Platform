@@ -1338,7 +1338,17 @@ def _render_section_content(key: str, client):
                         unsafe_allow_html=True)
 
             # AML flags — 3 categories: Critico (red) · Attenzione (yellow) · Info mancanti (grey)
-            flags = parsed.get("flags", [])
+            # Fallback: use principaliEvidenze when flags is absent (transaction agent schema)
+            flags = parsed.get("flags") or []
+            evidenze = parsed.get("principaliEvidenze") or []
+            def _flag_style(rischio):
+                r = rischio.upper()
+                if r in ("CRITICAL","HIGH","CRITICO","ALTO"):
+                    return "#FEE2E2", "#DC2626", "#DC2626", "Punto critico"
+                if r in ("MEDIUM","MEDIO","ATTENZIONE","ANOMALIA"):
+                    return "#FFFBEB", "#D97706", "#D97706", "Punto di attenzione"
+                return "#F3F4F6", "#6B7280", "#9CA3AF", "Info mancante"
+
             if flags:
                 def _flag_rank(f):
                     r = (f.get("rischio","") or "").upper()
@@ -1350,13 +1360,6 @@ def _render_section_content(key: str, client):
                     f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
                     f'color:{TEXT_SEC};margin:6px 0 8px;text-transform:uppercase;">Flag AML</div>',
                     unsafe_allow_html=True)
-                def _flag_style(rischio):
-                    r = rischio.upper()
-                    if r in ("CRITICAL","HIGH","CRITICO","ALTO"):
-                        return "#FEE2E2", "#DC2626", "#DC2626", "Punto critico"
-                    if r in ("MEDIUM","MEDIO","ATTENZIONE","ANOMALIA"):
-                        return "#FFFBEB", "#D97706", "#D97706", "Punto di attenzione"
-                    return "#F3F4F6", "#6B7280", "#9CA3AF", "Info mancante"
                 for fl in flags:
                     rischio = (fl.get("rischio","") or "").upper()
                     bg_f, fg_f, bd_f, cat_label = _flag_style(rischio)
@@ -1371,6 +1374,35 @@ def _render_section_content(key: str, client):
                         f'<span style="font-size:0.62rem;font-weight:700;color:{fg_f};'
                         f'background:{bd_f}22;padding:1px 7px;border-radius:20px;">{cat_label}</span>'
                         f'<span style="font-size:0.82rem;font-weight:600;color:{fg_f};">{tipo}</span>'
+                        f'</div>'
+                        + (f'<div style="font-size:0.8rem;color:{TEXT};line-height:1.5;">{desc}</div>' if desc else '')
+                        + (f'<div style="font-size:0.68rem;color:{TEXT_SEC};margin-top:3px;">{norm}</div>' if norm else '')
+                        + f'</div>',
+                        unsafe_allow_html=True)
+            elif evidenze:
+                # principaliEvidenze schema (transaction agent)
+                def _ev_rank(e):
+                    l = (e.get("livello","") or "").upper()
+                    if l == "CRITICO": return 0
+                    if l == "ANOMALIA": return 1
+                    return 2
+                evidenze = sorted(evidenze, key=_ev_rank)
+                st.markdown(
+                    f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
+                    f'color:{TEXT_SEC};margin:6px 0 8px;text-transform:uppercase;">Principali Evidenze AML</div>',
+                    unsafe_allow_html=True)
+                for ev in evidenze:
+                    livello = (ev.get("livello","") or "").upper()
+                    bg_f, fg_f, bd_f, cat_label = _flag_style(livello)
+                    desc = ev.get("evidenza","")
+                    norm = ev.get("normativa","")
+                    st.markdown(
+                        f'<div style="background:{bg_f};border:1px solid {BORDER};'
+                        f'border-left:3px solid {bd_f};border-radius:0 6px 6px 0;'
+                        f'padding:8px 12px;margin-bottom:5px;">'
+                        f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">'
+                        f'<span style="font-size:0.62rem;font-weight:700;color:{fg_f};'
+                        f'background:{bd_f}22;padding:1px 7px;border-radius:20px;">{cat_label}</span>'
                         f'</div>'
                         + (f'<div style="font-size:0.8rem;color:{TEXT};line-height:1.5;">{desc}</div>' if desc else '')
                         + (f'<div style="font-size:0.68rem;color:{TEXT_SEC};margin-top:3px;">{norm}</div>' if norm else '')
