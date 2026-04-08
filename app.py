@@ -124,6 +124,16 @@ st.markdown(f"""
   details summary {{ color: {TEXT} !important; font-weight: 500 !important; }}
   details {{ background: #fff !important; border: 1px solid {BORDER} !important; border-radius: 8px !important; }}
 
+  /* ── Bordered containers (st.container(border=True)) styled as cards ── */
+  [data-testid="stVerticalBlockBorderWrapper"] {{
+    background: #fff !important;
+    border: 1px solid {BORDER} !important;
+    border-radius: 10px !important;
+    padding: 18px 22px !important;
+    margin-bottom: 16px !important;
+    box-shadow: none !important;
+  }}
+
   /* ── Alerts ── */
   [data-testid="stAlert"] {{ border-radius: 6px !important; }}
 
@@ -653,74 +663,81 @@ def render_setup():
         if not get_api_key():
             st.error("⚠️  API Key Anthropic non trovata — aggiungi ANTHROPIC_API_KEY nei Secrets.")
 
-        # Controparte card
-        st.markdown(
-            f'<div style="background:#fff;border:1px solid {BORDER};border-radius:10px;'
-            f'padding:22px 26px;margin-bottom:16px;">'
-            f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
-            f'color:{BLUE};text-transform:uppercase;margin-bottom:16px;">Dati Controparte</div>',
-            unsafe_allow_html=True)
-
-        _field_label("Ragione Sociale", required=True)
-        company = st.text_input("Ragione Sociale", placeholder="es. Meridian Capital S.r.l.",
-                                label_visibility="collapsed")
-        c1, c2 = st.columns(2)
-        with c1:
-            _field_label("Paese", required=True)
-            country = st.text_input("Paese", placeholder="es. Italia", label_visibility="collapsed")
-        with c2:
-            _field_label("Settore")
-            sector = st.text_input("Settore", placeholder="es. Wealth Management", label_visibility="collapsed")
-        c3, c4 = st.columns(2)
-        with c3:
-            _field_label("Case ID")
-            case_id = st.text_input("Case ID", placeholder="es. AML-2026-0341", label_visibility="collapsed")
-        with c4:
-            _field_label("Analista")
-            analyst = st.text_input("Analista", placeholder="es. M. Rossi", label_visibility="collapsed")
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        # KB card
-        st.markdown(
-            f'<div style="background:#fff;border:1px solid {BORDER};border-radius:10px;'
-            f'padding:22px 26px;margin-bottom:20px;">'
-            f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
-            f'color:{BLUE};text-transform:uppercase;margin-bottom:6px;">Knowledge Base Normativa</div>'
-            f'<div style="font-size:0.78rem;color:{TEXT_SEC};margin-bottom:14px;">'
-            f'FATF guidelines, circolari UIF, D.Lgs.&nbsp;231/2007, liste sanzioni, policy AML interne.</div>',
-            unsafe_allow_html=True)
-
-        kb_files = st.file_uploader("KB", type=["pdf","docx","txt","md","csv"],
-                                    accept_multiple_files=True, key="kb_upload",
-                                    label_visibility="collapsed")
-        if kb_files:
-            texts, names = [], []
-            for f in kb_files:
-                texts.append(f"=== {f.name} ===\n{extract_text_from_file(f)}")
-                names.append(f.name)
-            st.session_state.knowledge_base = "\n\n".join(texts)
-            st.session_state.kb_doc_names   = names
-            st.success(f"✓ {len(texts)} documento/i caricati · {len(st.session_state.knowledge_base):,} caratteri")
-        elif st.session_state.kb_doc_names:
+        # ── Controparte card (uses st.container so widgets sit inside) ──
+        with st.container(border=True):
             st.markdown(
-                f'<div style="font-size:0.78rem;color:{BLUE};padding:6px 0;">'
-                + " · ".join(f"📄 {n}" for n in st.session_state.kb_doc_names)
-                + '</div>', unsafe_allow_html=True)
+                f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
+                f'color:{BLUE};text-transform:uppercase;margin-bottom:14px;">Dati Controparte</div>',
+                unsafe_allow_html=True)
 
-        st.markdown("</div>", unsafe_allow_html=True)
+            _field_label("Ragione Sociale")
+            company = st.text_input("Ragione Sociale", placeholder="es. Meridian Capital S.r.l.",
+                                    label_visibility="collapsed")
+            c1, c2 = st.columns(2)
+            with c1:
+                _field_label("Paese", required=True)
+                country = st.text_input("Paese", placeholder="es. Italia",
+                                        label_visibility="collapsed")
+            with c2:
+                _field_label("Settore")
+                sector = st.text_input("Settore", placeholder="es. Wealth Management",
+                                       label_visibility="collapsed")
+            c3, c4 = st.columns(2)
+            with c3:
+                # Case ID always auto-generated — shown as read-only label
+                auto_case_id = f"AML-{datetime.now().strftime('%Y%m%d-%H%M')}"
+                st.markdown(
+                    f'<div style="font-size:0.7rem;font-weight:600;letter-spacing:0.5px;'
+                    f'color:{TEXT_SEC};text-transform:uppercase;margin-bottom:3px;">Case ID</div>'
+                    f'<div style="font-size:0.82rem;color:{TEXT_SEC};background:#F8F9FA;'
+                    f'border:1px solid {BORDER};border-radius:6px;padding:8px 12px;">'
+                    f'{auto_case_id}</div>',
+                    unsafe_allow_html=True)
+                case_id = auto_case_id
+            with c4:
+                _field_label("Analista", required=True)
+                analyst = st.text_input("Analista", placeholder="es. M. Rossi",
+                                        label_visibility="collapsed")
+
+        # ── Knowledge Base card ──────────────────────────────────────
+        with st.container(border=True):
+            st.markdown(
+                f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
+                f'color:{BLUE};text-transform:uppercase;margin-bottom:4px;">Knowledge Base Normativa</div>'
+                f'<div style="font-size:0.78rem;color:{TEXT_SEC};margin-bottom:12px;">'
+                f'FATF guidelines, circolari UIF, D.Lgs.&nbsp;231/2007, liste sanzioni, policy AML interne.</div>',
+                unsafe_allow_html=True)
+
+            kb_files = st.file_uploader("KB", type=["pdf","docx","txt","md","csv"],
+                                        accept_multiple_files=True, key="kb_upload",
+                                        label_visibility="collapsed")
+            if kb_files:
+                texts, names = [], []
+                for f in kb_files:
+                    texts.append(f"=== {f.name} ===\n{extract_text_from_file(f)}")
+                    names.append(f.name)
+                st.session_state.knowledge_base = "\n\n".join(texts)
+                st.session_state.kb_doc_names   = names
+                st.success(f"✓ {len(texts)} documento/i caricati · {len(st.session_state.knowledge_base):,} caratteri")
+            elif st.session_state.kb_doc_names:
+                st.markdown(
+                    f'<div style="font-size:0.78rem;color:{BLUE};padding:6px 0;">'
+                    + " · ".join(f"📄 {n}" for n in st.session_state.kb_doc_names)
+                    + '</div>', unsafe_allow_html=True)
 
         if st.button("Continua → Carica Documenti", use_container_width=True):
-            if not company.strip() or not country.strip():
-                st.error("Ragione Sociale e Paese sono obbligatori.")
+            if not country.strip():
+                st.error("Il campo Paese è obbligatorio.")
+            elif not analyst.strip():
+                st.error("Il campo Analista è obbligatorio.")
             elif not get_api_key():
                 st.error("Configura ANTHROPIC_API_KEY nei Secrets.")
             else:
                 s = st.session_state.kyc_state
-                s.case.company_name = company.strip()
+                s.case.company_name = company.strip() or "Controparte N/D"
                 s.case.country      = country.strip()
-                s.case.case_id      = case_id.strip() or f"AML-{datetime.now().strftime('%Y%m%d-%H%M')}"
-                log_event("Sistema", f"Caso aperto: {company} ({country})", "super")
+                s.case.case_id      = case_id
+                log_event("Sistema", f"Caso aperto: {s.case.company_name} ({country})", "super")
                 # Reset per-case analysis state so agents default to "agent" mode
                 st.session_state.section_modes = {}
                 st.session_state.section_web   = {}
