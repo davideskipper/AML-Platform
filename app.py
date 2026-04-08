@@ -1626,199 +1626,197 @@ def render_analysis():
 # ── STEP 5: FINAL VALUATION ───────────────────────────────────────
 def render_final_valuation():
     render_header()
-    _, col, _ = st.columns([0.3, 5.4, 0.3])
-    with col:
+    st.markdown(
+        f'<div style="font-size:1.2rem;font-weight:700;color:{TEXT};margin-bottom:4px;">⚡ Valutazione Finale</div>'
+        f'<div style="font-size:0.82rem;color:{TEXT_SEC};margin-bottom:16px;">'
+        f'Sintesi del rischio AML e raccomandazione operativa per il fascicolo cliente.</div>',
+        unsafe_allow_html=True)
+
+    # Mode selector
+    current_final_mode = st.session_state.final_mode or "manual"
+    mode_map    = {"✍️ A mano": "manual", "🤖 Super Agent": "agent"}
+    mode_labels = list(mode_map.keys())
+    mode_idx    = 1 if current_final_mode == "agent" else 0
+    chosen_label = st.radio(
+        "Modalità valutazione", mode_labels, index=mode_idx,
+        horizontal=True, key="final_mode_radio", label_visibility="collapsed")
+    st.session_state.final_mode = mode_map[chosen_label]
+
+    st.markdown(f'<div style="height:10px;"></div>', unsafe_allow_html=True)
+
+    client = get_client()
+    key    = "final_valuation"
+
+    if st.session_state.final_mode == "manual":
+        existing = get_content(key) or ""
         st.markdown(
-            f'<div style="font-size:1.2rem;font-weight:700;color:{TEXT};margin-bottom:4px;">⚡ Valutazione Finale</div>'
-            f'<div style="font-size:0.82rem;color:{TEXT_SEC};margin-bottom:16px;">'
-            f'Sintesi del rischio AML e raccomandazione operativa per il fascicolo cliente.</div>',
+            f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
+            f'color:{TEXT_SEC};text-transform:uppercase;margin-bottom:6px;">Narrativa di Valutazione</div>',
             unsafe_allow_html=True)
+        manual_narrative = st.text_area(
+            "Narrativa", value=existing, height=280, key="final_manual_text",
+            placeholder="Inserisci la valutazione finale della controparte…",
+            label_visibility="collapsed")
+        st.markdown(
+            f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
+            f'color:{TEXT_SEC};text-transform:uppercase;margin:12px 0 6px;">Profilo di Rischio</div>',
+            unsafe_allow_html=True)
+        risk_opts = ["Confermato", "Innalzamento", "Abbassamento", "Modifica"]
+        risk_choice = st.radio("Profilo", risk_opts, horizontal=True,
+                               key="final_risk_radio", label_visibility="collapsed")
+        if st.button("Salva Valutazione", key="final_manual_save", use_container_width=True):
+            narrative_full = f"[{risk_choice}]\n\n{manual_narrative}"
+            st.session_state.edited_content[key] = narrative_full
+            st.session_state.kyc_state.add_result(key, narrative_full)
+            st.success("✓ Valutazione salvata.")
 
-        # Mode selector
-        current_final_mode = st.session_state.final_mode or "manual"
-        mode_map    = {"✍️ A mano": "manual", "🤖 Super Agent": "agent"}
-        mode_labels = list(mode_map.keys())
-        mode_idx    = 1 if current_final_mode == "agent" else 0
-        chosen_label = st.radio(
-            "Modalità valutazione", mode_labels, index=mode_idx,
-            horizontal=True, key="final_mode_radio", label_visibility="collapsed")
-        st.session_state.final_mode = mode_map[chosen_label]
+    else:
+        # Super Agent mode
+        content = get_content(key)
+        parsed  = parse_json_result(content) if content else None
 
-        st.markdown(f'<div style="height:10px;"></div>', unsafe_allow_html=True)
-
-        client = get_client()
-        key    = "final_valuation"
-
-        if st.session_state.final_mode == "manual":
-            existing = get_content(key) or ""
-            st.markdown(
-                f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
-                f'color:{TEXT_SEC};text-transform:uppercase;margin-bottom:6px;">Narrativa di Valutazione</div>',
-                unsafe_allow_html=True)
-            manual_narrative = st.text_area(
-                "Narrativa", value=existing, height=280, key="final_manual_text",
-                placeholder="Inserisci la valutazione finale della controparte…",
-                label_visibility="collapsed")
-            st.markdown(
-                f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
-                f'color:{TEXT_SEC};text-transform:uppercase;margin:12px 0 6px;">Profilo di Rischio</div>',
-                unsafe_allow_html=True)
-            risk_opts = ["Confermato", "Innalzamento", "Abbassamento", "Modifica"]
-            risk_choice = st.radio("Profilo", risk_opts, horizontal=True,
-                                   key="final_risk_radio", label_visibility="collapsed")
-            if st.button("Salva Valutazione", key="final_manual_save", use_container_width=True):
-                narrative_full = f"[{risk_choice}]\n\n{manual_narrative}"
-                st.session_state.edited_content[key] = narrative_full
-                st.session_state.kyc_state.add_result(key, narrative_full)
-                st.success("✓ Valutazione salvata.")
-
-        else:
-            # Super Agent mode
-            content = get_content(key)
-            parsed  = parse_json_result(content) if content else None
-
-            # Collect active findings
-            all_findings = []
-            overrides    = st.session_state.crit_overrides
-            for sec in MAIN_SECTIONS:
-                sk = sec["key"]
-                sc = get_content(sk)
-                sp = parse_json_result(sc) if sc else None
-                if not sp:
+        # Collect active findings
+        all_findings = []
+        overrides    = st.session_state.crit_overrides
+        for sec in MAIN_SECTIONS:
+            sk = sec["key"]
+            sc = get_content(sk)
+            sp = parse_json_result(sc) if sc else None
+            if not sp:
+                continue
+            for idx, ev in enumerate(sp.get("principaliEvidenze",[])):
+                lvl = (ev.get("livello","") or "").upper()
+                if lvl not in ("CRITICO","ANOMALIA"):
                     continue
-                for idx, ev in enumerate(sp.get("principaliEvidenze",[])):
-                    lvl = (ev.get("livello","") or "").upper()
-                    if lvl not in ("CRITICO","ANOMALIA"):
-                        continue
-                    ov_status = (overrides.get(sk,{}).get(idx,{}).get("status","") or "").lower()
-                    if ov_status == "chiuso":
-                        continue
-                    all_findings.append({
-                        "sezione": sec["full_label"], "livello": lvl,
-                        "evidenza": ev.get("evidenza",""), "normativa": ev.get("normativa",""),
-                    })
+                ov_status = (overrides.get(sk,{}).get(idx,{}).get("status","") or "").lower()
+                if ov_status == "chiuso":
+                    continue
+                all_findings.append({
+                    "sezione": sec["full_label"], "livello": lvl,
+                    "evidenza": ev.get("evidenza",""), "normativa": ev.get("normativa",""),
+                })
 
-            # Findings summary chips
-            n_crit = sum(1 for f in all_findings if f["livello"] == "CRITICO")
-            n_anom = sum(1 for f in all_findings if f["livello"] == "ANOMALIA")
-            chips  = ""
-            if n_crit:
-                chips += (f'<span style="background:#FEF2F2;color:{DANGER};font-size:0.72rem;'
-                          f'font-weight:700;padding:3px 12px;border-radius:20px;margin-right:6px;">'
-                          f'🔴 {n_crit} critiche</span>')
-            if n_anom:
-                chips += (f'<span style="background:#FFFBEB;color:{YELLOW};font-size:0.72rem;'
-                          f'font-weight:700;padding:3px 12px;border-radius:20px;">'
-                          f'🟡 {n_anom} anomalie</span>')
-            if chips:
+        # Findings summary chips
+        n_crit = sum(1 for f in all_findings if f["livello"] == "CRITICO")
+        n_anom = sum(1 for f in all_findings if f["livello"] == "ANOMALIA")
+        chips  = ""
+        if n_crit:
+            chips += (f'<span style="background:#FEF2F2;color:{DANGER};font-size:0.72rem;'
+                      f'font-weight:700;padding:3px 12px;border-radius:20px;margin-right:6px;">'
+                      f'🔴 {n_crit} critiche</span>')
+        if n_anom:
+            chips += (f'<span style="background:#FFFBEB;color:{YELLOW};font-size:0.72rem;'
+                      f'font-weight:700;padding:3px 12px;border-radius:20px;">'
+                      f'🟡 {n_anom} anomalie</span>')
+        if chips:
+            st.markdown(
+                f'<div style="margin-bottom:12px;">{chips}</div>',
+                unsafe_allow_html=True)
+
+        if st.button("Avvia Final Valuation Agent", key="run_super_agent",
+                     use_container_width=True):
+            _run_with_stream(key, client)
+            return
+
+        if parsed:
+            risk     = parsed.get("rischioComplessivo","") or parsed.get("customerRiskRating","")
+            rc       = get_risk_color(risk) if risk else BLUE
+            narrativa = (parsed.get("narrativa") or parsed.get("narrativaCompleta")
+                         or parsed.get("sintesiEsecutiva","") or "")
+            flags    = parsed.get("flags", [])
+            racc     = parsed.get("raccomandazione","")
+
+            # Build raccomandazione string
+            racc_str = ""
+            if isinstance(racc, dict):
+                parts_r = [x for x in [racc.get("accettazione",""),
+                                        racc.get("livelloAdeguataVerifica",""),
+                                        racc.get("frequenzaMonitoraggio","")] if x]
+                if parts_r: racc_str = " · ".join(parts_r)
+            elif isinstance(racc, str) and racc:
+                racc_str = racc
+
+            # ── Risk badge + Confirm/Raise selector (same row) ────
+            risk_col, profile_col = st.columns([1.5, 2.5])
+            with risk_col:
                 st.markdown(
-                    f'<div style="margin-bottom:12px;">{chips}</div>',
+                    f'<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;'
+                    f'background:#fff;border:1px solid {BORDER};border-left:4px solid {rc};'
+                    f'border-radius:0 8px 8px 0;padding:12px 14px;height:100%;">'
+                    f'<span style="font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
+                    f'color:{TEXT_SEC};text-transform:uppercase;">Rischio Complessivo</span>'
+                    f'{risk_badge(risk)}'
+                    + (f'<div style="width:100%;font-size:0.72rem;color:{TEXT_SEC};margin-top:2px;">'
+                       f'{racc_str}</div>' if racc_str else '')
+                    + f'</div>',
                     unsafe_allow_html=True)
 
-            if st.button("Avvia Final Valuation Agent", key="run_super_agent",
-                         use_container_width=True):
-                _run_with_stream(key, client)
-                return
+            with profile_col:
+                st.markdown(
+                    f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
+                    f'color:{TEXT_SEC};text-transform:uppercase;margin-bottom:6px;">'
+                    f'Decisione Compliance</div>',
+                    unsafe_allow_html=True)
+                risk_profile_opts = ["✓ Confermato", "▲ Innalzamento", "▼ Abbassamento", "~ Modifica"]
+                risk_profile = st.radio("Profilo", risk_profile_opts, horizontal=True,
+                                        key="final_agent_risk", label_visibility="collapsed")
+                save_col, _ = st.columns([1, 1])
+                with save_col:
+                    if st.button("Conferma decisione", key="final_agent_save",
+                                 use_container_width=True):
+                        annotated = f"[{risk_profile}]\n\n{content}"
+                        st.session_state.edited_content[key] = annotated
+                        st.session_state.kyc_state.add_result(key, annotated)
+                        st.success("✓ Decisione salvata.")
 
-            if parsed:
-                risk     = parsed.get("rischioComplessivo","") or parsed.get("customerRiskRating","")
-                rc       = get_risk_color(risk) if risk else BLUE
-                narrativa = (parsed.get("narrativa") or parsed.get("narrativaCompleta")
-                             or parsed.get("sintesiEsecutiva","") or "")
-                flags    = parsed.get("flags", [])
-                racc     = parsed.get("raccomandazione","")
+            st.markdown(f'<div style="height:14px;"></div>', unsafe_allow_html=True)
 
-                # Build raccomandazione string
-                racc_str = ""
-                if isinstance(racc, dict):
-                    parts_r = [x for x in [racc.get("accettazione",""),
-                                            racc.get("livelloAdeguataVerifica",""),
-                                            racc.get("frequenzaMonitoraggio","")] if x]
-                    if parts_r: racc_str = " · ".join(parts_r)
-                elif isinstance(racc, str) and racc:
-                    racc_str = racc
+            # ── Motivazioni (narrativa) ───────────────────────────
+            if narrativa:
+                st.markdown(
+                    f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
+                    f'color:{TEXT_SEC};text-transform:uppercase;margin-bottom:6px;">'
+                    f'Motivazioni del Profilo di Rischio</div>'
+                    f'<div style="background:#fff;border:1px solid {BORDER};'
+                    f'border-left:4px solid {rc};border-radius:0 8px 8px 0;'
+                    f'padding:18px 22px;font-size:0.875rem;line-height:1.85;'
+                    f'color:{TEXT};margin-bottom:18px;">'
+                    + narrativa.replace("\n","<br>") + '</div>',
+                    unsafe_allow_html=True)
 
-                # ── Risk badge + Confirm/Raise selector (same row) ────
-                risk_col, profile_col = st.columns([1.5, 2.5])
-                with risk_col:
+            # ── Flag AML ─────────────────────────────────────────
+            if flags:
+                st.markdown(
+                    f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
+                    f'color:{TEXT_SEC};margin:0 0 8px;text-transform:uppercase;">Flag AML</div>',
+                    unsafe_allow_html=True)
+                _flag_cfg = {
+                    "CRITICAL": ("#F3E8FF","#7C3AED","#7C3AED"),
+                    "HIGH":     ("#FEE2E2","#B91C1C","#DC2626"),
+                    "MEDIUM":   ("#FFFBEB","#92400E","#D97706"),
+                    "LOW":      ("#F3F4F6","#6B7280","#9CA3AF"),
+                }
+                for fl in flags:
+                    rischio = (fl.get("rischio","") or "").upper()
+                    bg_f, fg_f, bd_f = _flag_cfg.get(rischio, ("#F3F4F6","#6B7280","#9CA3AF"))
+                    tipo = fl.get("tipo","")
+                    desc = fl.get("descrizione","")
+                    norm = fl.get("riferimentoNormativo","") or fl.get("indicatoreUIF","")
                     st.markdown(
-                        f'<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;'
-                        f'background:#fff;border:1px solid {BORDER};border-left:4px solid {rc};'
-                        f'border-radius:0 8px 8px 0;padding:12px 14px;height:100%;">'
-                        f'<span style="font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
-                        f'color:{TEXT_SEC};text-transform:uppercase;">Rischio Complessivo</span>'
-                        f'{risk_badge(risk)}'
-                        + (f'<div style="width:100%;font-size:0.72rem;color:{TEXT_SEC};margin-top:2px;">'
-                           f'{racc_str}</div>' if racc_str else '')
-                        + f'</div>',
+                        f'<div style="display:flex;align-items:flex-start;gap:10px;'
+                        f'background:{bg_f};border:1px solid {BORDER};border-left:3px solid {bd_f};'
+                        f'border-radius:0 6px 6px 0;padding:8px 12px;margin-bottom:5px;">'
+                        f'<div style="flex:1;">'
+                        f'<span style="font-size:0.8rem;font-weight:600;color:{fg_f};">{tipo}</span>'
+                        + (f'<span style="font-size:0.78rem;color:{TEXT_SEC};"> — {desc}</span>' if desc else '')
+                        + (f'<div style="font-size:0.68rem;color:{TEXT_SEC};margin-top:2px;">📎 {norm}</div>' if norm else '')
+                        + f'</div></div>',
                         unsafe_allow_html=True)
 
-                with profile_col:
-                    st.markdown(
-                        f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
-                        f'color:{TEXT_SEC};text-transform:uppercase;margin-bottom:6px;">'
-                        f'Decisione Compliance</div>',
-                        unsafe_allow_html=True)
-                    risk_profile_opts = ["✓ Confermato", "▲ Innalzamento", "▼ Abbassamento", "~ Modifica"]
-                    risk_profile = st.radio("Profilo", risk_profile_opts, horizontal=True,
-                                            key="final_agent_risk", label_visibility="collapsed")
-                    save_col, _ = st.columns([1, 1])
-                    with save_col:
-                        if st.button("Conferma decisione", key="final_agent_save",
-                                     use_container_width=True):
-                            annotated = f"[{risk_profile}]\n\n{content}"
-                            st.session_state.edited_content[key] = annotated
-                            st.session_state.kyc_state.add_result(key, annotated)
-                            st.success("✓ Decisione salvata.")
-
-                st.markdown(f'<div style="height:14px;"></div>', unsafe_allow_html=True)
-
-                # ── Motivazioni (narrativa) ───────────────────────────
-                if narrativa:
-                    st.markdown(
-                        f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
-                        f'color:{TEXT_SEC};text-transform:uppercase;margin-bottom:6px;">'
-                        f'Motivazioni del Profilo di Rischio</div>'
-                        f'<div style="background:#fff;border:1px solid {BORDER};'
-                        f'border-left:4px solid {rc};border-radius:0 8px 8px 0;'
-                        f'padding:18px 22px;font-size:0.875rem;line-height:1.85;'
-                        f'color:{TEXT};margin-bottom:18px;">'
-                        + narrativa.replace("\n","<br>") + '</div>',
-                        unsafe_allow_html=True)
-
-                # ── Flag AML ─────────────────────────────────────────
-                if flags:
-                    st.markdown(
-                        f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
-                        f'color:{TEXT_SEC};margin:0 0 8px;text-transform:uppercase;">Flag AML</div>',
-                        unsafe_allow_html=True)
-                    _flag_cfg = {
-                        "CRITICAL": ("#F3E8FF","#7C3AED","#7C3AED"),
-                        "HIGH":     ("#FEE2E2","#B91C1C","#DC2626"),
-                        "MEDIUM":   ("#FFFBEB","#92400E","#D97706"),
-                        "LOW":      ("#F3F4F6","#6B7280","#9CA3AF"),
-                    }
-                    for fl in flags:
-                        rischio = (fl.get("rischio","") or "").upper()
-                        bg_f, fg_f, bd_f = _flag_cfg.get(rischio, ("#F3F4F6","#6B7280","#9CA3AF"))
-                        tipo = fl.get("tipo","")
-                        desc = fl.get("descrizione","")
-                        norm = fl.get("riferimentoNormativo","") or fl.get("indicatoreUIF","")
-                        st.markdown(
-                            f'<div style="display:flex;align-items:flex-start;gap:10px;'
-                            f'background:{bg_f};border:1px solid {BORDER};border-left:3px solid {bd_f};'
-                            f'border-radius:0 6px 6px 0;padding:8px 12px;margin-bottom:5px;">'
-                            f'<div style="flex:1;">'
-                            f'<span style="font-size:0.8rem;font-weight:600;color:{fg_f};">{tipo}</span>'
-                            + (f'<span style="font-size:0.78rem;color:{TEXT_SEC};"> — {desc}</span>' if desc else '')
-                            + (f'<div style="font-size:0.68rem;color:{TEXT_SEC};margin-top:2px;">📎 {norm}</div>' if norm else '')
-                            + f'</div></div>',
-                            unsafe_allow_html=True)
-
-        st.markdown(f'<div style="height:16px;"></div>', unsafe_allow_html=True)
-        if st.button("Torna all'analisi", key="back_to_analysis"):
-            st.session_state.step = "analysis"
-            st.rerun()
+    st.markdown(f'<div style="height:16px;"></div>', unsafe_allow_html=True)
+    if st.button("Torna all'analisi", key="back_to_analysis"):
+        st.session_state.step = "analysis"
+        st.rerun()
 
 
 # ── ROUTER ───────────────────────────────────────────────────────
