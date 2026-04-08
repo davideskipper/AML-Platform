@@ -470,12 +470,7 @@ def render_step_nav(current_step_id: str):
             label_style = f"color:{TEXT_SEC};font-weight:400;"
             num_label   = num
         parts.append(
-            f'<span style="display:inline-flex;align-items:center;gap:6px;">'
-            f'<span style="{num_style}width:20px;height:20px;border-radius:50%;'
-            f'font-size:0.62rem;font-weight:700;display:inline-flex;'
-            f'align-items:center;justify-content:center;">{num_label}</span>'
             f'<span style="{label_style}font-size:0.8rem;">{label}</span>'
-            f'</span>'
         )
         if i < len(_STEP_ORDER) - 1:
             parts.append(f'<span style="color:{BORDER};margin:0 10px;font-size:0.8rem;">──</span>')
