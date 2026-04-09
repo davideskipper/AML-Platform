@@ -75,9 +75,6 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido. Nessun testo prima o dopo. N
     "consistency":  { "rating": "GREEN|YELLOW|RED", "motivazione": "" }
   },
   "stimaCapacitaEconomica": "",
-  "flags": [
-    { "tipo": "", "descrizione": "", "rischio": "LOW|MEDIUM|HIGH", "indicatoreUIF": "" }
-  ],
   "raccomandazione": "CONSISTENT|INCONSISTENCIES_FOUND|HIGH_RISK",
   "principaliEvidenze": [
     {

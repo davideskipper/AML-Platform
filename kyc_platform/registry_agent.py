@@ -65,9 +65,6 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido. Nessun testo prima o dopo. N
     "poteriFirma": ""
   },
   "procedureConcorsuali": false,
-  "flags": [
-    { "tipo": "", "descrizione": "", "rischio": "LOW|MEDIUM|HIGH", "riferimentoNormativo": "" }
-  ],
   "principaliEvidenze": [
     {
       "evidenza": "Descrizione sintetica dell'elemento di attenzione o anomalia rilevata",

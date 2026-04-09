@@ -71,9 +71,6 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido. Nessun testo prima o dopo. N
     }
   ],
   "uboFinale": { "nome": "", "quota": "", "modalitaControllo": "" },
-  "flags": [
-    { "tipo": "", "descrizione": "", "rischio": "LOW|MEDIUM|HIGH", "riferimentoNormativo": "" }
-  ],
   "raccomandazione": "STANDARD|ENHANCED_DUE_DILIGENCE|RIFIUTO",
   "principaliEvidenze": [
     {

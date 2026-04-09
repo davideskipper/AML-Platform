@@ -1428,53 +1428,9 @@ def _render_section_content(key: str, client):
                         + "".join(_proposta_parts) + '</div>',
                         unsafe_allow_html=True)
 
-            # AML flags — 3 categories: Critico (red) · Attenzione (yellow) · Info mancanti (grey)
-            # Fallback: use principaliEvidenze when flags is absent (transaction agent schema)
-            flags = parsed.get("flags") or []
+            # Principali Evidenze AML — unico schema per tutte le sezioni
             evidenze = parsed.get("principaliEvidenze") or []
-            def _flag_style(rischio):
-                r = rischio.upper()
-                if r in ("CRITICAL", "HIGH", "CRITICO", "ALTO"):
-                    return "#FDECEA", "#B71C1C", "#C62828", "Critico"
-                if r in ("MEDIUM", "MEDIO", "ANOMALIA"):
-                    return "#FFF3E0", "#E65100", "#F57C00", "Anomalia"
-                if r in ("LOW", "BASSO", "ATTENZIONE"):
-                    return "#FFFDE7", "#F57F17", "#F9A825", "Punto di attenzione"
-                return "#F5F5F5", "#616161", "#9E9E9E", "Informazioni mancanti"
-
-            if flags:
-                def _flag_rank(f):
-                    r = (f.get("rischio","") or "").upper()
-                    if r in ("CRITICAL","HIGH","CRITICO","ALTO"): return 0
-                    if r in ("MEDIUM","MEDIO","ATTENZIONE","ANOMALIA"): return 1
-                    return 2
-                flags = sorted(flags, key=_flag_rank)
-                st.markdown(
-                    f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
-                    f'color:{TEXT_SEC};margin:6px 0 8px;text-transform:uppercase;">Flag AML</div>',
-                    unsafe_allow_html=True)
-                for fl in flags:
-                    rischio = (fl.get("rischio","") or "").upper()
-                    bg_f, fg_f, bd_f, cat_label = _flag_style(rischio)
-                    tipo = fl.get("tipo","")
-                    desc = fl.get("descrizione","")
-                    norm = fl.get("riferimentoNormativo","") or fl.get("indicatoreUIF","")
-                    testo_principale = f"{tipo} — {desc}" if tipo and desc else tipo or desc
-                    norm_html = (f'<p style="color:#9E9E9E;font-size:11px;font-style:italic;margin:0;">{norm}</p>'
-                                 if norm else "")
-                    st.markdown(
-                        f'<div style="background-color:{bg_f};border-left:4px solid {bd_f};'
-                        f'border-radius:4px;padding:12px 16px;margin-bottom:10px;">'
-                        f'<span style="background-color:{bd_f};color:white;font-size:11px;'
-                        f'font-weight:600;padding:2px 8px;border-radius:10px;'
-                        f'text-transform:uppercase;letter-spacing:0.5px;">{cat_label}</span>'
-                        f'<p style="color:{fg_f};font-size:13px;margin:8px 0 4px 0;line-height:1.5;">'
-                        f'{testo_principale}</p>'
-                        + norm_html +
-                        f'</div>',
-                        unsafe_allow_html=True)
-            elif evidenze:
-                # principaliEvidenze schema (transaction agent)
+            if evidenze:
                 def _ev_rank(e):
                     l = (e.get("livello","") or "").upper()
                     if l == "CRITICO": return 0
@@ -1662,25 +1618,14 @@ def render_analysis():
         _p = get_parsed(_s["key"])
         if not _p:
             continue
-        _flags_list = _p.get("flags") or []
-        if _flags_list:
-            for _fl in _flags_list:
-                _r = (_fl.get("rischio","") or "").upper()
-                if _r in ("CRITICAL", "HIGH", "CRITICO", "ALTO"):
-                    _fl_counts["CRITICO"]    += 1
-                elif _r in ("MEDIUM", "MEDIO", "ATTENZIONE", "ANOMALIA"):
-                    _fl_counts["ATTENZIONE"] += 1
-                elif _r in ("LOW", "BASSO"):
-                    _fl_counts["MANCANTE"]   += 1
-        else:
-            for _ev in _p.get("principaliEvidenze", []):
-                _l = (_ev.get("livello","") or "").upper()
-                if _l == "CRITICO":
-                    _fl_counts["CRITICO"]    += 1
-                elif _l in ("ANOMALIA", "ATTENZIONE"):
-                    _fl_counts["ATTENZIONE"] += 1
-                else:
-                    _fl_counts["MANCANTE"]   += 1
+        for _ev in _p.get("principaliEvidenze", []):
+            _l = (_ev.get("livello","") or "").upper()
+            if _l == "CRITICO":
+                _fl_counts["CRITICO"]    += 1
+            elif _l in ("ANOMALIA", "ATTENZIONE"):
+                _fl_counts["ATTENZIONE"] += 1
+            else:
+                _fl_counts["MANCANTE"]   += 1
 
     _badge_cfg = [
         ("CRITICO",    "#DC2626", "#FEE2E2", "Critici"),

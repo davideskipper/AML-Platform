@@ -81,9 +81,6 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido. Nessun testo prima o dopo. N
       "rischio": "LOW|MEDIUM|HIGH|CRITICAL"
     }
   ],
-  "flags": [
-    { "tipo": "", "descrizione": "", "rischio": "LOW|MEDIUM|HIGH|CRITICAL", "riferimentoNormativo": "" }
-  ],
   "raccomandazione": "PROCEED|ENHANCED_MONITORING|ESCALATE_TO_COMPLIANCE|RIFIUTO",
   "principaliEvidenze": [
     {
