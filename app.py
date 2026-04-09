@@ -445,11 +445,11 @@ def classify_evidence(ev: dict) -> dict:
                     "border_color": "#F9A825", "label": "Punto di attenzione"}
         else:
             return {"bg_color": "#F5F5F5", "text_color": "#424242",
-                    "border_color": "#BDBDBD", "label": "Da valutare"}
+                    "border_color": "#BDBDBD", "label": "Informazioni mancanti"}
 
     # Fallback
     return {"bg_color": "#F5F5F5", "text_color": "#616161",
-            "border_color": "#9E9E9E", "label": livello or "Info"}
+            "border_color": "#9E9E9E", "label": "Informazioni mancanti"}
 
 
 def render_evidenze(evidenze: list) -> None:
@@ -1434,11 +1434,13 @@ def _render_section_content(key: str, client):
             evidenze = parsed.get("principaliEvidenze") or []
             def _flag_style(rischio):
                 r = rischio.upper()
-                if r in ("CRITICAL","HIGH","CRITICO","ALTO"):
-                    return "#FEE2E2", "#DC2626", "#DC2626", "Punto critico"
-                if r in ("MEDIUM","MEDIO","ATTENZIONE","ANOMALIA"):
-                    return "#FFFBEB", "#D97706", "#D97706", "Punto di attenzione"
-                return "#F3F4F6", "#6B7280", "#9CA3AF", "Info mancante"
+                if r in ("CRITICAL", "HIGH", "CRITICO", "ALTO"):
+                    return "#FDECEA", "#B71C1C", "#C62828", "Critico"
+                if r in ("MEDIUM", "MEDIO", "ANOMALIA"):
+                    return "#FFF3E0", "#E65100", "#F57C00", "Anomalia"
+                if r in ("LOW", "BASSO", "ATTENZIONE"):
+                    return "#FFFDE7", "#F57F17", "#F9A825", "Punto di attenzione"
+                return "#F5F5F5", "#616161", "#9E9E9E", "Informazioni mancanti"
 
             if flags:
                 def _flag_rank(f):
@@ -1457,18 +1459,19 @@ def _render_section_content(key: str, client):
                     tipo = fl.get("tipo","")
                     desc = fl.get("descrizione","")
                     norm = fl.get("riferimentoNormativo","") or fl.get("indicatoreUIF","")
+                    testo_principale = f"{tipo} — {desc}" if tipo and desc else tipo or desc
+                    norm_html = (f'<p style="color:#9E9E9E;font-size:11px;font-style:italic;margin:0;">{norm}</p>'
+                                 if norm else "")
                     st.markdown(
-                        f'<div style="background:{bg_f};border:1px solid {BORDER};'
-                        f'border-left:3px solid {bd_f};border-radius:0 6px 6px 0;'
-                        f'padding:8px 12px;margin-bottom:5px;">'
-                        f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">'
-                        f'<span style="font-size:0.62rem;font-weight:700;color:{fg_f};'
-                        f'background:{bd_f}22;padding:1px 7px;border-radius:20px;">{cat_label}</span>'
-                        f'<span style="font-size:0.82rem;font-weight:600;color:{fg_f};">{tipo}</span>'
-                        f'</div>'
-                        + (f'<div style="font-size:0.8rem;color:{TEXT};line-height:1.5;">{desc}</div>' if desc else '')
-                        + (f'<div style="font-size:0.68rem;color:{TEXT_SEC};margin-top:3px;">{norm}</div>' if norm else '')
-                        + f'</div>',
+                        f'<div style="background-color:{bg_f};border-left:4px solid {bd_f};'
+                        f'border-radius:4px;padding:12px 16px;margin-bottom:10px;">'
+                        f'<span style="background-color:{bd_f};color:white;font-size:11px;'
+                        f'font-weight:600;padding:2px 8px;border-radius:10px;'
+                        f'text-transform:uppercase;letter-spacing:0.5px;">{cat_label}</span>'
+                        f'<p style="color:{fg_f};font-size:13px;margin:8px 0 4px 0;line-height:1.5;">'
+                        f'{testo_principale}</p>'
+                        + norm_html +
+                        f'</div>',
                         unsafe_allow_html=True)
             elif evidenze:
                 # principaliEvidenze schema (transaction agent)
