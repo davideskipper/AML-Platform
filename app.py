@@ -372,40 +372,84 @@ def risk_badge(level: str) -> str:
 
 def classify_evidence(ev: dict) -> dict:
     """Classify a single principaliEvidenze entry and return display style."""
-    livello = (ev.get("livello", "") or "").upper()
+    livello = (ev.get("livello", "") or "").upper().strip()
     testo   = (ev.get("evidenza", "") or "").lower()
 
+    # CRITICO — sempre rosso
     if "CRITICO" in livello:
         return {"bg_color": "#FDECEA", "text_color": "#B71C1C",
                 "border_color": "#C62828", "label": "Critico"}
-    elif "ANOMALIA" in livello:
+
+    # ANOMALIA — sempre arancione
+    if "ANOMALIA" in livello:
         return {"bg_color": "#FFF3E0", "text_color": "#E65100",
                 "border_color": "#F57C00", "label": "Anomalia"}
-    elif "ATTENZIONE" in livello:
-        parole_positive = [
-            "nessun", "assenza totale", "completa tracciabil",
-            "coerente", "regolare", "primario standing",
-            "correttamente", "conforme", "positiv",
-            "standard intra", "tutti paesi standard",
-            "tracciata", "verificat", "pulito", "privo",
+
+    # ATTENZIONE — distingui positivo da neutro/negativo tramite conteggio hit
+    if "ATTENZIONE" in livello:
+        pattern_positivi = [
+            "trasparente",
+            "identificabile con certezza",
+            "interamente versato",
+            "adeguato rispetto",
+            "coerenza tra",
+            "assenza di procedure",
+            "assenza di protesti",
+            "assenza di ipoteche",
+            "nessuna procedura",
+            "nessun protesto",
+            "regolarità commerciale",
+            "solidità finanziaria",
+            "profilo di rischio aml intrinsecamente basso",
+            "flussi finanziari tipicamente tracciabili",
+            "indicatore positivo",
+            "elemento positivo",
+            "certificazioni",
+            "conforme",
+            "coerente con",
+            "senza interposizione",
+            "tracciabilità",
+            "primario standing",
+            "regolarmente",
+            "puntualmente",
+            "privo di criticità",
         ]
-        parole_negative = [
-            "anomal", "sospett", "incongruen", "assenza di",
-            "mancanza", "irregolar", "eleват", "sproporzionat",
-            "opac", "rischio", "criticità", "atipic",
-            "incoerente", "incompatibil",
+        pattern_negativi = [
+            "anomal",
+            "sospett",
+            "incongruente",
+            "incoerente",
+            "sproporzionat",
+            "opacità",
+            "struttura opaca",
+            "impossibilità",
+            "non verificabile",
+            "non documentat",
+            "concentrazione anomala",
+            "rischio di abuso",
+            "riduce i controlli",
+            "pur non costituendo anomalia",
+            "tale assetto riduce",
+            "oggetto sociale eccessivamente generico",
+            "clausola residuale",
+            "amplia formalmente il perimetro",
         ]
-        is_positive = any(p in testo for p in parole_positive)
-        is_negative = any(p in testo for p in parole_negative)
-        if is_positive and not is_negative:
+        hit_positivi = sum(1 for p in pattern_positivi if p in testo)
+        hit_negativi = sum(1 for p in pattern_negativi if p in testo)
+
+        if hit_positivi > hit_negativi:
             return {"bg_color": "#F1F8E9", "text_color": "#2E7D32",
                     "border_color": "#558B2F", "label": "Elemento positivo"}
-        else:
+        elif hit_negativi > 0:
             return {"bg_color": "#FFFDE7", "text_color": "#F57F17",
                     "border_color": "#F9A825", "label": "Punto di attenzione"}
-    else:
-        return {"bg_color": "#F5F5F5", "text_color": "#616161",
-                "border_color": "#9E9E9E", "label": livello or "Info"}
+        else:
+            return {"bg_color": "#F5F5F5", "text_color": "#424242",
+                    "border_color": "#BDBDBD", "label": "Da valutare"}
+
+    # Fallback
+    return {"bg_color": "#F5F5F5", "text_color": "#616161",
+            "border_color": "#9E9E9E", "label": livello or "Info"}
 
 
 def render_evidenze(evidenze: list) -> None:
