@@ -1449,12 +1449,8 @@ def _render_section_content(key: str, client):
             # Principali Evidenze AML — unico schema per tutte le sezioni
             evidenze = parsed.get("principaliEvidenze") or []
             if evidenze:
-                def _ev_rank(e):
-                    l = (e.get("livello","") or "").upper()
-                    if l == "CRITICO": return 0
-                    if l == "ANOMALIA": return 1
-                    return 2
-                evidenze = sorted(evidenze, key=_ev_rank)
+                _rank_map = {"Anomalia": 0, "Punto di attenzione": 1, "Info mancanti": 2, "Elemento positivo": 3}
+                evidenze = sorted(evidenze, key=lambda e: _rank_map.get(classify_evidence(e)["label"], 2))
                 st.markdown(
                     f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
                     f'color:{TEXT_SEC};margin:6px 0 8px;text-transform:uppercase;">Principali Evidenze AML</div>',
@@ -1893,7 +1889,7 @@ def render_final_valuation():
                     unsafe_allow_html=True)
 
             # ── Flag AML — riepilogo completo da tutte le sezioni ────
-            _lvl_order = {"CRITICO": 0, "ANOMALIA": 1, "ATTENZIONE": 2}
+            _rank_map = {"Anomalia": 0, "Punto di attenzione": 1, "Info mancanti": 2, "Elemento positivo": 3}
             _all_evidenze = []
             for _sec in MAIN_SECTIONS:
                 _sp = get_parsed(_sec["key"])
@@ -1901,14 +1897,15 @@ def render_final_valuation():
                     continue
                 for _ev in _sp.get("principaliEvidenze", []):
                     _lvl = (_ev.get("livello","") or "").upper()
-                    _all_evidenze.append({
+                    _entry = {
                         "sezione":   _sec["full_label"],
                         "sec_icon":  _sec["icon"],
                         "livello":   _lvl,
                         "evidenza":  _ev.get("evidenza",""),
                         "normativa": _ev.get("normativa",""),
-                        "_ord":      _lvl_order.get(_lvl, 3),
-                    })
+                    }
+                    _entry["_ord"] = _rank_map.get(classify_evidence(_entry)["label"], 2)
+                    _all_evidenze.append(_entry)
             _all_evidenze.sort(key=lambda x: x["_ord"])
 
             if _all_evidenze:
