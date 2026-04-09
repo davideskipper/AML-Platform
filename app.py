@@ -375,15 +375,10 @@ def classify_evidence(ev: dict) -> dict:
     livello = (ev.get("livello", "") or "").upper().strip()
     testo   = (ev.get("evidenza", "") or "").lower()
 
-    # CRITICO — sempre rosso
-    if "CRITICO" in livello:
+    # CRITICO o ANOMALIA → Anomalia (rosso)
+    if "CRITICO" in livello or "ANOMALIA" in livello:
         return {"bg_color": "#FDECEA", "text_color": "#B71C1C",
-                "border_color": "#C62828", "label": "Critico"}
-
-    # ANOMALIA — sempre arancione
-    if "ANOMALIA" in livello:
-        return {"bg_color": "#FFF3E0", "text_color": "#E65100",
-                "border_color": "#F57C00", "label": "Anomalia"}
+                "border_color": "#C62828", "label": "Anomalia"}
 
     # ATTENZIONE — distingui positivo da neutro/negativo tramite conteggio hit
     if "ATTENZIONE" in livello:
@@ -445,11 +440,11 @@ def classify_evidence(ev: dict) -> dict:
                     "border_color": "#F9A825", "label": "Punto di attenzione"}
         else:
             return {"bg_color": "#F5F5F5", "text_color": "#424242",
-                    "border_color": "#BDBDBD", "label": "Informazioni mancanti"}
+                    "border_color": "#BDBDBD", "label": "Info mancanti"}
 
     # Fallback
     return {"bg_color": "#F5F5F5", "text_color": "#616161",
-            "border_color": "#9E9E9E", "label": "Informazioni mancanti"}
+            "border_color": "#9E9E9E", "label": "Info mancanti"}
 
 
 def render_evidenze(evidenze: list) -> None:
@@ -1613,23 +1608,23 @@ def render_analysis():
     # CRITICO (red)  = normative/risk impact
     # ATTENZIONE (yellow) = needs investigation
     # MANCANTE (grey) = missing information
-    _fl_counts = {"CRITICO": 0, "ATTENZIONE": 0, "MANCANTE": 0}
+    _fl_counts = {"ANOMALIA": 0, "ATTENZIONE": 0, "MANCANTE": 0}
     for _s in MAIN_SECTIONS:
         _p = get_parsed(_s["key"])
         if not _p:
             continue
         for _ev in _p.get("principaliEvidenze", []):
             _l = (_ev.get("livello","") or "").upper()
-            if _l == "CRITICO":
-                _fl_counts["CRITICO"]    += 1
-            elif _l in ("ANOMALIA", "ATTENZIONE"):
+            if _l in ("CRITICO", "ANOMALIA"):
+                _fl_counts["ANOMALIA"]   += 1
+            elif _l == "ATTENZIONE":
                 _fl_counts["ATTENZIONE"] += 1
             else:
                 _fl_counts["MANCANTE"]   += 1
 
     _badge_cfg = [
-        ("CRITICO",    "#DC2626", "#FEE2E2", "Critici"),
-        ("ATTENZIONE", "#D97706", "#FFFBEB", "Attenzioni"),
+        ("ANOMALIA",   "#B71C1C", "#FDECEA", "Anomalie"),
+        ("ATTENZIONE", "#F57F17", "#FFFDE7", "Attenzioni"),
         ("MANCANTE",   "#6B7280", "#F3F4F6", "Info mancanti"),
     ]
     _badges_html = "".join(
