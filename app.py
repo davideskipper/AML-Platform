@@ -597,10 +597,10 @@ def render_header():
         if st.session_state.step in ("analysis", "final"):
             done, total = main_progress()
             pct  = int(done / total * 100)
-            rc   = GREEN if done == total else ACCENT
+            rc   = GREEN if done == total else "#1A1A2E"
             prog_bar = (
                 f'<div style="display:inline-flex;align-items:center;gap:6px;'
-                f'background:{"#DCFCE7" if done==total else "#FEE2E2"};'
+                f'background:{"#DCFCE7" if done==total else "#EBEBEB"};'
                 f'padding:2px 10px;border-radius:20px;">'
                 f'<span style="font-size:0.62rem;font-weight:700;color:{rc};">{done}/{total}</span>'
                 f'</div>'
