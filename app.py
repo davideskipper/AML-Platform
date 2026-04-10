@@ -693,6 +693,10 @@ def render_header():
             f'<div style="text-align:right;padding-top:10px;font-size:0.62rem;'
             f'color:{TEXT_SEC};font-weight:500;">claude-sonnet-4-6</div>',
             unsafe_allow_html=True)
+        if st.session_state.step not in ("setup", ""):
+            if st.button("← Home", key="btn_go_home", use_container_width=True):
+                st.session_state.step = "setup"
+                st.rerun()
     if st.session_state.step not in ("setup", ""):
         render_step_nav(st.session_state.step)
 
