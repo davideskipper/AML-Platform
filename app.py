@@ -862,7 +862,7 @@ def render_header():
         if extracted:
             state.case.company_name = extracted
 
-    h_left, h_right = st.columns([7, 1])
+    h_left, h_right = st.columns([5, 2.5])
     with h_left:
         if st.session_state.step in ("analysis", "final"):
             done, total = main_progress()
