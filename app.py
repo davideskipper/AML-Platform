@@ -892,12 +892,22 @@ def render_upload():
             f'<div style="height:4px;"></div>',
             unsafe_allow_html=True)
 
-        uploaded = st.file_uploader(
-            "Documenti controparte",
-            type=["pdf", "docx", "txt", "md", "csv", "xlsx", "xls"],
-            accept_multiple_files=True,
-            key="upload_step_files",
-            label_visibility="collapsed")
+        with st.container(border=True):
+            st.markdown(
+                f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
+                f'color:{BLUE};text-transform:uppercase;margin-bottom:4px;">Documenti Controparte</div>'
+                f'<div style="font-size:0.78rem;color:{TEXT_SEC};margin-bottom:10px;">'
+                f'Visura camerale, statuto, dichiarazione UBO, documenti identità, bilancio, '
+                f'estratti conto, movimenti bancari (Excel/CSV), sentenze, atti giudiziari. '
+                f'Ogni file viene assegnato automaticamente alla sezione corrispondente.</div>',
+                unsafe_allow_html=True)
+
+            uploaded = st.file_uploader(
+                "Documenti controparte",
+                type=["pdf", "docx", "txt", "md", "csv", "xlsx", "xls"],
+                accept_multiple_files=True,
+                key="upload_step_files",
+                label_visibility="collapsed")
 
         if uploaded:
             new_hash = "_".join(f"{f.name}_{f.size}" for f in uploaded)
