@@ -428,8 +428,6 @@ def classify_evidence(ev: dict) -> dict:
             "piano di ammortamento",
             "perizia immobiliare",
             "graduale",
-            "documentati",
-            "documentata",
         ]
         pattern_negativi = [
             "operazioni anomal",
@@ -456,6 +454,28 @@ def classify_evidence(ev: dict) -> dict:
             "oggetto sociale eccessivamente generico",
             "clausola residuale",
             "amplia formalmente il perimetro",
+            # Governance accentrata / concentrazione di controllo
+            "accentrat",
+            "concentrazione di controllo",
+            "cumula la qualità",
+            "cumulo di caric",
+            "cariche cumulate",
+            "senza meccanismi di contrappeso",
+            "senza contrappeso",
+            "assenza di meccanismi di contrappeso",
+            "limita i presidi",
+            "riduce i presidi",
+            "limita il controllo",
+            "poteri di firma libera e disgiunta",
+            "medesimo soggetto",
+            "conflitto di interesse",
+            "privo di meccanismi di controllo",
+            "mancanza di governance",
+            "governance carente",
+            "non documentat",
+            "senza documentazion",
+            "senza evidenza",
+            "senza riscontro",
         ]
         hit_positivi = sum(1 for p in pattern_positivi if p in testo)
         hit_negativi = sum(1 for p in pattern_negativi if p in testo)
