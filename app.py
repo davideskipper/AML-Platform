@@ -707,6 +707,151 @@ def _try_extract_company_name() -> str:
     return ""
 
 
+# ── Agents info dialog ────────────────────────────────────────────
+if hasattr(st, "dialog"):
+    @st.dialog("Visualizza Agenti", width="large")
+    def _agents_info_dialog():
+        _AGENTS_INFO = [
+            {
+                "number": "01",
+                "label": "Registry & Struttura Societaria",
+                "icon": "🏛",
+                "desc": "Analizza la struttura legale e la governance dell'azienda.",
+                "documenti": [
+                    "Visura camerale ordinaria o storica",
+                    "Statuto e atti costitutivi",
+                    "Organigramma societario",
+                    "Patti parasociali (se disponibili)",
+                ],
+                "analizza": [
+                    "Forma giuridica e oggetto sociale — verifica ampiezza e coerenza con l'attività dichiarata",
+                    "Composizione del CDA e poteri di firma — rileva governance accentrata o ruoli anomali",
+                    "Assetti proprietari — mappa la catena di controllo e le variazioni recenti",
+                    "Durata societaria e modifiche statutarie — identifica società di nuova costituzione o riassetti frequenti",
+                    "Sede legale e operativa — verifica coerenza geografica e presenza di indirizzi fittizi",
+                ],
+                "regole": "D.Lgs. 231/2007 artt. 18-20 (adeguata verifica); FATF Recommendation 10; EBA Guidelines on customer due diligence.",
+            },
+            {
+                "number": "02",
+                "label": "UBO & PEP",
+                "icon": "👤",
+                "desc": "Identifica i titolari effettivi e verifica l'esposizione politica.",
+                "documenti": [
+                    "Dichiarazione UBO (autocertificazione titolare effettivo)",
+                    "Documenti d'identità degli UBO",
+                    "Visura camerale (per la catena proprietaria)",
+                    "Eventuali atti notarili di trust o fiduciarie",
+                ],
+                "analizza": [
+                    "Catena di controllo — risale fino al titolare effettivo persona fisica (soglia 25% D.Lgs. 231/2007 art.20)",
+                    "PEP screening — verifica se gli UBO o soggetti collegati sono persone politicamente esposte (domestici e internazionali)",
+                    "Sanzioni internazionali — screening su liste OFAC, EU Consolidated List, ONU, Consob",
+                    "Origine dei fondi e del patrimonio — obbligatoria per PEP e soggetti ad alto rischio",
+                    "Coerenza tra UBO dichiarato e struttura societaria emersa dai documenti",
+                ],
+                "regole": "D.Lgs. 231/2007 artt. 20-22 (titolare effettivo); IV e V Direttiva AML UE; FATF Recommendation 12 (PEP); Reg. UE 2015/847.",
+            },
+            {
+                "number": "03",
+                "label": "Reputational",
+                "icon": "🔍",
+                "desc": "Analizza la reputazione online tramite ricerca web strutturata.",
+                "documenti": [
+                    "Ricerca web (notizie, comunicati stampa, provvedimenti)",
+                    "Nota Parere o altri documenti a supporto (se caricati)",
+                    "Fonti giudiziarie e registri pubblici accessibili online",
+                ],
+                "analizza": [
+                    "Notizie negative — procedimenti penali, civili, fallimentari o amministrativi",
+                    "Presence in liste nere — sanzioni, esclusioni da gare, provvedimenti Banca d'Italia/Consob",
+                    "Associazioni con soggetti a rischio AML — co-imputati, soci in procedimenti, network di aziende sanzionate",
+                    "Scandali reputazionali — frodi, evasione fiscale, corruzione, riciclaggio",
+                    "Congruenza narrativa — verifica che la storia pubblica dell'azienda sia coerente con quanto dichiarato",
+                ],
+                "regole": "D.Lgs. 231/2007 art. 17 (approccio basato sul rischio); FATF Recommendation 10; Circolare Banca d'Italia n. 285 (Titolo IV).",
+            },
+            {
+                "number": "04",
+                "label": "Profilo Economico",
+                "icon": "📊",
+                "desc": "Analizza la solidità e la coerenza del profilo finanziario.",
+                "documenti": [
+                    "Bilancio di esercizio (ultimi 3 anni)",
+                    "Conto economico",
+                    "Dichiarazioni fiscali (Redditi / IVA)",
+                ],
+                "analizza": [
+                    "Coerenza fatturato/settore — confronto con benchmark ATECO e dimensione aziendale",
+                    "Struttura patrimoniale — rapporto equity/debito, composizione immobilizzazioni, leva finanziaria",
+                    "Marginalità — EBITDA/ricavi vs benchmark di settore; anomalie nei margini",
+                    "Flussi di cassa — analisi operativo vs finanziario vs investimento; cash generation anomala",
+                    "Attività e passività anomale — voci difficilmente giustificabili, crediti verso soci non documentati",
+                    "Concentrazione ricavi — dipendenza da pochi clienti o da un'unica area geografica",
+                ],
+                "regole": "D.Lgs. 231/2007 art. 18 (profilo economico); FATF Recommendation 10; Indicatori di anomalia UIF (Provvedimento 24/08/2010).",
+            },
+            {
+                "number": "05",
+                "label": "Transaction & Geographic Risk",
+                "icon": "💳",
+                "desc": "Analizza i movimenti bancari e il rischio geografico delle controparti.",
+                "documenti": [
+                    "File Excel/CSV movimenti bancari (estratto conto strutturato)",
+                ],
+                "analizza": [
+                    "Pattern AML — strutturazione (smurfing), layering, integrazione; pass-through sistematico",
+                    "Operazioni verso paesi ad alto rischio — FATF Black List (azione immediata) e Grey List (EDD obbligatoria)",
+                    "Concentrazione controparti — dipendenza da pochi soggetti; controparti in paradisi fiscali",
+                    "Anomalie negli importi — transazioni appena sotto le soglie di segnalazione (€15.000 / €10.000)",
+                    "Frequenza e stagionalità — picchi anomali, operazioni notturne o fuori orario",
+                    "Rischio geografico — classificazione FATF Black / Grey / EU High Risk / Sanzioni per ogni paese di flusso",
+                ],
+                "regole": "D.Lgs. 231/2007 art. 35 (SOS); FATF Recommendations 10 e 16; Indicatori anomalia UIF n. 42/2023; Reg. UE 2015/847 (tracciabilità bonifici).",
+            },
+            {
+                "number": "06",
+                "label": "Final Valuation",
+                "icon": "⚡",
+                "desc": "Sintetizza gli output di tutti gli agenti e produce il Customer Risk Rating finale.",
+                "documenti": [
+                    "Output strutturati (JSON) degli agenti 01–05",
+                    "Nota Parere e documenti aggiuntivi (se caricati)",
+                ],
+                "analizza": [
+                    "Matrice di rischio 5 dimensioni — punteggio 1-5 per identità/struttura, reputazionale, economico, transazionale, geografico",
+                    "Consolidamento evidenze — aggrega i principali FLAG AML da tutti gli agenti, elimina duplicati, ordina per criticità",
+                    "Customer Risk Rating — BASSO / MEDIO / MEDIO-ALTO / ALTO / CRITICO (con logica di escalation automatica)",
+                    "Raccomandazione operativa — accettazione (SI/NO/CONDIZIONATA), livello EDD, frequenza monitoraggio, autorizzazione senior management, valutazione SOS",
+                    "Narrativa per il fascicolo — testo formale da 14-18 righe adatto a ispezioni Banca d'Italia",
+                ],
+                "regole": "D.Lgs. 231/2007; FATF Recommendations; Circolare Banca d'Italia n. 285; EBA Risk Factor Guidelines (JC/2017/37). Extended Thinking attivo: il modello ragiona internamente prima di produrre il rating.",
+            },
+        ]
+
+        for ag in _AGENTS_INFO:
+            with st.expander(f"{ag['icon']} Agente {ag['number']} — {ag['label']}", expanded=False):
+                st.markdown(
+                    f'<div style="font-size:0.82rem;color:#64748B;margin-bottom:10px;">{ag["desc"]}</div>',
+                    unsafe_allow_html=True)
+
+                col_d, col_a = st.columns([1, 1])
+                with col_d:
+                    st.markdown("**Documenti utilizzati**")
+                    for doc in ag["documenti"]:
+                        st.markdown(f"- {doc}")
+                with col_a:
+                    st.markdown("**Cosa analizza**")
+                    for item in ag["analizza"]:
+                        st.markdown(f"- {item}")
+
+                st.markdown(
+                    f'<div style="font-size:0.75rem;color:#64748B;margin-top:6px;'
+                    f'padding:6px 10px;background:#F8FAFC;border-radius:4px;">'
+                    f'<b>Normativa di riferimento:</b> {ag["regole"]}</div>',
+                    unsafe_allow_html=True)
+
+
 def render_header():
     state = st.session_state.kyc_state
 
@@ -755,6 +900,9 @@ def render_header():
             f'<div style="text-align:right;padding-top:10px;font-size:0.62rem;'
             f'color:{TEXT_SEC};font-weight:500;">claude-sonnet-4-6</div>',
             unsafe_allow_html=True)
+        if st.button("Visualizza Agenti", key="btn_agents_info", use_container_width=True):
+            if hasattr(st, "dialog"):
+                _agents_info_dialog()
         if st.session_state.step not in ("setup", ""):
             if st.button("← Home", key="btn_go_home", use_container_width=True):
                 st.session_state.step = "setup"
@@ -1424,7 +1572,7 @@ def _render_section_content(key: str, client):
                 st.session_state.kyc_state.add_result(key, new_val)
                 st.rerun()
         with btn_r:
-            if st.button("Avvia Agente", key=f"manual_rerun_{key}", use_container_width=True):
+            if st.button("Avvia agente", key=f"manual_rerun_{key}", use_container_width=True):
                 st.session_state.section_modes[key] = "agent"
                 st.session_state.run_queue = [key]
                 st.rerun()
@@ -1575,12 +1723,12 @@ def _render_section_content(key: str, client):
             f'</div>', unsafe_allow_html=True)
         btn_a, btn_m = st.columns(2)
         with btn_a:
-            if st.button("Avvia Agente", key=f"run_{key}", use_container_width=True):
+            if st.button("Avvia agente", key=f"run_{key}", use_container_width=True):
                 st.session_state.section_modes[key] = "agent"
                 st.session_state.run_queue = [key]
                 st.rerun()
         with btn_m:
-            if st.button("Inserisci Valutazione Manuale", key=f"manual_start_{key}", use_container_width=True):
+            if st.button("Inserisci valutazione manuale", key=f"manual_start_{key}", use_container_width=True):
                 st.session_state.section_modes[key] = "manual"
                 st.rerun()
 
@@ -1656,7 +1804,7 @@ def _render_right_panel(queued_key=None):
     st.markdown(
         f'<div style="height:1px;background:{BORDER};margin:12px 0 10px;"></div>',
         unsafe_allow_html=True)
-    if st.button("Valutazione Finale", key="go_final_panel", use_container_width=True):
+    if st.button("Valutazione finale", key="go_final_panel", use_container_width=True):
         st.session_state.step = "final"
         st.rerun()
 
@@ -1831,7 +1979,7 @@ def render_analysis():
             if st.button("Lancia agenti", key="run_all_top", use_container_width=True):
                 _run_all_dialog()
         with _tr_b:
-            if st.button("Valutazione Finale", key="go_final_top", use_container_width=True):
+            if st.button("Valutazione finale", key="go_final_top", use_container_width=True):
                 st.session_state.step = "final"
                 st.rerun()
 
@@ -2112,7 +2260,7 @@ def render_final_valuation():
 
     with left_col:
         st.markdown(
-            f'<div style="font-size:1.2rem;font-weight:700;color:{TEXT};margin-bottom:4px;">⚡ Valutazione Finale</div>'
+            f'<div style="font-size:1.2rem;font-weight:700;color:{TEXT};margin-bottom:4px;">Valutazione finale</div>'
             f'<div style="font-size:0.82rem;color:{TEXT_SEC};margin-bottom:16px;">'
             f'Sintesi del rischio AML e raccomandazione operativa per il fascicolo cliente.</div>',
             unsafe_allow_html=True)
@@ -2122,7 +2270,7 @@ def render_final_valuation():
 
         _btn_run, _btn_edit = st.columns([2, 1])
         with _btn_run:
-            if st.button("Avvia Final Valuation Agent", key="run_super_agent",
+            if st.button('Avvia "Final Valuation" Agent', key="run_super_agent",
                          use_container_width=True):
                 _run_with_stream(key, client)
                 return
