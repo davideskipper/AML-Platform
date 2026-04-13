@@ -229,6 +229,7 @@ DEFAULTS = {
     "additional_docs": "",
     "additional_doc_names": [],
     "final_chat_history": [],
+    "final_ev_overrides": {},
     "upload_hash": "",
     "running_agent": None,
     "all_docs": "",
@@ -1970,6 +1971,136 @@ def _render_final_chatbot(client, valuation_key: str):
             st.rerun()
 
 
+# ── Final valuation edit popup ────────────────────────────────────
+if hasattr(st, "dialog"):
+    @st.dialog("Modifica Valutazione Finale", width="large")
+    def _edit_final_dialog():
+        key    = "final_valuation"
+        parsed = get_parsed(key)
+        if not parsed:
+            st.warning("Esegui prima l'agente di valutazione finale.")
+            if st.button("Chiudi", key="efd_close"):
+                st.rerun()
+            return
+
+        ev_overrides = st.session_state.get("final_ev_overrides", {})
+
+        # ── Sezione 1: Rischio + Narrativa ────────────────────────
+        st.markdown(
+            f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
+            f'color:{BLUE};text-transform:uppercase;margin-bottom:8px;">Profilo di Rischio</div>',
+            unsafe_allow_html=True)
+
+        _risk_opts = ["LOW", "MEDIUM", "MEDIO-ALTO", "HIGH", "CRITICAL"]
+        _cur_risk  = (st.session_state.get("final_ev_overrides", {}).get("__risk__")
+                      or parsed.get("rischioComplessivo", "MEDIUM") or "MEDIUM")
+        try:
+            _r_idx = _risk_opts.index(_cur_risk.upper())
+        except (ValueError, AttributeError):
+            _r_idx = 1
+        st.selectbox("Rischio complessivo", _risk_opts, index=_r_idx, key="efd_risk")
+
+        st.markdown(
+            f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
+            f'color:{BLUE};text-transform:uppercase;margin:12px 0 6px;">Narrativa</div>',
+            unsafe_allow_html=True)
+        _cur_narr = (ev_overrides.get("__narrativa__")
+                     or parsed.get("narrativa") or parsed.get("narrativaCompleta") or "")
+        st.text_area("", value=_cur_narr, height=200, key="efd_narrativa",
+                     label_visibility="collapsed")
+
+        st.markdown(f'<hr style="border-color:{BORDER};margin:16px 0;">', unsafe_allow_html=True)
+
+        # ── Sezione 2: FLAG AML per sezione ──────────────────────
+        st.markdown(
+            f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
+            f'color:{BLUE};text-transform:uppercase;margin-bottom:10px;">'
+            f'FLAG AML — modifica evidenze</div>',
+            unsafe_allow_html=True)
+        st.caption("Modifica il testo, cambia livello o escludi un'evidenza. Le modifiche sovrascrivono l'output dell'agente.")
+
+        for sec in MAIN_SECTIONS:
+            sk  = sec["key"]
+            sp  = get_parsed(sk)
+            if not sp:
+                continue
+            evs = sp.get("principaliEvidenze", [])
+            if not evs:
+                continue
+
+            with st.expander(f"{sec['icon']} {sec['full_label']} — {len(evs)} evidenze",
+                             expanded=False):
+                for i, ev in enumerate(evs):
+                    ov       = ev_overrides.get(f"{sk}__{i}", {})
+                    cur_txt  = ov.get("evidenza",  ev.get("evidenza", ""))
+                    cur_lvl  = ov.get("livello",   ev.get("livello", "ATTENZIONE"))
+                    cur_vis  = ov.get("visible", True)
+
+                    st.markdown(
+                        f'<div style="font-size:0.75rem;font-weight:600;color:{TEXT_SEC};'
+                        f'margin:10px 0 4px;">Evidenza {i + 1}</div>',
+                        unsafe_allow_html=True)
+
+                    c_chk, c_lvl = st.columns([1, 2])
+                    with c_chk:
+                        st.checkbox("Includi", value=cur_vis, key=f"efd_vis_{sk}_{i}")
+                    with c_lvl:
+                        _lvl_opts = ["ATTENZIONE", "ANOMALIA", "CRITICO"]
+                        try:
+                            _li = _lvl_opts.index((cur_lvl or "").upper())
+                        except ValueError:
+                            _li = 0
+                        st.selectbox("Livello", _lvl_opts, index=_li,
+                                     key=f"efd_lvl_{sk}_{i}")
+
+                    st.text_area("Testo evidenza", value=cur_txt, height=70,
+                                 key=f"efd_txt_{sk}_{i}", label_visibility="visible")
+
+        st.markdown(f'<div style="height:6px;"></div>', unsafe_allow_html=True)
+        c_ann, c_save = st.columns([1, 2])
+        with c_ann:
+            if st.button("Annulla", key="efd_cancel", use_container_width=True):
+                st.rerun()
+        with c_save:
+            if st.button("Salva modifiche", key="efd_save", use_container_width=True):
+                # ── Persist risk + narrativa into the JSON ────────
+                new_risk  = st.session_state.get("efd_risk", "")
+                new_narr  = st.session_state.get("efd_narrativa", "")
+                _p = dict(get_parsed(key) or {})
+                if new_risk:
+                    _p["rischioComplessivo"] = new_risk
+                if new_narr is not None:
+                    _p["narrativa"] = new_narr
+                _new_json = json.dumps(_p, ensure_ascii=False, indent=2)
+                st.session_state.edited_content[key] = _new_json
+                st.session_state.kyc_state.add_result(key, _new_json)
+                st.session_state.setdefault("_parsed_cache", {}).pop(key, None)
+
+                # ── Persist evidence overrides ────────────────────
+                new_ov = {}
+                for sec in MAIN_SECTIONS:
+                    sk = sec["key"]
+                    sp = get_parsed(sk)
+                    if not sp:
+                        continue
+                    for i, ev in enumerate(sp.get("principaliEvidenze", [])):
+                        nv = st.session_state.get(f"efd_vis_{sk}_{i}", True)
+                        nl = st.session_state.get(f"efd_lvl_{sk}_{i}",
+                                                  ev.get("livello", "ATTENZIONE"))
+                        nt = st.session_state.get(f"efd_txt_{sk}_{i}",
+                                                  ev.get("evidenza", ""))
+                        orig_txt = ev.get("evidenza", "")
+                        orig_lvl = ev.get("livello", "")
+                        if nt != orig_txt or nl != orig_lvl or not nv:
+                            new_ov[f"{sk}__{i}"] = {
+                                "evidenza": nt, "livello": nl, "visible": nv}
+                st.session_state.final_ev_overrides = new_ov
+                st.rerun()
+else:
+    def _edit_final_dialog():
+        pass
+
+
 # ── STEP 5: FINAL VALUATION ───────────────────────────────────────
 def render_final_valuation():
     render_header()
@@ -1989,21 +2120,35 @@ def render_final_valuation():
         content = get_content(key)
         parsed  = get_parsed(key)
 
-        if st.button("Avvia Final Valuation Agent", key="run_super_agent",
-                     use_container_width=True):
-            _run_with_stream(key, client)
-            return
+        _btn_run, _btn_edit = st.columns([2, 1])
+        with _btn_run:
+            if st.button("Avvia Final Valuation Agent", key="run_super_agent",
+                         use_container_width=True):
+                _run_with_stream(key, client)
+                return
+        with _btn_edit:
+            if parsed and st.button("Modifica", key="edit_final_btn",
+                                    use_container_width=True):
+                _edit_final_dialog()
 
         if parsed:
-            # Chips — use classify_evidence() for 1-to-1 match with FLAG AML cards below
+            _ev_ov = st.session_state.get("final_ev_overrides", {})
+
+            # Chips — use classify_evidence() + overrides for 1-to-1 match with FLAG AML
             _chip_counts = {"Anomalia": 0, "Punto di attenzione": 0,
                             "Info mancanti": 0, "Elemento positivo": 0}
             for sec in MAIN_SECTIONS:
                 sp = get_parsed(sec["key"])
                 if not sp:
                     continue
-                for ev in sp.get("principaliEvidenze", []):
-                    _lbl = classify_evidence(ev)["label"]
+                for _i, ev in enumerate(sp.get("principaliEvidenze", [])):
+                    _ov = _ev_ov.get(f"{sec['key']}__{_i}", {})
+                    if not _ov.get("visible", True):
+                        continue
+                    _ev_eff = dict(ev)
+                    if "evidenza" in _ov: _ev_eff["evidenza"] = _ov["evidenza"]
+                    if "livello"  in _ov: _ev_eff["livello"]  = _ov["livello"]
+                    _lbl = classify_evidence(_ev_eff)["label"]
                     if _lbl in _chip_counts:
                         _chip_counts[_lbl] += 1
 
@@ -2101,7 +2246,13 @@ def render_final_valuation():
                 _sp = get_parsed(_sec["key"])
                 if not _sp:
                     continue
-                for _ev in _sp.get("principaliEvidenze", []):
+                for _i, _ev in enumerate(_sp.get("principaliEvidenze", [])):
+                    _ov = _ev_ov.get(f"{_sec['key']}__{_i}", {})
+                    if not _ov.get("visible", True):
+                        continue
+                    _ev = dict(_ev)
+                    if "evidenza" in _ov: _ev["evidenza"] = _ov["evidenza"]
+                    if "livello"  in _ov: _ev["livello"]  = _ov["livello"]
                     _entry = {
                         "sezione":   _sec["full_label"],
                         "sec_icon":  _sec["icon"],
