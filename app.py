@@ -230,6 +230,7 @@ DEFAULTS = {
     "additional_doc_names": [],
     "final_chat_history": [],
     "final_ev_overrides": {},
+    "counterparty_info": {},
     "upload_hash": "",
     "running_agent": None,
     "all_docs": "",
@@ -644,7 +645,7 @@ def _logo_html(height: int = 38) -> str:
 _STEP_ORDER = ["upload", "analysis", "final"]
 _STEP_LABELS = {
     "upload":   "① Carica Documenti",
-    "analysis": "② Analisi Nota Parere",
+    "analysis": "② Analisi Controparte",
     "final":    "③ Valutazione Finale",
 }
 
@@ -1261,6 +1262,14 @@ def render_upload():
                 # All sections start with no mode set — user chooses per tab
                 st.session_state.run_queue         = []
                 st.session_state.active_section    = "registry"
+                # Extract counterparty info from registry docs
+                _reg_text = _sec_docs.get("registry", "")
+                if _reg_text:
+                    with st.spinner("Lettura dati controparte…"):
+                        st.session_state.counterparty_info = _extract_counterparty_info(
+                            get_client(), _reg_text)
+                else:
+                    st.session_state.counterparty_info = {}
                 st.session_state.uploaded_files_data = []
                 st.session_state.file_assignments    = {}
                 st.session_state.upload_hash         = ""
@@ -1368,6 +1377,14 @@ def render_mode_config():
             for k in list(st.session_state.keys()):
                 if k.startswith("assign_"):
                     del st.session_state[k]
+            # Extract counterparty info from registry docs
+            _reg_text = section_docs.get("registry", "")
+            if _reg_text:
+                with st.spinner("Lettura dati controparte…"):
+                    st.session_state.counterparty_info = _extract_counterparty_info(
+                        get_client(), _reg_text)
+            else:
+                st.session_state.counterparty_info = {}
             st.session_state.uploaded_files_data = []
             st.session_state.file_assignments    = {}
             st.session_state.upload_hash         = ""
@@ -1897,9 +1914,93 @@ else:
         pass  # Streamlit < 1.33 — fallback: no popup
 
 
+# ── Counterparty extraction & card ───────────────────────────────
+def _extract_counterparty_info(client, docs_text: str) -> dict:
+    """Extract key company fields from registry documents using Claude Haiku."""
+    if not client or not docs_text:
+        return {}
+    try:
+        resp = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=600,
+            system=(
+                "Sei un estrattore di dati societari italiani. "
+                "Estrai le informazioni richieste dal documento e restituisci SOLO un oggetto JSON valido. "
+                "Usa null per i campi non disponibili. Nessun testo prima o dopo il JSON."
+            ),
+            messages=[{
+                "role": "user",
+                "content": (
+                    "Estrai dal seguente documento le informazioni societarie:\n\n"
+                    + docs_text[:10000]
+                    + "\n\nRestituisci ESCLUSIVAMENTE questo JSON:\n"
+                    '{"ragioneSociale":null,"formaGiuridica":null,"sedeLegale":null,'
+                    '"codiceFiscale":null,"partitaIva":null,"ateco":null,'
+                    '"descrizioneAttivita":null,"capitaleSociale":null,"dataCostituzione":null}'
+                ),
+            }],
+        )
+        text = resp.content[0].text.strip()
+        s = text.find("{"); e = text.rfind("}") + 1
+        if s >= 0 and e > s:
+            return {k: v for k, v in json.loads(text[s:e]).items() if v}
+    except Exception:
+        pass
+    return {}
+
+
+def _render_counterparty_card():
+    """Render compact counterparty info card at the top of analysis page."""
+    info = st.session_state.get("counterparty_info", {})
+    state = st.session_state.kyc_state
+
+    # Always show at minimum company name + country
+    nome     = (info.get("ragioneSociale") or
+                (state.case.company_name if state and state.case.company_name not in ("", "Controparte N/D") else None))
+    country  = state.case.country if state else ""
+
+    if not nome and not info:
+        return
+
+    def _field(label, value):
+        if not value:
+            return ""
+        return (
+            f'<div style="min-width:140px;flex:1;">'
+            f'<div style="font-size:0.6rem;font-weight:700;letter-spacing:0.8px;'
+            f'color:#94A3B8;text-transform:uppercase;margin-bottom:2px;">{label}</div>'
+            f'<div style="font-size:0.78rem;font-weight:500;color:#1E293B;">{value}</div>'
+            f'</div>'
+        )
+
+    fields_html = "".join([
+        _field("Forma giuridica",  info.get("formaGiuridica")),
+        _field("Sede legale",      info.get("sedeLegale")),
+        _field("ATECO",            (f'{info["ateco"]} — {info["descrizioneAttivita"]}'
+                                    if info.get("ateco") and info.get("descrizioneAttivita")
+                                    else info.get("ateco") or info.get("descrizioneAttivita"))),
+        _field("Codice fiscale",   info.get("codiceFiscale")),
+        _field("Partita IVA",      info.get("partitaIva")),
+        _field("Capitale sociale", info.get("capitaleSociale")),
+        _field("Costituzione",     info.get("dataCostituzione")),
+        _field("Paese",            country or None),
+    ])
+
+    st.markdown(
+        f'<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;'
+        f'padding:14px 20px;margin-bottom:16px;">'
+        f'<div style="font-size:1.05rem;font-weight:700;color:#1E293B;margin-bottom:10px;">'
+        f'{nome}</div>'
+        f'<div style="display:flex;flex-wrap:wrap;gap:16px 24px;">'
+        + fields_html +
+        f'</div></div>',
+        unsafe_allow_html=True)
+
+
 # ── STEP 4: ANALYSIS ─────────────────────────────────────────────
 def render_analysis():
     render_header()
+    _render_counterparty_card()
     client = get_client()
 
     # Pop next agent from queue (if any)
