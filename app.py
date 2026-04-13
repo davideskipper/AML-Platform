@@ -1983,6 +1983,30 @@ def render_final_valuation():
                 racc_str = racc
 
             # ── Risk badge ────────────────────────────────────────
+            # Detect which main sections were NOT run
+            _missing_secs = [s for s in MAIN_SECTIONS if sec_status(s["key"]) != "completed"]
+            _partial       = len(_missing_secs) > 0
+
+            _partial_html = ""
+            if _partial:
+                _missing_names = ", ".join(s["full_label"] for s in _missing_secs)
+                _partial_html = (
+                    f'<div style="width:100%;margin-top:12px;padding:10px 14px;'
+                    f'background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px;">'
+                    f'<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">'
+                    f'<span style="font-size:0.75rem;">⚠️</span>'
+                    f'<span style="font-size:0.68rem;font-weight:800;letter-spacing:0.8px;'
+                    f'color:#92400E;text-transform:uppercase;">Valutazione parziale — Rating provvisorio</span>'
+                    f'</div>'
+                    f'<div style="font-size:0.75rem;color:#78350F;line-height:1.6;">'
+                    f'<b>Agenti non eseguiti:</b> {_missing_names}.<br>'
+                    f'Il Customer Risk Rating è <b>provvisorio</b> e non definitivo ai fini '
+                    f'dell\'onboarding o dell\'aggiornamento del fascicolo cliente. '
+                    f'Eseguire gli agenti mancanti per ottenere una valutazione completa.'
+                    f'</div>'
+                    f'</div>'
+                )
+
             st.markdown(
                 f'<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;'
                 f'background:#fff;border:1px solid {BORDER};border-left:4px solid {rc};'
@@ -1990,8 +2014,12 @@ def render_final_valuation():
                 f'<span style="font-size:0.65rem;font-weight:700;letter-spacing:0.8px;'
                 f'color:{TEXT_SEC};text-transform:uppercase;">Rischio Complessivo</span>'
                 f'{risk_badge(risk)}'
+                + (f'<span style="margin-left:4px;font-size:0.68rem;font-weight:700;'
+                   f'color:#92400E;background:#FFFBEB;padding:2px 8px;border-radius:20px;'
+                   f'border:1px solid #FDE68A;">PROVVISORIO</span>' if _partial else '')
                 + (f'<div style="width:100%;font-size:0.72rem;color:{TEXT_SEC};margin-top:2px;">'
                    f'{racc_str}</div>' if racc_str else '')
+                + _partial_html
                 + f'</div>',
                 unsafe_allow_html=True)
 
