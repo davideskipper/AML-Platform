@@ -903,9 +903,10 @@ def render_header():
             unsafe_allow_html=True)
         _hb_a, _hb_b = st.columns(2)
         with _hb_a:
-            if st.button("Visualizza Agenti", key="btn_agents_info", use_container_width=True):
-                if hasattr(st, "dialog"):
-                    _agents_info_dialog()
+            if st.session_state.step in ("analysis", "final"):
+                if st.button("Visualizza Agenti", key="btn_agents_info", use_container_width=True):
+                    if hasattr(st, "dialog"):
+                        _agents_info_dialog()
         with _hb_b:
             if st.session_state.step not in ("setup", ""):
                 if st.button("← Home", key="btn_go_home", use_container_width=True):
