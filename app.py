@@ -989,8 +989,7 @@ def render_upload():
                 f'<div style="font-size:0.65rem;font-weight:700;letter-spacing:1.2px;'
                 f'color:{BLUE};text-transform:uppercase;margin-bottom:4px;">Documenti Aggiuntivi</div>'
                 f'<div style="font-size:0.78rem;color:{TEXT_SEC};margin-bottom:10px;">'
-                f'Nota Parere, pareri legali o altra documentazione non collegata a una sezione specifica. '
-                f'Questi documenti saranno inclusi come contesto per tutti gli agenti.</div>',
+                f'Nota Parere, altri documenti a supporto della valutazione</div>',
                 unsafe_allow_html=True)
             add_files = st.file_uploader(
                 "Documenti aggiuntivi", type=["pdf", "docx", "txt", "md"],
