@@ -1729,28 +1729,25 @@ def render_analysis():
             f'{brd}white-space:nowrap;">'
             + icon_html + s["label"] + '</span>')
 
-    # ── Count AML flags across completed sections — 3 categories ────
-    # CRITICO (red)  = normative/risk impact
-    # ATTENZIONE (yellow) = needs investigation
-    # MANCANTE (grey) = missing information
-    _fl_counts = {"ANOMALIA": 0, "ATTENZIONE": 0, "MANCANTE": 0}
+    # ── Count AML flags — use classify_evidence() for perfect consistency
+    # with the FLAG AML cards rendered in each section and in final valuation.
+    _fl_counts = {"Anomalia": 0, "Punto di attenzione": 0,
+                  "Info mancanti": 0, "Elemento positivo": 0}
     for _s in MAIN_SECTIONS:
         _p = get_parsed(_s["key"])
         if not _p:
             continue
         for _ev in _p.get("principaliEvidenze", []):
-            _l = (_ev.get("livello","") or "").upper()
-            if _l in ("CRITICO", "ANOMALIA"):
-                _fl_counts["ANOMALIA"]   += 1
-            elif _l == "ATTENZIONE":
-                _fl_counts["ATTENZIONE"] += 1
-            else:
-                _fl_counts["MANCANTE"]   += 1
+            _lbl = classify_evidence(_ev)["label"]
+            if _lbl in _fl_counts:
+                _fl_counts[_lbl] += 1
 
+    # Same colours as classify_evidence() / render_evidenze()
     _badge_cfg = [
-        ("ANOMALIA",   "#B71C1C", "#FDECEA", "Anomalie"),
-        ("ATTENZIONE", "#F57F17", "#FFFDE7", "Attenzioni"),
-        ("MANCANTE",   "#6B7280", "#F3F4F6", "Info mancanti"),
+        ("Anomalia",           "#B71C1C", "#FDECEA", "Anomalie"),
+        ("Punto di attenzione","#F57F17", "#FFFDE7", "Attenzioni"),
+        ("Info mancanti",      "#616161", "#F5F5F5", "Info mancanti"),
+        ("Elemento positivo",  "#2E7D32", "#F1F8E9", "Positivi"),
     ]
     _badges_html = "".join(
         f'<span style="display:inline-flex;align-items:center;gap:4px;'
