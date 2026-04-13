@@ -888,9 +888,16 @@ def render_upload():
     _, col, _ = st.columns([0.5, 5, 0.5])
     with col:
         st.markdown(
-            f'<div style="font-size:1.15rem;font-weight:700;color:{TEXT};margin-bottom:4px;">Carica Documenti</div>'
-            f'<div style="height:4px;"></div>',
+            f'<div style="font-size:1.15rem;font-weight:700;color:{TEXT};margin-bottom:8px;">Carica Documenti</div>',
             unsafe_allow_html=True)
+
+        files_data_check = st.session_state.uploaded_files_data
+        if not files_data_check:
+            st.markdown(
+                f'<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;'
+                f'padding:10px 14px;margin-bottom:10px;font-size:0.8rem;color:{BLUE};">'
+                f'ℹ️ Nessun documento caricato — gli agenti utilizzeranno la ricerca web.</div>',
+                unsafe_allow_html=True)
 
         with st.container(border=True):
             st.markdown(
@@ -985,13 +992,6 @@ def render_upload():
                     chosen_key = option_keys[option_labels.index(chosen)]
                     if chosen_key != st.session_state.file_assignments.get(fname):
                         st.session_state.file_assignments[fname] = chosen_key
-
-        if not files_data:
-            st.markdown(
-                f'<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;'
-                f'padding:10px 14px;margin:10px 0;font-size:0.8rem;color:{BLUE};">'
-                f'ℹ️ Nessun documento caricato — gli agenti utilizzeranno la ricerca web.</div>',
-                unsafe_allow_html=True)
 
         # ── Documenti aggiuntivi (Nota Parere, pareri legali, ecc.) ──
         with st.container(border=True):
