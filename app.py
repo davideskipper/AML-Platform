@@ -1775,7 +1775,7 @@ def render_analysis():
     with top_r:
         _tr_a, _tr_b = st.columns(2)
         with _tr_a:
-            if st.button("Lancia tutti gli agenti", key="run_all_top", use_container_width=True):
+            if st.button("Lancia agenti", key="run_all_top", use_container_width=True):
                 _run_all_dialog()
         with _tr_b:
             if st.button("Valutazione Finale", key="go_final_top", use_container_width=True):
