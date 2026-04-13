@@ -1599,50 +1599,81 @@ def _render_right_panel(queued_key=None):
 if hasattr(st, "dialog"):
     @st.dialog("Avvia Agenti", width="large")
     def _run_all_dialog():
-        st.markdown(
-            f'<div style="font-size:0.85rem;color:{TEXT_SEC};margin-bottom:16px;">'
-            f'Seleziona gli agenti da eseguire e imposta l\'ordine di esecuzione (1 = primo).</div>',
-            unsafe_allow_html=True)
-        selections = {}
-        orders     = {}
-        for i, sec in enumerate(MAIN_SECTIONS):
-            k = sec["key"]
-            col_chk, col_lbl, col_ord = st.columns([0.4, 4, 1.2])
-            with col_chk:
-                st.markdown('<div style="padding-top:6px;"></div>', unsafe_allow_html=True)
-                selections[k] = st.checkbox(
-                    "", value=True, key=f"rall_chk_{k}", label_visibility="collapsed")
-            with col_lbl:
-                done_mark = (
-                    f'<span style="color:{GREEN};font-size:0.72rem;margin-left:6px;">✓ completato</span>'
-                    if sec_status(k) == "completed" else "")
-                dim = "opacity:0.45;" if not selections.get(k, True) else ""
-                st.markdown(
-                    f'<div style="{dim}display:flex;align-items:center;gap:6px;padding:4px 0;">'
-                    f'<span style="font-size:1rem;">{sec["icon"]}</span>'
-                    f'<span style="font-size:0.88rem;font-weight:500;color:{TEXT};">{sec["full_label"]}</span>'
-                    + done_mark + '</div>',
-                    unsafe_allow_html=True)
-            with col_ord:
-                orders[k] = st.number_input(
-                    "Ordine", min_value=1, max_value=len(MAIN_SECTIONS),
-                    value=i + 1, step=1, key=f"rall_ord_{k}",
-                    label_visibility="visible",
-                    disabled=not selections.get(k, True))
+        # Persist order and selection across fragment reruns
+        if "rall_order" not in st.session_state:
+            st.session_state.rall_order = [s["key"] for s in MAIN_SECTIONS]
+        if "rall_sel" not in st.session_state:
+            st.session_state.rall_sel = {s["key"]: True for s in MAIN_SECTIONS}
 
-        st.markdown('<div style="height:8px;"></div>', unsafe_allow_html=True)
+        order = list(st.session_state.rall_order)
+        sel   = st.session_state.rall_sel
+
+        st.markdown(
+            f'<div style="font-size:0.82rem;color:{TEXT_SEC};margin-bottom:14px;">'
+            f'Seleziona gli agenti e usa ↑ ↓ per definire l\'ordine di esecuzione.</div>',
+            unsafe_allow_html=True)
+
+        for i, k in enumerate(order):
+            sec = next(s for s in MAIN_SECTIONS if s["key"] == k)
+            col_chk, col_lbl, col_up, col_dn = st.columns([0.4, 5.2, 0.45, 0.45])
+
+            with col_chk:
+                st.markdown('<div style="height:7px;"></div>', unsafe_allow_html=True)
+                new_val = st.checkbox(
+                    "", value=sel.get(k, True), key=f"rall_chk_{k}",
+                    label_visibility="collapsed")
+                sel[k] = new_val
+
+            with col_lbl:
+                done_html = (
+                    f'<span style="font-size:0.7rem;color:{GREEN};margin-left:6px;">✓</span>'
+                    if sec_status(k) == "completed" else "")
+                dim = "opacity:0.4;" if not sel.get(k, True) else ""
+                pos_badge = (
+                    f'<span style="display:inline-flex;align-items:center;justify-content:center;'
+                    f'min-width:20px;height:20px;background:#E5E7EB;border-radius:50%;'
+                    f'font-size:0.68rem;font-weight:700;color:#6B7280;">{i + 1}</span>')
+                st.markdown(
+                    f'<div style="{dim}display:flex;align-items:center;gap:8px;'
+                    f'padding:9px 14px;background:#F8F9FA;border-radius:7px;'
+                    f'border:1px solid #E5E7EB;margin-bottom:2px;">'
+                    f'<span style="color:#CBD5E1;font-size:1rem;user-select:none;">⠿</span>'
+                    + pos_badge +
+                    f'<span style="font-size:1rem;">{sec["icon"]}</span>'
+                    f'<span style="font-size:0.87rem;font-weight:500;color:{TEXT};">'
+                    f'{sec["full_label"]}</span>'
+                    + done_html + '</div>',
+                    unsafe_allow_html=True)
+
+            with col_up:
+                st.markdown('<div style="height:3px;"></div>', unsafe_allow_html=True)
+                if st.button("↑", key=f"rall_up_{k}", disabled=(i == 0),
+                             use_container_width=True):
+                    order[i], order[i - 1] = order[i - 1], order[i]
+                    st.session_state.rall_order = order
+
+            with col_dn:
+                st.markdown('<div style="height:3px;"></div>', unsafe_allow_html=True)
+                if st.button("↓", key=f"rall_dn_{k}", disabled=(i == len(order) - 1),
+                             use_container_width=True):
+                    order[i], order[i + 1] = order[i + 1], order[i]
+                    st.session_state.rall_order = order
+
+        st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
         col_ann, col_go = st.columns([1, 2])
         with col_ann:
             if st.button("Annulla", key="rall_cancel", use_container_width=True):
+                st.session_state.pop("rall_order", None)
+                st.session_state.pop("rall_sel", None)
                 st.rerun()
         with col_go:
-            if st.button("▶ Avvia selezionati", key="rall_go", use_container_width=True):
-                queue = sorted(
-                    [k for k, v in selections.items() if v],
-                    key=lambda k: orders.get(k, 99))
+            if st.button("Avvia selezionati", key="rall_go", use_container_width=True):
+                queue = [k for k in order if sel.get(k, True)]
                 if queue:
                     st.session_state.run_queue      = queue
                     st.session_state.active_section = queue[0]
+                st.session_state.pop("rall_order", None)
+                st.session_state.pop("rall_sel", None)
                 st.rerun()
 else:
     def _run_all_dialog():
@@ -1734,7 +1765,7 @@ def render_analysis():
     with top_r:
         _tr_a, _tr_b = st.columns(2)
         with _tr_a:
-            if st.button("▶ Tutti gli agenti", key="run_all_top", use_container_width=True):
+            if st.button("Lancia tutti gli agenti", key="run_all_top", use_container_width=True):
                 _run_all_dialog()
         with _tr_b:
             if st.button("Valutazione Finale", key="go_final_top", use_container_width=True):
