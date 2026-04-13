@@ -1980,8 +1980,7 @@ def _render_counterparty_card():
         _field("ATECO",            (f'{info["ateco"]} — {info["descrizioneAttivita"]}'
                                     if info.get("ateco") and info.get("descrizioneAttivita")
                                     else info.get("ateco") or info.get("descrizioneAttivita"))),
-        _field("Codice fiscale",   info.get("codiceFiscale")),
-        _field("Partita IVA",      info.get("partitaIva")),
+        _field("CF / P.IVA",       " / ".join(filter(None, [info.get("codiceFiscale"), info.get("partitaIva")])) or None),
         _field("Capitale sociale", info.get("capitaleSociale")),
         _field("Costituzione",     info.get("dataCostituzione")),
         _field("Paese",            country or None),
