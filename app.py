@@ -1995,35 +1995,30 @@ def render_final_valuation():
             return
 
         if parsed:
-            # Collect active findings for the chips summary
-            all_findings = []
-            overrides    = st.session_state.crit_overrides
+            # Chips — use classify_evidence() for 1-to-1 match with FLAG AML cards below
+            _chip_counts = {"Anomalia": 0, "Punto di attenzione": 0,
+                            "Info mancanti": 0, "Elemento positivo": 0}
             for sec in MAIN_SECTIONS:
-                sk = sec["key"]
-                sp = get_parsed(sk)
+                sp = get_parsed(sec["key"])
                 if not sp:
                     continue
-                for idx, ev in enumerate(sp.get("principaliEvidenze", [])):
-                    lvl = (ev.get("livello", "") or "").upper()
-                    if lvl not in ("CRITICO", "ANOMALIA"):
-                        continue
-                    ov_status = (overrides.get(sk, {}).get(idx, {}).get("status", "") or "").lower()
-                    if ov_status == "chiuso":
-                        continue
-                    all_findings.append({"sezione": sec["full_label"], "livello": lvl,
-                                         "evidenza": ev.get("evidenza", "")})
+                for ev in sp.get("principaliEvidenze", []):
+                    _lbl = classify_evidence(ev)["label"]
+                    if _lbl in _chip_counts:
+                        _chip_counts[_lbl] += 1
 
-            n_crit = sum(1 for f in all_findings if f["livello"] == "CRITICO")
-            n_anom = sum(1 for f in all_findings if f["livello"] == "ANOMALIA")
-            chips  = ""
-            if n_crit:
-                chips += (f'<span style="background:#FEF2F2;color:{DANGER};font-size:0.72rem;'
-                          f'font-weight:700;padding:3px 12px;border-radius:20px;margin-right:6px;">'
-                          f'🔴 {n_crit} critiche</span>')
-            if n_anom:
-                chips += (f'<span style="background:#FFFBEB;color:{YELLOW};font-size:0.72rem;'
-                          f'font-weight:700;padding:3px 12px;border-radius:20px;">'
-                          f'🟡 {n_anom} anomalie</span>')
+            _chip_cfg = [
+                ("Anomalia",            "#B71C1C", "#FDECEA"),
+                ("Punto di attenzione", "#F57F17", "#FFFDE7"),
+                ("Info mancanti",       "#616161", "#F5F5F5"),
+                ("Elemento positivo",   "#2E7D32", "#F1F8E9"),
+            ]
+            chips = "".join(
+                f'<span style="background:{_bg};color:{_fg};font-size:0.72rem;'
+                f'font-weight:700;padding:3px 12px;border-radius:20px;margin-right:6px;">'
+                f'● {_chip_counts[_k]} {_k}</span>'
+                for _k, _fg, _bg in _chip_cfg if _chip_counts[_k] > 0
+            )
             if chips:
                 st.markdown(f'<div style="margin-bottom:12px;">{chips}</div>',
                             unsafe_allow_html=True)
