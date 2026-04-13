@@ -473,6 +473,49 @@ def classify_evidence(ev: dict) -> dict:
             "border_color": "#9E9E9E", "label": "Info mancanti"}
 
 
+# Keyword → suggested recovery action for "Info mancanti" evidences
+_INFO_SUGGESTIONS = [
+    (["ubo", "titolare effettivo", "beneficiar", "ownership"],
+     "Richiedere dichiarazione UBO certificata e documenti identità dei titolari effettivi."),
+    (["documento identit", "passaporto", "carta d'identit", "carta di identit"],
+     "Acquisire copia del documento identità in corso di validità."),
+    (["bilancio", "conto economico", "stato patrimoniale", "fatturato", "ricavi", "ebitda", "margine"],
+     "Caricare bilancio degli ultimi 3 esercizi, conto economico e dichiarazioni fiscali."),
+    (["estratto conto", "movimenti bancari", "transazion", "bonifici", "flussi finanziari", "movimentazion"],
+     "Caricare estratti conto bancari degli ultimi 12 mesi in formato Excel/CSV."),
+    (["organigramma", "struttura societaria", "soci", "quote", "partecipazion"],
+     "Richiedere organigramma aggiornato e visura camerale storica."),
+    (["origine dei fondi", "provenienza fondi", "patrimonio", "source of wealth", "origine patrimonio"],
+     "Richiedere documentazione comprovante l'origine dei fondi e del patrimonio dichiarato."),
+    (["sentenz", "procediment", "giudiziar", "penale", "casellario"],
+     "Acquisire casellario giudiziario e documentazione aggiornata sui procedimenti citati."),
+    (["statuto", "atto costitutivo", "oggetto sociale"],
+     "Richiedere copia aggiornata dello statuto e dell'atto costitutivo."),
+    (["pep", "politicamente espost", "carica politica", "carica pubblica", "incarico pubblico"],
+     "Eseguire screening PEP su fonti ufficiali (es. Open Sanctions, World-Check) per le persone identificate."),
+    (["dichiarazione dei redditi", "dichiarazione fiscale", "redditi", "irpef", "ires"],
+     "Richiedere le ultime 3 dichiarazioni dei redditi e relativi accertamenti."),
+    (["visura camerale", "registro imprese", "rea", "camera di commercio"],
+     "Acquisire visura camerale aggiornata (storica) dal Registro Imprese."),
+    (["notizie", "media", "stampa", "articoli", "adverse media", "web search"],
+     "Eseguire ricerca adverse media avanzata (Factiva, World-Check, fonti giornalistiche)."),
+    (["contratto", "accordo", "patto parasociale"],
+     "Richiedere copia dei contratti o accordi rilevanti citati."),
+    (["licenz", "autoriz", "certificazion", "iscrizione albo", "albo"],
+     "Verificare iscrizioni ad albi, licenze e autorizzazioni su registri ufficiali."),
+    (["sanzioni", "lista sanzioni", "screening sanzioni"],
+     "Eseguire screening su liste sanzioni aggiornate (UE, OFAC, ONU, HMT)."),
+]
+
+def _info_suggestion(testo: str) -> str:
+    """Return the best-matching recovery suggestion for a missing-info evidence, or ''."""
+    testo_low = (testo or "").lower()
+    for keywords, suggestion in _INFO_SUGGESTIONS:
+        if any(kw in testo_low for kw in keywords):
+            return suggestion
+    return ""
+
+
 def render_evidenze(evidenze: list) -> None:
     """Render a list of principaliEvidenze dicts with semantic colour coding."""
     if not evidenze:
@@ -485,6 +528,18 @@ def render_evidenze(evidenze: list) -> None:
             f'<p style="color:#9E9E9E;font-size:11px;font-style:italic;margin:0;">{norm}</p>'
             if norm else ""
         )
+        suggestion_html = ""
+        if style["label"] == "Info mancanti":
+            hint = _info_suggestion(desc)
+            if hint:
+                suggestion_html = (
+                    f'<div style="display:flex;align-items:flex-start;gap:5px;'
+                    f'margin-top:6px;padding:6px 10px;background:#ECECEC;border-radius:4px;">'
+                    f'<span style="font-size:11px;color:#616161;font-weight:700;'
+                    f'white-space:nowrap;">Azione suggerita:</span>'
+                    f'<span style="font-size:11px;color:#424242;line-height:1.5;">{hint}</span>'
+                    f'</div>'
+                )
         st.markdown(
             f'<div style="background-color:{style["bg_color"]};'
             f'border-left:4px solid {style["border_color"]};'
@@ -494,7 +549,7 @@ def render_evidenze(evidenze: list) -> None:
             f'text-transform:uppercase;letter-spacing:0.5px;">{style["label"]}</span>'
             f'<p style="color:{style["text_color"]};font-size:13px;'
             f'margin:8px 0 4px 0;line-height:1.5;">{desc}</p>'
-            + norm_html +
+            + norm_html + suggestion_html +
             f'</div>',
             unsafe_allow_html=True)
 
@@ -2073,6 +2128,18 @@ def render_final_valuation():
                     _norm_html = (
                         f'<p style="color:#9E9E9E;font-size:11px;font-style:italic;margin:4px 0 0;">'
                         f'📎 {_ev["normativa"]}</p>' if _ev["normativa"] else "")
+                    _sugg_html = ""
+                    if _style["label"] == "Info mancanti":
+                        _hint = _info_suggestion(_ev["evidenza"])
+                        if _hint:
+                            _sugg_html = (
+                                f'<div style="display:flex;align-items:flex-start;gap:5px;'
+                                f'margin-top:6px;padding:6px 10px;background:#ECECEC;border-radius:4px;">'
+                                f'<span style="font-size:11px;color:#616161;font-weight:700;'
+                                f'white-space:nowrap;">Azione suggerita:</span>'
+                                f'<span style="font-size:11px;color:#424242;line-height:1.5;">{_hint}</span>'
+                                f'</div>'
+                            )
                     st.markdown(
                         f'<div style="background-color:{_style["bg_color"]};'
                         f'border-left:4px solid {_style["border_color"]};'
@@ -2084,7 +2151,7 @@ def render_final_valuation():
                         f'margin:8px 0 3px 0;line-height:1.5;">{_ev["evidenza"]}</p>'
                         f'<p style="font-size:11px;color:{TEXT_SEC};margin:0;">'
                         f'{_ev["sec_icon"]} {_ev["sezione"]}</p>'
-                        + _norm_html + f'</div>',
+                        + _norm_html + _sugg_html + f'</div>',
                         unsafe_allow_html=True)
 
         st.markdown(f'<div style="height:16px;"></div>', unsafe_allow_html=True)
