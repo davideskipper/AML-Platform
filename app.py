@@ -156,6 +156,14 @@ st.markdown(f"""
   [data-testid="stTabs"] [data-testid="stTab"] {{
     font-size: 0.82rem !important; font-weight: 500 !important; padding: 8px 16px !important;
   }}
+
+  /* ── Buttons — compact to prevent text wrapping ── */
+  [data-testid="stButton"] > button {{
+    font-size: 0.74rem !important;
+    padding: 0.22rem 0.55rem !important;
+    line-height: 1.3 !important;
+    white-space: nowrap !important;
+  }}
 </style>
 """, unsafe_allow_html=True)
 
