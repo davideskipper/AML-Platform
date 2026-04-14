@@ -86,21 +86,29 @@ st.markdown(f"""
     font-size: 0.875rem !important;
   }}
 
-  /* ── Buttons ── */
-  .stButton > button {{
-    background: #E5E7EB !important; color: #111827 !important;
-    border: 1px solid #D1D5DB !important; border-radius: 6px !important;
-    font-weight: 600 !important; font-size: 0.875rem !important;
-    padding: 8px 20px !important; letter-spacing: 0.1px !important;
-    transition: background 0.15s, transform 0.1s, box-shadow 0.15s !important;
+  /* ── Buttons — chip style ── */
+  .stButton > button, [data-testid="stButton"] > button,
+  [data-testid="stDownloadButton"] > button {{
+    background: #F1F5F9 !important; color: #475569 !important;
+    border: 1px solid #CBD5E1 !important; border-radius: 20px !important;
+    font-weight: 600 !important; font-size: 0.76rem !important;
+    padding: 0.3rem 0.9rem !important; letter-spacing: 0.2px !important;
+    line-height: 1.35 !important; white-space: nowrap !important;
+    min-height: unset !important; box-shadow: none !important;
+    transition: background 0.12s, color 0.12s, border-color 0.12s !important;
   }}
-  .stButton > button:hover {{
-    background: #D1D5DB !important; transform: translateY(-1px) !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.10) !important;
+  .stButton > button:hover, [data-testid="stButton"] > button:hover,
+  [data-testid="stDownloadButton"] > button:hover {{
+    background: #E2E8F0 !important; color: #1A1A2E !important;
+    border-color: #94A3B8 !important;
+    transform: none !important; box-shadow: none !important;
   }}
-  .stButton > button:active {{ transform: translateY(0) !important; }}
-  .stButton > button:disabled {{
-    background: #F3F4F6 !important; color: #9CA3AF !important;
+  .stButton > button:active, [data-testid="stButton"] > button:active {{
+    background: #CBD5E1 !important; transform: none !important;
+  }}
+  .stButton > button:disabled, [data-testid="stButton"] > button:disabled {{
+    background: #F8FAFC !important; color: #CBD5E1 !important;
+    border-color: #E2E8F0 !important;
     cursor: not-allowed !important; transform: none !important; box-shadow: none !important;
   }}
 
@@ -158,16 +166,6 @@ st.markdown(f"""
     font-size: 0.82rem !important; font-weight: 500 !important; padding: 8px 16px !important;
   }}
 
-  /* ── Buttons — compact, text wraps cleanly ── */
-  [data-testid="stButton"] > button {{
-    font-size: 0.72rem !important;
-    padding: 0.2rem 0.4rem !important;
-    line-height: 1.25 !important;
-    white-space: normal !important;
-    word-break: break-word !important;
-    text-align: center !important;
-    min-height: unset !important;
-  }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -1041,12 +1039,12 @@ def render_header():
         _hb_a, _hb_b, _hb_c = st.columns(3)
         with _hb_a:
             if st.session_state.step in ("analysis", "final"):
-                if st.button("Visualizza Agenti", key="btn_agents_info", use_container_width=True):
+                if st.button("Visualizza Agenti", key="btn_agents_info"):
                     if hasattr(st, "dialog"):
                         _agents_info_dialog()
         with _hb_b:
             if st.session_state.step in ("analysis", "final"):
-                if st.button("Genera PDF", key="btn_gen_pdf_hdr", use_container_width=True):
+                if st.button("Genera PDF", key="btn_gen_pdf_hdr"):
                     with st.spinner("Generazione PDF…"):
                         st.session_state.pdf_bytes_hdr = _generate_pdf_bytes()
             if st.session_state.get("pdf_bytes_hdr"):
@@ -1059,7 +1057,7 @@ def render_header():
                                    key="dl_pdf_hdr")
         with _hb_c:
             if st.session_state.step not in ("setup", ""):
-                if st.button("← Home", key="btn_go_home", use_container_width=True):
+                if st.button("← Home", key="btn_go_home"):
                     st.session_state.step = "setup"
                     st.rerun()
     if st.session_state.step not in ("setup", ""):
@@ -2320,13 +2318,13 @@ def render_analysis():
     with top_r:
         _tr_a, _tr_b, _tr_c = st.columns(3)
         with _tr_a:
-            if st.button("Lancia agenti", key="run_all_top", use_container_width=True):
+            if st.button("Lancia agenti", key="run_all_top"):
                 _run_all_dialog()
         with _tr_b:
-            if st.button("Checklist", key="open_checklist_top", use_container_width=True):
+            if st.button("Checklist", key="open_checklist_top"):
                 _checklist_dialog()
         with _tr_c:
-            if st.button("Valutazione finale", key="go_final_top", use_container_width=True):
+            if st.button("Valutazione finale", key="go_final_top"):
                 st.session_state.step = "final"
                 st.rerun()
 
