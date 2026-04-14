@@ -604,6 +604,14 @@ def classify_evidence(ev: dict) -> dict:
             "necessita di approfondimento",
             "da monitorare",
             "da verificare",
+            # Dati mancanti / monitoraggio richiesto
+            "tuttavia",
+            "l'assenza del dato",
+            "non è esplicitamente indicato",
+            "impedisce una verifica",
+            "dovrà essere monitorat",
+            "essere monitorat",
+            "dovrà essere verific",
         ]
         hit_positivi = sum(1 for p in pattern_positivi if p in testo)
         hit_negativi = sum(1 for p in pattern_negativi if p in testo)
