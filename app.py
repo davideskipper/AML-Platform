@@ -91,7 +91,7 @@ st.markdown(f"""
   [data-testid="stDownloadButton"] > button {{
     background: #F1F5F9 !important; color: #475569 !important;
     border: 1px solid #CBD5E1 !important; border-radius: 20px !important;
-    font-weight: 600 !important; font-size: 0.76rem !important;
+    font-weight: 600 !important; font-size: 0.68rem !important;
     padding: 0.3rem 0.9rem !important; letter-spacing: 0.2px !important;
     line-height: 1.35 !important; white-space: nowrap !important;
     min-height: unset !important; box-shadow: none !important;
