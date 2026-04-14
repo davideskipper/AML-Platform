@@ -513,8 +513,8 @@ def classify_evidence(ev: dict) -> dict:
         return {"bg_color": "#FFFDE7", "text_color": "#F57F17",
                 "border_color": "#F9A825", "label": "Attenzione"}
     elif "INFO_MANCANTE" in livello:
-        return {"bg_color": "#E8F4FD", "text_color": "#1565C0",
-                "border_color": "#1976D2", "label": "Info mancante"}
+        return {"bg_color": "#F5F5F5", "text_color": "#424242",
+                "border_color": "#9E9E9E", "label": "Info mancante"}
     else:
         return {"bg_color": "#F5F5F5", "text_color": "#616161",
                 "border_color": "#9E9E9E", "label": livello or "Info"}
