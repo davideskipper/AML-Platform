@@ -91,9 +91,10 @@ st.markdown(f"""
   [data-testid="stDownloadButton"] > button {{
     background: #F1F5F9 !important; color: #475569 !important;
     border: 1px solid #CBD5E1 !important; border-radius: 20px !important;
-    font-weight: 600 !important; font-size: 0.68rem !important;
+    font-weight: 600 !important; font-size: 0.72rem !important;
     padding: 0.3rem 0.9rem !important; letter-spacing: 0.2px !important;
-    line-height: 1.35 !important; white-space: nowrap !important;
+    line-height: 1.35 !important; white-space: normal !important;
+    text-align: center !important;
     min-height: unset !important; box-shadow: none !important;
     transition: background 0.12s, color 0.12s, border-color 0.12s !important;
   }}
@@ -2268,13 +2269,13 @@ def render_analysis():
     with top_r:
         _tr_a, _tr_b, _tr_c = st.columns(3)
         with _tr_a:
-            if st.button("Lancia agenti", key="run_all_top"):
+            if st.button("Lancia agenti", key="run_all_top", use_container_width=True):
                 _run_all_dialog()
         with _tr_b:
-            if st.button("Checklist", key="open_checklist_top"):
+            if st.button("Checklist", key="open_checklist_top", use_container_width=True):
                 _checklist_dialog()
         with _tr_c:
-            if st.button("Valutazione finale", key="go_final_top"):
+            if st.button("Valutazione finale", key="go_final_top", use_container_width=True):
                 st.session_state.step = "final"
                 st.rerun()
 
