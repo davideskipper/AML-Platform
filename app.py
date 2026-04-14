@@ -506,7 +506,6 @@ def classify_evidence(ev: dict) -> dict:
             "identificabile con certezza",
             "interamente versato",
             "adeguato rispetto",
-            "coerenza tra",
             "coerenza con",
             "assenza di procedure",
             "assenza di protesti",
@@ -590,6 +589,21 @@ def classify_evidence(ev: dict) -> dict:
             "senza documentazion",
             "senza evidenza",
             "senza riscontro",
+            # Commistione ruoli / controllo sostanziale
+            "commistione",
+            "duplice ruolo",
+            "doppio ruolo",
+            "ruolo dirigenziale apicale",
+            "controllo sostanziale",
+            "esercitati di fatto",
+            "poteri di fatto",
+            "richiede verifica",
+            "richiede monitoraggio",
+            "richiede approfondimento",
+            "necessita di verifica",
+            "necessita di approfondimento",
+            "da monitorare",
+            "da verificare",
         ]
         hit_positivi = sum(1 for p in pattern_positivi if p in testo)
         hit_negativi = sum(1 for p in pattern_negativi if p in testo)
