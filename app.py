@@ -355,7 +355,6 @@ DEFAULTS = {
     "final_ev_overrides": {},
     "counterparty_info": {},
     "rfi_email_draft": "",
-    "pdf_bytes_hdr": None,
     "upload_hash": "",
     "running_agent": None,
     "all_docs": "",
@@ -955,15 +954,11 @@ def render_header():
                         _agents_info_dialog()
         with _hb_b:
             if st.session_state.step in ("analysis", "final"):
-                if st.button("Genera PDF", key="btn_gen_pdf_hdr"):
-                    with st.spinner("Generazione PDF…"):
-                        st.session_state.pdf_bytes_hdr = _generate_pdf_bytes()
-            if st.session_state.get("pdf_bytes_hdr"):
                 _s = st.session_state.kyc_state
                 _co = (st.session_state.get("counterparty_info", {}).get("ragioneSociale")
                        or (_s.case.company_name if _s else "rapporto"))
                 _fn = f"AML_{_co.replace(' ','_')}_{date.today().strftime('%Y%m%d')}.pdf"
-                st.download_button("Scarica PDF", st.session_state.pdf_bytes_hdr,
+                st.download_button("Genera PDF", data=_generate_pdf_bytes,
                                    file_name=_fn, mime="application/pdf",
                                    key="dl_pdf_hdr")
         with _hb_c:
