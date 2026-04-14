@@ -2088,7 +2088,7 @@ def _generate_rfi_email(client, company_name: str, items: list) -> str:
     if not client or not items:
         return "Errore: nessuna informazione selezionata o API Key non configurata."
     items_list = "\n".join(
-        f"{i+1}. {it['verifica']}\n   Rif.: {it['normativa']}"
+        f"{i+1}. {it['verifica']}"
         for i, it in enumerate(items))
     try:
         resp = client.messages.create(
@@ -2096,15 +2096,16 @@ def _generate_rfi_email(client, company_name: str, items: list) -> str:
             max_tokens=900,
             messages=[{"role": "user", "content": (
                 f"Genera una bozza di email formale in italiano per richiedere informazioni "
-                f"nell'ambito di un'istruttoria AML/KYC (adeguata verifica D.Lgs. 231/2007).\n\n"
+                f"nell'ambito di un'istruttoria di adeguata verifica della clientela.\n\n"
                 f"Controparte: {company_name}\n\n"
                 f"Informazioni/documenti da richiedere:\n{items_list}\n\n"
-                f"Requisiti: tono formale compliance AML; intestazione con [Spett.le Sig./Sig.ra "
+                f"Requisiti: tono formale e cordiale; intestazione con [Spett.le Sig./Sig.ra "
                 f"[Nome Gestore/Cliente]]; oggetto 'Richiesta Documentazione Integrativa — "
-                f"Adeguata Verifica Clientela — {company_name}'; riferimento al D.Lgs. 231/2007; "
-                f"elenco chiaro dei documenti richiesti numerato; termine di risposta 10 giorni "
-                f"lavorativi; avviso che la mancata risposta può comportare la sospensione del "
-                f"rapporto; firma [Nome Analista AML] — [Struttura/Ufficio].\n"
+                f"Adeguata Verifica Clientela — {company_name}'; elenco chiaro dei documenti "
+                f"richiesti numerato; termine di risposta 10 giorni lavorativi; "
+                f"firma [Nome Analista] — [Struttura/Ufficio].\n"
+                f"NON includere riferimenti normativi (leggi, decreti, articoli).\n"
+                f"NON includere avvisi di sospensione o interruzione del rapporto.\n"
                 f"Restituisci SOLO il testo dell'email."
             )}],
         )
