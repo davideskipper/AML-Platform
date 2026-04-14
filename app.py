@@ -1971,8 +1971,22 @@ else:
 
 # ── Checklist helpers ─────────────────────────────────────────────
 def _compute_checklist():
-    """Return CHECKLIST_ITEMS enriched with computed status A/B/C."""
+    """Return CHECKLIST_ITEMS enriched with computed status A/B/C,
+    plus dynamic C rows for INFO_MANCANTE evidences not covered by any static item."""
+
+    _AMBITO_MAP = {
+        "registry":         "Registry & Struttura",
+        "ubo_pep":          "UBO & PEP",
+        "economic_profile": "Profilo Economico",
+        "transaction":      "Transaction & Geographic Risk",
+        "reputational":     "Reputazionale",
+        "final_valuation":  "Valutazione Finale",
+    }
+
+    # ── 1. Static items ───────────────────────────────────────────
     out = []
+    matched_texts: set = set()   # normalised evidenza texts already linked to a static item
+
     for item in CHECKLIST_ITEMS:
         it = dict(item)
         if item.get("always_manual"):
@@ -1988,18 +2002,48 @@ def _compute_checklist():
                 missing_note = ""
                 if parsed:
                     for ev in parsed.get("principaliEvidenze", []):
-                        if classify_evidence(ev)["label"] == "Info mancanti":
+                        if (ev.get("livello") or "").upper() == "INFO_MANCANTE":
                             ev_text = ev.get("evidenza", "").lower()
                             if any(kw in ev_text for kw in item.get("keywords", [])):
                                 missing_note = ev.get("evidenza", "")
+                                matched_texts.add(missing_note.strip().lower())
                                 break
-                if missing_note:
-                    it["status"] = "C"
-                    it["status_note"] = missing_note
-                else:
-                    it["status"] = "A"
-                    it["status_note"] = ""
+                it["status"] = "C" if missing_note else "A"
+                it["status_note"] = missing_note
         out.append(it)
+
+    # ── 2. Dynamic items for unmatched INFO_MANCANTE evidences ────
+    # Scan individual sections first; final_valuation last to deduplicate.
+    scan_order = (
+        [s["key"] for s in MAIN_SECTIONS if sec_status(s["key"]) == "completed"]
+        + (["final_valuation"] if sec_status("final_valuation") == "completed" else [])
+    )
+    seen: set = set()
+    dyn_counter = 0
+    for ak in scan_order:
+        parsed = get_parsed(ak)
+        if not parsed:
+            continue
+        for ev in parsed.get("principaliEvidenze", []):
+            if (ev.get("livello") or "").upper() != "INFO_MANCANTE":
+                continue
+            ev_raw  = ev.get("evidenza", "")
+            ev_norm = ev_raw.strip().lower()
+            if not ev_norm or ev_norm in matched_texts or ev_norm in seen:
+                continue
+            seen.add(ev_norm)
+            dyn_counter += 1
+            out.append({
+                "id":            f"dyn_{ak}_{dyn_counter}",
+                "ambito":        _AMBITO_MAP.get(ak, "Altro"),
+                "agent_key":     ak,
+                "verifica":      ev_raw,
+                "normativa":     ev.get("normativa") or "Art. 18 D.Lgs. 231/2007",
+                "keywords":      [],
+                "always_manual": False,
+                "status":        "C",
+                "status_note":   "",
+            })
     return out
 
 
