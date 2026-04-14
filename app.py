@@ -197,6 +197,119 @@ REQUIRED_DOCS = {
     "final_valuation":  [],
 }
 
+CHECKLIST_ITEMS = [
+    # ── Registry & Struttura ──────────────────────────────────────────────
+    {"id": "reg_01", "ambito": "Registry & Struttura", "agent_key": "registry",
+     "verifica": "Forma giuridica e oggetto sociale verificati e coerenti con attività svolta",
+     "normativa": "D.Lgs. 231/2007 art. 18; FATF Rec. 10",
+     "keywords": ["oggetto sociale", "forma giuridica"], "always_manual": False},
+    {"id": "reg_02", "ambito": "Registry & Struttura", "agent_key": "registry",
+     "verifica": "Composizione CDA, poteri di firma e governance verificati",
+     "normativa": "D.Lgs. 231/2007 art. 18; EBA GL/2021/02 par. 4.28",
+     "keywords": ["cda", "amministratore", "firma", "governance", "organo"], "always_manual": False},
+    {"id": "reg_03", "ambito": "Registry & Struttura", "agent_key": "registry",
+     "verifica": "Catena di controllo e assetti proprietari mappati",
+     "normativa": "D.Lgs. 231/2007 art. 20; FATF Rec. 24",
+     "keywords": ["soci", "quote", "partecipazione", "proprietà", "controllo"], "always_manual": False},
+    {"id": "reg_04", "ambito": "Registry & Struttura", "agent_key": "registry",
+     "verifica": "Sede legale verificata (assenza indirizzi fittizi o c/o sospetti)",
+     "normativa": "D.Lgs. 231/2007 art. 18; FATF Rec. 10",
+     "keywords": ["sede", "domicilio", "indirizzo"], "always_manual": False},
+    {"id": "reg_05", "ambito": "Registry & Struttura", "agent_key": "registry",
+     "verifica": "Assenza procedure concorsuali, fallimenti o liquidazioni",
+     "normativa": "D.Lgs. 231/2007 art. 17",
+     "keywords": ["fallimento", "procedura concorsuale", "liquidazione", "insolvenza"], "always_manual": False},
+    {"id": "reg_06", "ambito": "Registry & Struttura", "agent_key": "registry",
+     "verifica": "Verifica licenze/autorizzazioni per settori regolamentati (se applicabile)",
+     "normativa": "Normativa di settore; D.Lgs. 141/2010",
+     "keywords": ["licenza", "autorizzazione"], "always_manual": True},
+    # ── UBO & PEP ─────────────────────────────────────────────────────────
+    {"id": "ubo_01", "ambito": "UBO & PEP", "agent_key": "ubo_pep",
+     "verifica": "Titolari effettivi identificati (soglia ≥25%)",
+     "normativa": "D.Lgs. 231/2007 art. 20; IV Dir. AML UE",
+     "keywords": ["ubo", "titolare effettivo", "beneficiar", "ownership"], "always_manual": False},
+    {"id": "ubo_02", "ambito": "UBO & PEP", "agent_key": "ubo_pep",
+     "verifica": "PEP screening effettuato (domestici e internazionali)",
+     "normativa": "D.Lgs. 231/2007 art. 24; FATF Rec. 12",
+     "keywords": ["pep", "politicamente esposto", "carica pubblica"], "always_manual": False},
+    {"id": "ubo_03", "ambito": "UBO & PEP", "agent_key": "ubo_pep",
+     "verifica": "Screening liste sanzioni internazionali (OFAC, EU, ONU)",
+     "normativa": "Reg. UE 2580/2001; D.Lgs. 231/2007 art. 23",
+     "keywords": ["sanzioni", "ofac", "lista", "embargo"], "always_manual": False},
+    {"id": "ubo_04", "ambito": "UBO & PEP", "agent_key": "ubo_pep",
+     "verifica": "Origine dei fondi e del patrimonio documentata",
+     "normativa": "D.Lgs. 231/2007 art. 22; EBA GL/2021/02",
+     "keywords": ["origine fondi", "patrimonio", "source of wealth", "provenienza fondi"], "always_manual": False},
+    {"id": "ubo_05", "ambito": "UBO & PEP", "agent_key": "ubo_pep",
+     "verifica": "Documenti d'identità degli UBO acquisiti e verificati",
+     "normativa": "D.Lgs. 231/2007 art. 19; FATF Rec. 10",
+     "keywords": ["documento identit", "passaporto", "carta identit"], "always_manual": False},
+    {"id": "ubo_06", "ambito": "UBO & PEP", "agent_key": "ubo_pep",
+     "verifica": "Dichiarazione UBO firmata acquisita nel fascicolo cliente",
+     "normativa": "D.Lgs. 231/2007 art. 21; DM 11/03/2022",
+     "keywords": [], "always_manual": True},
+    # ── Reputazionale ─────────────────────────────────────────────────────
+    {"id": "rep_01", "ambito": "Reputazionale", "agent_key": "reputational",
+     "verifica": "Ricerca notizie negative e procedimenti giudiziari effettuata",
+     "normativa": "D.Lgs. 231/2007 art. 17; Circ. BI n. 285",
+     "keywords": ["notizie", "procedimento", "penale", "civile", "giudiziario"], "always_manual": False},
+    {"id": "rep_02", "ambito": "Reputazionale", "agent_key": "reputational",
+     "verifica": "Screening liste nere e provvedimenti Banca d'Italia/Consob",
+     "normativa": "D.Lgs. 231/2007 art. 23; Reg. UE 2015/847",
+     "keywords": ["lista nera", "provvedimento", "consob", "vigilanza"], "always_manual": False},
+    {"id": "rep_03", "ambito": "Reputazionale", "agent_key": "reputational",
+     "verifica": "Assenza associazioni con soggetti a rischio AML",
+     "normativa": "FATF Rec. 10; EBA GL/2021/02",
+     "keywords": ["associazione", "collegamento", "network", "riferibile"], "always_manual": False},
+    # ── Profilo Economico ────────────────────────────────────────────────
+    {"id": "eco_01", "ambito": "Profilo Economico", "agent_key": "economic_profile",
+     "verifica": "Bilancio ultimi 3 esercizi analizzato",
+     "normativa": "D.Lgs. 231/2007 art. 18; Indicatori UIF 24/08/2010",
+     "keywords": ["bilancio", "conto economico", "stato patrimoniale"], "always_manual": False},
+    {"id": "eco_02", "ambito": "Profilo Economico", "agent_key": "economic_profile",
+     "verifica": "Coerenza fatturato/settore verificata vs benchmark ATECO",
+     "normativa": "D.Lgs. 231/2007 art. 18; FATF Rec. 10",
+     "keywords": ["coerenza", "benchmark", "ateco", "fatturato", "ricavi"], "always_manual": False},
+    {"id": "eco_03", "ambito": "Profilo Economico", "agent_key": "economic_profile",
+     "verifica": "Struttura patrimoniale e flussi di cassa analizzati",
+     "normativa": "D.Lgs. 231/2007 art. 18",
+     "keywords": ["patrimonio", "flussi", "cash flow", "cassa"], "always_manual": False},
+    {"id": "eco_04", "ambito": "Profilo Economico", "agent_key": "economic_profile",
+     "verifica": "Dichiarazioni fiscali e adempimenti tributari verificati",
+     "normativa": "D.Lgs. 231/2007 art. 18; Indicatori UIF",
+     "keywords": ["fiscale", "imposte", "dichiarazione redditi", "iva"], "always_manual": False},
+    # ── Transaction & Geographic Risk ───────────────────────────────────
+    {"id": "trx_01", "ambito": "Transaction & Geographic Risk", "agent_key": "transaction",
+     "verifica": "Movimenti bancari analizzati per pattern AML (strutturazione, layering)",
+     "normativa": "D.Lgs. 231/2007 art. 35; Indicatori UIF n. 42/2023",
+     "keywords": ["pattern", "strutturazione", "layering", "movimenti"], "always_manual": False},
+    {"id": "trx_02", "ambito": "Transaction & Geographic Risk", "agent_key": "transaction",
+     "verifica": "Operazioni verso paesi FATF Black/Grey List verificate",
+     "normativa": "FATF Rec. 19; D.Lgs. 231/2007 art. 23",
+     "keywords": ["fatf", "black list", "grey list", "paese ad alto rischio"], "always_manual": False},
+    {"id": "trx_03", "ambito": "Transaction & Geographic Risk", "agent_key": "transaction",
+     "verifica": "Concentrazione controparti e soglie antiriciclaggio verificate",
+     "normativa": "D.Lgs. 231/2007 art. 35; Reg. UE 2015/847",
+     "keywords": ["concentrazione", "controparte", "soglia"], "always_manual": False},
+    # ── Conclusione Istruttoria ──────────────────────────────────────────
+    {"id": "fin_01", "ambito": "Conclusione Istruttoria", "agent_key": None,
+     "verifica": "Customer Risk Rating approvato dal responsabile dell'istruttoria",
+     "normativa": "D.Lgs. 231/2007 art. 15; Circ. BI n. 285",
+     "keywords": [], "always_manual": True},
+    {"id": "fin_02", "ambito": "Conclusione Istruttoria", "agent_key": None,
+     "verifica": "Fascicolo cliente completo, firmato e archiviato",
+     "normativa": "D.Lgs. 231/2007 art. 32 (conservazione documentale)",
+     "keywords": [], "always_manual": True},
+    {"id": "fin_03", "ambito": "Conclusione Istruttoria", "agent_key": None,
+     "verifica": "Valutazione SOS eseguita (se applicabile) e documentata",
+     "normativa": "D.Lgs. 231/2007 art. 35; Provvedimento UIF 24/08/2010",
+     "keywords": [], "always_manual": True},
+    {"id": "fin_04", "ambito": "Conclusione Istruttoria", "agent_key": None,
+     "verifica": "Autorizzazione Senior Management acquisita (se rating ALTO/CRITICO)",
+     "normativa": "D.Lgs. 231/2007 art. 24; Circ. BI n. 285 Tit. IV",
+     "keywords": [], "always_manual": True},
+]
+
 RISK_COLORS = {
     "LOW": GREEN, "MEDIUM": YELLOW, "HIGH": DANGER, "CRITICAL": "#7C3AED",
     "BASSO": GREEN, "MEDIO": YELLOW, "MEDIO-ALTO": "#F97316",
@@ -231,6 +344,7 @@ DEFAULTS = {
     "final_chat_history": [],
     "final_ev_overrides": {},
     "counterparty_info": {},
+    "rfi_email_draft": "",
     "upload_hash": "",
     "running_agent": None,
     "all_docs": "",
@@ -1935,6 +2049,70 @@ else:
         pass  # Streamlit < 1.33 — fallback: no popup
 
 
+# ── Checklist helpers ─────────────────────────────────────────────
+def _compute_checklist():
+    """Return CHECKLIST_ITEMS enriched with computed status A/B/C."""
+    out = []
+    for item in CHECKLIST_ITEMS:
+        it = dict(item)
+        if item.get("always_manual"):
+            it["status"] = "B"
+            it["status_note"] = ""
+        else:
+            ak = item["agent_key"]
+            if not ak or sec_status(ak) != "completed":
+                it["status"] = "B"
+                it["status_note"] = "Agente non ancora eseguito"
+            else:
+                parsed = get_parsed(ak)
+                missing_note = ""
+                if parsed:
+                    for ev in parsed.get("principaliEvidenze", []):
+                        if classify_evidence(ev)["label"] == "Info mancanti":
+                            ev_text = ev.get("evidenza", "").lower()
+                            if any(kw in ev_text for kw in item.get("keywords", [])):
+                                missing_note = ev.get("evidenza", "")
+                                break
+                if missing_note:
+                    it["status"] = "C"
+                    it["status_note"] = missing_note
+                else:
+                    it["status"] = "A"
+                    it["status_note"] = ""
+        out.append(it)
+    return out
+
+
+def _generate_rfi_email(client, company_name: str, items: list) -> str:
+    """Generate a formal RFI email draft via Claude Haiku."""
+    if not client or not items:
+        return "Errore: nessuna informazione selezionata o API Key non configurata."
+    items_list = "\n".join(
+        f"{i+1}. {it['verifica']}\n   Rif.: {it['normativa']}"
+        for i, it in enumerate(items))
+    try:
+        resp = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=900,
+            messages=[{"role": "user", "content": (
+                f"Genera una bozza di email formale in italiano per richiedere informazioni "
+                f"nell'ambito di un'istruttoria AML/KYC (adeguata verifica D.Lgs. 231/2007).\n\n"
+                f"Controparte: {company_name}\n\n"
+                f"Informazioni/documenti da richiedere:\n{items_list}\n\n"
+                f"Requisiti: tono formale compliance AML; intestazione con [Spett.le Sig./Sig.ra "
+                f"[Nome Gestore/Cliente]]; oggetto 'Richiesta Documentazione Integrativa — "
+                f"Adeguata Verifica Clientela — {company_name}'; riferimento al D.Lgs. 231/2007; "
+                f"elenco chiaro dei documenti richiesti numerato; termine di risposta 10 giorni "
+                f"lavorativi; avviso che la mancata risposta può comportare la sospensione del "
+                f"rapporto; firma [Nome Analista AML] — [Struttura/Ufficio].\n"
+                f"Restituisci SOLO il testo dell'email."
+            )}],
+        )
+        return resp.content[0].text
+    except Exception as e:
+        return f"Errore nella generazione dell'email: {e}"
+
+
 # ── Counterparty extraction & card ───────────────────────────────
 def _extract_counterparty_info(client, docs_text: str) -> dict:
     """Extract key company fields from registry documents using Claude Haiku."""
@@ -2098,11 +2276,14 @@ def render_analysis():
                 f'padding:4px 0 10px;justify-content:flex-end;">' + _badges_html + '</div>',
                 unsafe_allow_html=True)
     with top_r:
-        _tr_a, _tr_b = st.columns(2)
+        _tr_a, _tr_b, _tr_c = st.columns(3)
         with _tr_a:
             if st.button("Lancia agenti", key="run_all_top", use_container_width=True):
                 _run_all_dialog()
         with _tr_b:
+            if st.button("Checklist", key="open_checklist_top", use_container_width=True):
+                _checklist_dialog()
+        with _tr_c:
             if st.button("Valutazione finale", key="go_final_top", use_container_width=True):
                 st.session_state.step = "final"
                 st.rerun()
@@ -2241,6 +2422,121 @@ def _render_final_chatbot(client, valuation_key: str):
         if st.button("🗑 Cancella chat", key="clear_final_chat", use_container_width=True):
             st.session_state.final_chat_history = []
             st.rerun()
+
+
+# ── Checklist dialog ──────────────────────────────────────────────
+if hasattr(st, "dialog"):
+    @st.dialog("Checklist AML — Verifica Controparte", width="large")
+    def _checklist_dialog():
+        items = _compute_checklist()
+
+        n_a = sum(1 for i in items if i["status"] == "A")
+        n_b = sum(1 for i in items if i["status"] == "B")
+        n_c = sum(1 for i in items if i["status"] == "C")
+
+        # Summary pills
+        st.markdown(
+            f'<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">'
+            f'<span style="background:#F1F8E9;color:#2E7D32;padding:3px 12px;border-radius:20px;'
+            f'font-size:0.74rem;font-weight:700;">✓ {n_a} Verificati dall\'agente</span>'
+            f'<span style="background:#EFF6FF;color:#1D4ED8;padding:3px 12px;border-radius:20px;'
+            f'font-size:0.74rem;font-weight:700;">⚠ {n_b} Da verificare manualmente</span>'
+            f'<span style="background:#FEF3C7;color:#B45309;padding:3px 12px;border-radius:20px;'
+            f'font-size:0.74rem;font-weight:700;">○ {n_c} Info mancanti (RFI)</span>'
+            f'</div>',
+            unsafe_allow_html=True)
+
+        # Filter buttons
+        _fk = "cl_filter_sel"
+        if _fk not in st.session_state:
+            st.session_state[_fk] = "Tutti"
+        fc1, fc2, fc3, fc4 = st.columns(4)
+        for _col, _lbl in zip([fc1, fc2, fc3, fc4],
+                               ["Tutti", "A — Verificati", "B — Manuali", "C — Info mancanti"]):
+            with _col:
+                _active = st.session_state[_fk] == _lbl
+                if st.button(_lbl, key=f"cl_filt_{_lbl}", use_container_width=True,
+                             type="primary" if _active else "secondary"):
+                    st.session_state[_fk] = _lbl
+
+        _sel = st.session_state[_fk]
+        _sf = None
+        if "A —" in _sel: _sf = "A"
+        elif "B —" in _sel: _sf = "B"
+        elif "C —" in _sel: _sf = "C"
+        filtered = [i for i in items if not _sf or i["status"] == _sf]
+
+        # Items grouped by ambito
+        _STATUS_CFG = {
+            "A": ("✓", "#2E7D32", "#F1F8E9"),
+            "B": ("⚠", "#1D4ED8", "#EFF6FF"),
+            "C": ("○", "#B45309", "#FEF3C7"),
+        }
+        ambiti_seen = []
+        for _it in filtered:
+            if _it["ambito"] not in ambiti_seen:
+                ambiti_seen.append(_it["ambito"])
+
+        for _amb in ambiti_seen:
+            st.markdown(
+                f'<div style="font-size:0.68rem;font-weight:700;letter-spacing:0.9px;'
+                f'color:#94A3B8;text-transform:uppercase;margin:14px 0 5px;">{_amb}</div>',
+                unsafe_allow_html=True)
+            for _it in [i for i in filtered if i["ambito"] == _amb]:
+                _icon, _fg, _bg = _STATUS_CFG[_it["status"]]
+                _note = (f'<div style="font-size:0.67rem;color:#64748B;margin-top:3px;">'
+                         f'{_it["status_note"]}</div>') if _it.get("status_note") else ""
+                st.markdown(
+                    f'<div style="display:flex;align-items:flex-start;gap:10px;background:{_bg};'
+                    f'border-radius:6px;padding:8px 12px;margin-bottom:4px;">'
+                    f'<span style="font-size:0.82rem;color:{_fg};font-weight:700;'
+                    f'min-width:14px;margin-top:1px;">{_icon}</span>'
+                    f'<div style="flex:1;">'
+                    f'<div style="font-size:0.78rem;font-weight:500;color:#1E293B;">{_it["verifica"]}</div>'
+                    f'<div style="font-size:0.62rem;color:#94A3B8;margin-top:2px;">{_it["normativa"]}</div>'
+                    + _note +
+                    f'</div></div>',
+                    unsafe_allow_html=True)
+
+        # ── RFI section ──────────────────────────────────────────
+        c_items = [i for i in items if i["status"] == "C"]
+        if c_items:
+            st.markdown('<div style="height:6px;"></div>', unsafe_allow_html=True)
+            st.divider()
+            st.markdown(
+                f'<div style="font-size:0.88rem;font-weight:700;color:#1E293B;margin-bottom:4px;">'
+                f'Genera RFI — Richiesta Informazioni</div>'
+                f'<div style="font-size:0.76rem;color:#64748B;margin-bottom:10px;">'
+                f'Seleziona le informazioni mancanti da includere nella richiesta al gestore/cliente.</div>',
+                unsafe_allow_html=True)
+
+            _selected_rfi = []
+            for _it in c_items:
+                _checked = st.checkbox(
+                    _it["verifica"], key=f"rfi_chk_{_it['id']}", value=True,
+                    help=_it["normativa"])
+                if _checked:
+                    _selected_rfi.append(_it)
+
+            st.markdown('<div style="height:6px;"></div>', unsafe_allow_html=True)
+            _rfi_col, _ = st.columns([1, 2])
+            with _rfi_col:
+                if st.button("Genera bozza email RFI", key="rfi_gen_btn",
+                             disabled=len(_selected_rfi) == 0,
+                             use_container_width=True):
+                    _state = st.session_state.kyc_state
+                    _co = _state.case.company_name if _state else "Controparte"
+                    with st.spinner("Generazione email in corso…"):
+                        st.session_state.rfi_email_draft = _generate_rfi_email(
+                            get_client(), _co, _selected_rfi)
+
+            if st.session_state.get("rfi_email_draft"):
+                st.text_area("Bozza email", st.session_state.rfi_email_draft,
+                             height=320, key="rfi_email_ta")
+                st.caption("Copia il testo e incollalo nel tuo client email.")
+else:
+    def _checklist_dialog():
+        pass
 
 
 # ── Final valuation edit popup ────────────────────────────────────
