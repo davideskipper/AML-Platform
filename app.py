@@ -357,8 +357,7 @@ DEFAULTS = {
     "final_ev_overrides": {},
     "counterparty_info": {},
     "rfi_email_draft": "",
-    "pdf_bytes_analysis": None,
-    "pdf_bytes_final": None,
+    "pdf_bytes_hdr": None,
     "upload_hash": "",
     "running_agent": None,
     "all_docs": "",
@@ -1000,7 +999,7 @@ def render_header():
         if extracted:
             state.case.company_name = extracted
 
-    h_left, h_right = st.columns([5, 2.5])
+    h_left, h_right = st.columns([4, 3.5])
     with h_left:
         if st.session_state.step in ("analysis", "final"):
             done, total = main_progress()
@@ -1039,13 +1038,26 @@ def render_header():
             f'<div style="text-align:right;padding-top:10px;font-size:0.62rem;'
             f'color:{TEXT_SEC};font-weight:500;">claude-sonnet-4-6</div>',
             unsafe_allow_html=True)
-        _hb_a, _hb_b = st.columns(2)
+        _hb_a, _hb_b, _hb_c = st.columns(3)
         with _hb_a:
             if st.session_state.step in ("analysis", "final"):
                 if st.button("Visualizza Agenti", key="btn_agents_info", use_container_width=True):
                     if hasattr(st, "dialog"):
                         _agents_info_dialog()
         with _hb_b:
+            if st.session_state.step in ("analysis", "final"):
+                if st.button("Genera PDF", key="btn_gen_pdf_hdr", use_container_width=True):
+                    with st.spinner("Generazione PDF…"):
+                        st.session_state.pdf_bytes_hdr = _generate_pdf_bytes()
+            if st.session_state.get("pdf_bytes_hdr"):
+                _s = st.session_state.kyc_state
+                _co = (st.session_state.get("counterparty_info", {}).get("ragioneSociale")
+                       or (_s.case.company_name if _s else "rapporto"))
+                _fn = f"AML_{_co.replace(' ','_')}_{date.today().strftime('%Y%m%d')}.pdf"
+                st.download_button("Scarica PDF", st.session_state.pdf_bytes_hdr,
+                                   file_name=_fn, mime="application/pdf",
+                                   key="dl_pdf_hdr")
+        with _hb_c:
             if st.session_state.step not in ("setup", ""):
                 if st.button("← Home", key="btn_go_home", use_container_width=True):
                     st.session_state.step = "setup"
@@ -2306,7 +2318,7 @@ def render_analysis():
                 f'padding:4px 0 10px;justify-content:flex-end;">' + _badges_html + '</div>',
                 unsafe_allow_html=True)
     with top_r:
-        _tr_a, _tr_b, _tr_c, _tr_d = st.columns(4)
+        _tr_a, _tr_b, _tr_c = st.columns(3)
         with _tr_a:
             if st.button("Lancia agenti", key="run_all_top", use_container_width=True):
                 _run_all_dialog()
@@ -2317,18 +2329,6 @@ def render_analysis():
             if st.button("Valutazione finale", key="go_final_top", use_container_width=True):
                 st.session_state.step = "final"
                 st.rerun()
-        with _tr_d:
-            if st.button("Genera PDF", key="gen_pdf_analysis", use_container_width=True):
-                with st.spinner("Generazione PDF…"):
-                    st.session_state.pdf_bytes_analysis = _generate_pdf_bytes()
-    # Download button appears below top bar when PDF is ready
-    if st.session_state.get("pdf_bytes_analysis"):
-        state   = st.session_state.kyc_state
-        company = state.case.company_name if state else "rapporto"
-        fname   = f"AML_{company.replace(' ', '_')}_{date.today().strftime('%Y%m%d')}.pdf"
-        st.download_button("Scarica PDF", st.session_state.pdf_bytes_analysis,
-                           file_name=fname, mime="application/pdf",
-                           key="dl_pdf_analysis")
 
     # ── Main content (single column) ─────────────────────────────────
     just_completed = st.session_state.get("just_completed")
@@ -2730,7 +2730,7 @@ def render_final_valuation():
         content = get_content(key)
         parsed  = get_parsed(key)
 
-        _btn_run, _btn_edit, _btn_pdf = st.columns([2, 1, 1])
+        _btn_run, _btn_edit = st.columns([2, 1])
         with _btn_run:
             if st.button('Avvia "Final Valuation" Agent', key="run_super_agent",
                          use_container_width=True):
@@ -2740,17 +2740,6 @@ def render_final_valuation():
             if parsed and st.button("Modifica", key="edit_final_btn",
                                     use_container_width=True):
                 _edit_final_dialog()
-        with _btn_pdf:
-            if st.button("Genera PDF", key="gen_pdf_final", use_container_width=True):
-                with st.spinner("Generazione PDF…"):
-                    st.session_state.pdf_bytes_final = _generate_pdf_bytes()
-            if st.session_state.get("pdf_bytes_final"):
-                _state   = st.session_state.kyc_state
-                _company = _state.case.company_name if _state else "rapporto"
-                _fname   = f"AML_{_company.replace(' ','_')}_{date.today().strftime('%Y%m%d')}.pdf"
-                st.download_button("Scarica PDF", st.session_state.pdf_bytes_final,
-                                   file_name=_fname, mime="application/pdf",
-                                   key="dl_pdf_final")
 
         if parsed:
             _ev_ov = st.session_state.get("final_ev_overrides", {})
