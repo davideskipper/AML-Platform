@@ -4,11 +4,24 @@ import json
 import anthropic
 
 
-def no_docs_json(narrativa: str, note: str, extra_fields: dict = None) -> str:
-    """Return a standard NON_VALUTABILE JSON string for agents lacking required docs."""
+def no_docs_json(narrativa: str, note: str,
+                 extra_fields: dict = None,
+                 info_mancante: str = None) -> str:
+    """Return a standard NON_VALUTABILE JSON string for agents lacking required docs.
+
+    If `info_mancante` is provided, an INFO_MANCANTE evidence is added to
+    principaliEvidenze so the compliance officer knows exactly what to acquire.
+    """
+    evidenze = []
+    if info_mancante:
+        evidenze.append({
+            "evidenza": info_mancante,
+            "normativa": "Art. 18 D.Lgs. 231/2007 — adeguata verifica della clientela",
+            "livello": "INFO_MANCANTE",
+        })
     d = {
         "rischioComplessivo": "NON_VALUTABILE",
-        "principaliEvidenze": [],
+        "principaliEvidenze": evidenze,
         "flags": [],
         "narrativa": narrativa,
         "note": note,
@@ -134,7 +147,8 @@ def run_standard_agent(
 
 # ── Output validation ─────────────────────────────────────────────
 
-_VALID_RISK_LEVELS = {"LOW", "MEDIUM", "HIGH", "CRITICAL", "NON_VALUTABILE"}
+_VALID_RISK_LEVELS    = {"LOW", "MEDIUM", "HIGH", "CRITICAL", "NON_VALUTABILE"}
+_VALID_EVIDENCE_LEVELS = {"ATTENZIONE", "ANOMALIA", "CRITICO", "INFO_MANCANTE"}
 _HALLUCINATION_MARKERS = [
     "da compilare", "inserire qui", "TODO", "PLACEHOLDER",
     "esempio", "sample text", "<nome>", "<data>",
@@ -171,6 +185,13 @@ def validate_agent_output(agent_name: str, output: str) -> tuple:
         narrativa = data.get("narrativa", "")
         if narrativa and len(narrativa) < 100:
             return False, f"{agent_name}: narrativa troppo breve ({len(narrativa)} caratteri)"
+
+    # Check evidence levels
+    for ev in data.get("principaliEvidenze", []):
+        livello = (ev.get("livello") or "").upper().strip()
+        if livello and livello not in _VALID_EVIDENCE_LEVELS:
+            return False, (f"{agent_name}: livello evidenza '{livello}' non riconosciuto "
+                           f"(validi: {', '.join(sorted(_VALID_EVIDENCE_LEVELS))})")
 
     # Check for hallucination placeholders
     output_lower = output.lower()

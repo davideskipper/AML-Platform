@@ -501,113 +501,24 @@ def risk_badge(level: str) -> str:
 
 
 def classify_evidence(ev: dict) -> dict:
-    """
-    Classify a principaliEvidenze entry into one of four categories:
-
-    Anomalia        (red)    — livello CRITICO o ANOMALIA: violazioni AML, fattori che
-                               peggiorano il profilo di rischio
-    Punto attenzione(yellow) — livello ATTENZIONE con contenuto investigativo/esplorativo:
-                               cose che l'analista umano deve approfondire
-    Info mancanti   (grey)   — documentazione assente, informazioni non disponibili,
-                               serve input dal gestore/cliente
-    Elemento positivo(green) — solo per evidenze genuinamente positive (raro in principaliEvidenze)
-    """
+    """Map a principaliEvidenze livello to display colours and label."""
     livello = (ev.get("livello", "") or "").upper().strip()
-    testo   = (ev.get("evidenza", "") or "").lower()
 
-    # ── CRITICO / ANOMALIA → Anomalia (red) ──────────────────────
-    if "CRITICO" in livello or "ANOMALIA" in livello:
+    if "CRITICO" in livello:
         return {"bg_color": "#FDECEA", "text_color": "#B71C1C",
-                "border_color": "#C62828", "label": "Anomalia"}
-
-    # ── ATTENZIONE → classifica in 3 sotto-categorie ─────────────
-    if "ATTENZIONE" in livello:
-
-        # 1. Info mancanti: documentazione assente / dato non disponibile
-        #    Serve input esterno (gestore, cliente, registro pubblico)
-        pattern_info_mancanti = [
-            "non è disponibile",
-            "non disponibile",
-            "non è stato fornit",
-            "non fornit",
-            "non è presente",
-            "non present",
-            "non è stato reperit",
-            "non reperit",
-            "non è indicat",
-            "non è esplicitamente indicat",
-            "dato non ",
-            "dati non ",
-            "documentazione non ",
-            "documento non ",
-            "assenza di documentazione",
-            "assenza di document",
-            "mancanza di documentazione",
-            "mancanza di document",
-            "mancante",
-            "mancanza di",
-            "in attesa di",
-            "non è stato possibile verific",
-            "non è stato possibile accertar",
-            "impossibile determinare",
-            "impossibile verific",
-            "informazioni non disponibili",
-            "l'assenza del dato",
-            "assenza del dato",
-            "impedisce una verifica formale",
-            "non reperita",
-            "non reperibile",
-            "non reperito",
-            "non è stato possibile",
-        ]
-
-        # 2. Elemento positivo: genuinamente conforme/positivo
-        pattern_positivi = [
-            "assenza di procedure",
-            "assenza di protesti",
-            "assenza di ipoteche",
-            "nessuna procedura",
-            "nessun protesto",
-            "nessuna transazione sospetta",
-            "nessuna esposizione",
-            "nessun collegamento",
-            "regolarità commerciale",
-            "solidità finanziaria",
-            "profilo di rischio aml intrinsecamente basso",
-            "flussi finanziari tipicamente tracciabili",
-            "senza interposizione",
-            "senza discontinuità",
-            "senza anomalie",
-            "tracciabilità garantita",
-            "primario standing",
-            "privo di criticità",
-            "interamente versato",
-            "paesi eu standard",
-            "giurisdizioni eu",
-            "adempimenti fiscali regolari",
-            "nessuna notizia negativa",
-            "nessun procedimento",
-        ]
-
-        # 3. Tutto il resto → Punto di attenzione (default ATTENZIONE)
-        #    Include: governance, monitoraggio, approfondimento, rischi da esplorare
-
-        if any(p in testo for p in pattern_info_mancanti):
-            return {"bg_color": "#F5F5F5", "text_color": "#424242",
-                    "border_color": "#BDBDBD", "label": "Info mancanti"}
-
-        hit_pos = sum(1 for p in pattern_positivi if p in testo)
-        if hit_pos >= 2:
-            return {"bg_color": "#F1F8E9", "text_color": "#2E7D32",
-                    "border_color": "#558B2F", "label": "Elemento positivo"}
-
-        # Default ATTENZIONE → Punto di attenzione (da esplorare dall'umano)
+                "border_color": "#C62828", "label": "Critico"}
+    elif "ANOMALIA" in livello:
+        return {"bg_color": "#FFF3E0", "text_color": "#E65100",
+                "border_color": "#F57C00", "label": "Anomalia"}
+    elif "ATTENZIONE" in livello:
         return {"bg_color": "#FFFDE7", "text_color": "#F57F17",
-                "border_color": "#F9A825", "label": "Punto di attenzione"}
-
-    # ── Fallback (livello non riconosciuto) → Info mancanti ───────
-    return {"bg_color": "#F5F5F5", "text_color": "#616161",
-            "border_color": "#9E9E9E", "label": "Info mancanti"}
+                "border_color": "#F9A825", "label": "Attenzione"}
+    elif "INFO_MANCANTE" in livello:
+        return {"bg_color": "#E8F4FD", "text_color": "#1565C0",
+                "border_color": "#1976D2", "label": "Info mancante"}
+    else:
+        return {"bg_color": "#F5F5F5", "text_color": "#616161",
+                "border_color": "#9E9E9E", "label": livello or "Info"}
 
 
 # Keyword → suggested recovery action for "Info mancanti" evidences
@@ -666,7 +577,7 @@ def render_evidenze(evidenze: list) -> None:
             if norm else ""
         )
         suggestion_html = ""
-        if style["label"] == "Info mancanti":
+        if style["label"] == "Info mancante":
             hint = _info_suggestion(desc)
             if hint:
                 suggestion_html = (

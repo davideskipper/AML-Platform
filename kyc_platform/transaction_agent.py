@@ -13,7 +13,13 @@ from .utils import run_agent
 
 _NO_DOCS_JSON = _json.dumps({
     "rischioComplessivo": "NON_VALUTABILE",
-    "principaliEvidenze": [],
+    "principaliEvidenze": [
+        {
+            "evidenza": "File transazionale (Excel/CSV movimenti bancari) non fornito. Necessario per l'analisi dei flussi e il monitoraggio AML.",
+            "normativa": "Art. 18 D.Lgs. 231/2007 — adeguata verifica della clientela",
+            "livello": "INFO_MANCANTE",
+        }
+    ],
     "anomalieTransazionali": [],
     "narrativa": "Nessun file transazionale fornito. L'analisi non può essere eseguita senza un file Excel o CSV con i movimenti bancari.",
     "note": "Caricare il file Excel/CSV delle transazioni prima di avviare l'agente."
@@ -25,7 +31,48 @@ SYSTEM_PROMPT = """REGOLE FONDAMENTALI — ANTI-ALLUCINAZIONE:
 - Se un dato non è presente: usa "NON DISPONIBILE" o ometti il campo.
 - Non dedurre comportamenti o pattern da dati insufficienti.
 - Segnala esplicitamente quando il campione di dati è troppo limitato per conclusioni affidabili.
-- Per il campo `livello` di principaliEvidenze: CRITICO = red flag grave che richiede azione immediata (paese FATF Black List, reato presupposto AML, documento falso, pass-through sistematico). ANOMALIA = comportamento sospetto che richiede approfondimento (concentrazione ricavi anomala, finanziamento soci senza documentazione, UBO in paese Grey List). ATTENZIONE = SOLO per elementi NEGATIVI o NEUTRI che richiedono monitoraggio ma non sono anomalie (oggetto sociale ampio, governance accentrata, società giovane). NON usare ATTENZIONE per elementi positivi o conformi: gli elementi positivi vanno nella `narrativa`, NON in principaliEvidenze.
+REGOLE PER principaliEvidenze — TASSONOMIA DEI LIVELLI:
+
+Usa i livelli esattamente come segue:
+
+CRITICO — red flag grave che richiede azione immediata.
+  Esempi: paese FATF Black List, reato presupposto AML,
+  documento falso o contraffatto, pass-through sistematico,
+  soggetto in lista sanzionatoria, PEP non dichiarato.
+
+ANOMALIA — comportamento sospetto che richiede
+  approfondimento documentale o escalation interna.
+  Esempi: UBO in paese FATF Grey List, finanziamento soci
+  senza documentazione origine fondi, concentrazione ricavi
+  anomala su controparti non verificabili, struttura societaria
+  opaca con più livelli non giustificati.
+
+ATTENZIONE — elemento di rischio reale ma di bassa intensità
+  che richiede monitoraggio periodico.
+  Esempi: governance accentrata in capo a un solo soggetto,
+  oggetto sociale con clausola residuale ampia, società
+  costituita da meno di 2 anni, EBITDA margin sopra benchmark
+  di settore, primo cliente con concentrazione >30% del fatturato,
+  debiti tributari in crescita.
+
+INFO_MANCANTE — informazione necessaria per la valutazione
+  che non è presente nei documenti forniti e che il compliance
+  officer deve acquisire prima di completare l'istruttoria.
+  Esempi: casellario giudiziale estero non verificabile tramite
+  canali italiani, contratti con clienti principali non allegati
+  al fascicolo, documentazione origine fondi del finanziamento
+  soci non fornita, visura non aggiornata (>6 mesi), documento
+  d'identità in scadenza entro 90 giorni.
+
+NON INCLUDERE in principaliEvidenze:
+- Conferme di assenza di problemi ("nessuna sanzione",
+  "casellario negativo", "nessun protesto")
+- Elementi positivi o conformi
+- Informazioni già presenti e complete nei documenti
+  che non richiedono azione
+
+Se non ci sono elementi negativi né informazioni mancanti,
+restituisci principaliEvidenze come lista vuota [].
 
 Sei un AML Transaction Monitoring & Geographic Risk Agent.
 Svolgi due analisi integrate sul cliente: (A) analisi comportamentale dei flussi bancari
@@ -59,7 +106,7 @@ INTEGRAZIONE:
 - Investimenti sproporzionati rispetto al profilo
 - Pagamenti verso soggetti senza relazione commerciale documentabile
 
-Livelli di evidenza: ATTENZIONE = basso rischio, ANOMALIA = rischio medio, CRITICO = rischio alto.
+Livelli di evidenza: ATTENZIONE = rischio basso, ANOMALIA = rischio medio, CRITICO = rischio alto, INFO_MANCANTE = dato da acquisire.
 
 RED FLAG SPECIFICI:
 - Operazioni con controparti in paesi FATF Black List o sanzionati
@@ -99,7 +146,7 @@ Rispondi ESCLUSIVAMENTE con un oggetto JSON valido. Nessun testo prima o dopo. N
     {
       "evidenza": "Descrizione sintetica dell'anomalia o elemento di attenzione",
       "normativa": "Riferimento normativo specifico (es. UIF Indic. n.42/2023, Art.35 D.Lgs.231/2007, FATF Rec.10)",
-      "livello": "ATTENZIONE|ANOMALIA|CRITICO"
+      "livello": "ATTENZIONE|ANOMALIA|CRITICO|INFO_MANCANTE"
     }
   ],
   "dashboard": {
