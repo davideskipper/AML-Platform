@@ -5,7 +5,7 @@ Bain & Company Style — KYC / CDD Module
 
 import base64
 import io, json, os, re, tempfile
-from datetime import datetime
+from datetime import datetime, date
 import streamlit as st
 import anthropic
 
@@ -15,6 +15,7 @@ from kyc_platform import (
     economic_profile_agent, transaction_agent, final_valuation_agent,
 )
 from kyc_platform.utils import validate_agent_output
+from kyc_platform.pdf_report import build_pdf
 
 st.set_page_config(
     page_title="AML IntelliGent Platform | Bain & Company",
@@ -353,6 +354,8 @@ DEFAULTS = {
     "final_ev_overrides": {},
     "counterparty_info": {},
     "rfi_email_draft": "",
+    "pdf_bytes_analysis": None,
+    "pdf_bytes_final": None,
     "upload_hash": "",
     "running_agent": None,
     "all_docs": "",
@@ -498,143 +501,111 @@ def risk_badge(level: str) -> str:
 
 
 def classify_evidence(ev: dict) -> dict:
-    """Classify a single principaliEvidenze entry and return display style."""
+    """
+    Classify a principaliEvidenze entry into one of four categories:
+
+    Anomalia        (red)    — livello CRITICO o ANOMALIA: violazioni AML, fattori che
+                               peggiorano il profilo di rischio
+    Punto attenzione(yellow) — livello ATTENZIONE con contenuto investigativo/esplorativo:
+                               cose che l'analista umano deve approfondire
+    Info mancanti   (grey)   — documentazione assente, informazioni non disponibili,
+                               serve input dal gestore/cliente
+    Elemento positivo(green) — solo per evidenze genuinamente positive (raro in principaliEvidenze)
+    """
     livello = (ev.get("livello", "") or "").upper().strip()
     testo   = (ev.get("evidenza", "") or "").lower()
 
-    # CRITICO o ANOMALIA → Anomalia (rosso)
+    # ── CRITICO / ANOMALIA → Anomalia (red) ──────────────────────
     if "CRITICO" in livello or "ANOMALIA" in livello:
         return {"bg_color": "#FDECEA", "text_color": "#B71C1C",
                 "border_color": "#C62828", "label": "Anomalia"}
 
-    # ATTENZIONE — distingui positivo da neutro/negativo tramite conteggio hit
+    # ── ATTENZIONE → classifica in 3 sotto-categorie ─────────────
     if "ATTENZIONE" in livello:
+
+        # 1. Info mancanti: documentazione assente / dato non disponibile
+        #    Serve input esterno (gestore, cliente, registro pubblico)
+        pattern_info_mancanti = [
+            "non è disponibile",
+            "non disponibile",
+            "non è stato fornit",
+            "non fornit",
+            "non è presente",
+            "non present",
+            "non è stato reperit",
+            "non reperit",
+            "non è indicat",
+            "non è esplicitamente indicat",
+            "dato non ",
+            "dati non ",
+            "documentazione non ",
+            "documento non ",
+            "assenza di documentazione",
+            "assenza di document",
+            "mancanza di documentazione",
+            "mancanza di document",
+            "mancante",
+            "mancanza di",
+            "in attesa di",
+            "non è stato possibile verific",
+            "non è stato possibile accertar",
+            "impossibile determinare",
+            "impossibile verific",
+            "informazioni non disponibili",
+            "l'assenza del dato",
+            "assenza del dato",
+            "impedisce una verifica formale",
+            "non reperita",
+            "non reperibile",
+            "non reperito",
+            "non è stato possibile",
+        ]
+
+        # 2. Elemento positivo: genuinamente conforme/positivo
         pattern_positivi = [
-            "trasparente",
-            "identificabile con certezza",
-            "interamente versato",
-            "adeguato rispetto",
-            "coerenza con",
             "assenza di procedure",
             "assenza di protesti",
             "assenza di ipoteche",
             "nessuna procedura",
             "nessun protesto",
-            "nessuna transazione",
+            "nessuna transazione sospetta",
             "nessuna esposizione",
             "nessun collegamento",
             "regolarità commerciale",
             "solidità finanziaria",
             "profilo di rischio aml intrinsecamente basso",
             "flussi finanziari tipicamente tracciabili",
-            "indicatore positivo",
-            "elemento positivo",
-            "certificazioni",
-            "conforme",
-            "coerente con",
             "senza interposizione",
             "senza discontinuità",
             "senza anomalie",
-            "tracciabilità",
+            "tracciabilità garantita",
             "primario standing",
-            "regolarmente",
-            "regolari e ricorrenti",
-            "puntualmente",
             "privo di criticità",
-            "adempimenti fiscali",
-            "giurisdizioni eu",
-            "giurisdizioni standard",
-            "tutti i paesi coinvolti",
+            "interamente versato",
             "paesi eu standard",
-            "piano di ammortamento",
-            "perizia immobiliare",
-            "graduale",
+            "giurisdizioni eu",
+            "adempimenti fiscali regolari",
+            "nessuna notizia negativa",
+            "nessun procedimento",
         ]
-        pattern_negativi = [
-            "operazioni anomal",
-            "flussi anomal",
-            "movimentazioni anomal",
-            "comportamento anomal",
-            "picchi anomal",
-            "variazioni anomal",
-            "distribuzione anomal",
-            "sospett",
-            "incongruente",
-            "incoerente",
-            "sproporzionat",
-            "opacità",
-            "struttura opaca",
-            "impossibilità",
-            "non verificabile",
-            "non documentat",
-            "concentrazione anomala",
-            "rischio di abuso",
-            "riduce i controlli",
-            "pur non costituendo anomalia",
-            "tale assetto riduce",
-            "oggetto sociale eccessivamente generico",
-            "clausola residuale",
-            "amplia formalmente il perimetro",
-            # Governance accentrata / concentrazione di controllo
-            "accentrat",
-            "concentrazione di controllo",
-            "cumula la qualità",
-            "cumulo di caric",
-            "cariche cumulate",
-            "senza meccanismi di contrappeso",
-            "senza contrappeso",
-            "assenza di meccanismi di contrappeso",
-            "limita i presidi",
-            "riduce i presidi",
-            "limita il controllo",
-            "poteri di firma libera e disgiunta",
-            "medesimo soggetto",
-            "conflitto di interesse",
-            "privo di meccanismi di controllo",
-            "mancanza di governance",
-            "governance carente",
-            "non documentat",
-            "senza documentazion",
-            "senza evidenza",
-            "senza riscontro",
-            # Commistione ruoli / controllo sostanziale
-            "commistione",
-            "duplice ruolo",
-            "doppio ruolo",
-            "ruolo dirigenziale apicale",
-            "controllo sostanziale",
-            "esercitati di fatto",
-            "poteri di fatto",
-            "richiede verifica",
-            "richiede monitoraggio",
-            "richiede approfondimento",
-            "necessita di verifica",
-            "necessita di approfondimento",
-            "da monitorare",
-            "da verificare",
-            # Dati mancanti / monitoraggio richiesto
-            "tuttavia",
-            "l'assenza del dato",
-            "non è esplicitamente indicato",
-            "impedisce una verifica",
-            "dovrà essere monitorat",
-            "essere monitorat",
-            "dovrà essere verific",
-        ]
-        hit_positivi = sum(1 for p in pattern_positivi if p in testo)
-        hit_negativi = sum(1 for p in pattern_negativi if p in testo)
 
-        if hit_positivi > hit_negativi:
-            return {"bg_color": "#F1F8E9", "text_color": "#2E7D32",
-                    "border_color": "#558B2F", "label": "Elemento positivo"}
-        elif hit_negativi > 0:
-            return {"bg_color": "#FFFDE7", "text_color": "#F57F17",
-                    "border_color": "#F9A825", "label": "Punto di attenzione"}
-        else:
+        # 3. Tutto il resto → Punto di attenzione (default ATTENZIONE)
+        #    Include: governance, monitoraggio, approfondimento, rischi da esplorare
+
+        if any(p in testo for p in pattern_info_mancanti):
             return {"bg_color": "#F5F5F5", "text_color": "#424242",
                     "border_color": "#BDBDBD", "label": "Info mancanti"}
 
-    # Fallback
+        hit_pos = sum(1 for p in pattern_positivi if p in testo)
+        if hit_pos >= 2:
+            return {"bg_color": "#F1F8E9", "text_color": "#2E7D32",
+                    "border_color": "#558B2F", "label": "Elemento positivo"}
+
+        # Default ATTENZIONE → Punto di attenzione (da esplorare dall'umano)
+        return {"bg_color": "#FFFDE7", "text_color": "#F57F17",
+                "border_color": "#F9A825", "label": "Punto di attenzione"}
+
+    # ── Fallback (livello non riconosciuto) → Info mancanti ───────
     return {"bg_color": "#F5F5F5", "text_color": "#616161",
             "border_color": "#9E9E9E", "label": "Info mancanti"}
 
@@ -2226,6 +2197,26 @@ def _render_counterparty_card():
         unsafe_allow_html=True)
 
 
+# ── PDF helper ────────────────────────────────────────────────────
+def _generate_pdf_bytes() -> bytes:
+    state    = st.session_state.kyc_state
+    company  = state.case.company_name if state else "Controparte"
+    case_id  = state.case.case_id      if state else ""
+    results  = {}
+    for sec in MAIN_SECTIONS:
+        raw = st.session_state.edited_content.get(sec["key"], "")
+        results[sec["key"]] = raw
+    final_raw = st.session_state.edited_content.get("final_valuation", "")
+    return build_pdf(
+        company_name       = company,
+        counterparty_info  = st.session_state.get("counterparty_info", {}),
+        section_results    = results,
+        sections_meta      = MAIN_SECTIONS,
+        final_result       = final_raw,
+        case_id            = case_id,
+    )
+
+
 # ── STEP 4: ANALYSIS ─────────────────────────────────────────────
 def render_analysis():
     render_header()
@@ -2307,7 +2298,7 @@ def render_analysis():
                 f'padding:4px 0 10px;justify-content:flex-end;">' + _badges_html + '</div>',
                 unsafe_allow_html=True)
     with top_r:
-        _tr_a, _tr_b, _tr_c = st.columns(3)
+        _tr_a, _tr_b, _tr_c, _tr_d = st.columns(4)
         with _tr_a:
             if st.button("Lancia agenti", key="run_all_top", use_container_width=True):
                 _run_all_dialog()
@@ -2318,6 +2309,18 @@ def render_analysis():
             if st.button("Valutazione finale", key="go_final_top", use_container_width=True):
                 st.session_state.step = "final"
                 st.rerun()
+        with _tr_d:
+            if st.button("Genera PDF", key="gen_pdf_analysis", use_container_width=True):
+                with st.spinner("Generazione PDF…"):
+                    st.session_state.pdf_bytes_analysis = _generate_pdf_bytes()
+    # Download button appears below top bar when PDF is ready
+    if st.session_state.get("pdf_bytes_analysis"):
+        state   = st.session_state.kyc_state
+        company = state.case.company_name if state else "rapporto"
+        fname   = f"AML_{company.replace(' ', '_')}_{date.today().strftime('%Y%m%d')}.pdf"
+        st.download_button("Scarica PDF", st.session_state.pdf_bytes_analysis,
+                           file_name=fname, mime="application/pdf",
+                           key="dl_pdf_analysis")
 
     # ── Main content (single column) ─────────────────────────────────
     just_completed = st.session_state.get("just_completed")
@@ -2719,7 +2722,7 @@ def render_final_valuation():
         content = get_content(key)
         parsed  = get_parsed(key)
 
-        _btn_run, _btn_edit = st.columns([2, 1])
+        _btn_run, _btn_edit, _btn_pdf = st.columns([2, 1, 1])
         with _btn_run:
             if st.button('Avvia "Final Valuation" Agent', key="run_super_agent",
                          use_container_width=True):
@@ -2729,6 +2732,17 @@ def render_final_valuation():
             if parsed and st.button("Modifica", key="edit_final_btn",
                                     use_container_width=True):
                 _edit_final_dialog()
+        with _btn_pdf:
+            if st.button("Genera PDF", key="gen_pdf_final", use_container_width=True):
+                with st.spinner("Generazione PDF…"):
+                    st.session_state.pdf_bytes_final = _generate_pdf_bytes()
+            if st.session_state.get("pdf_bytes_final"):
+                _state   = st.session_state.kyc_state
+                _company = _state.case.company_name if _state else "rapporto"
+                _fname   = f"AML_{_company.replace(' ','_')}_{date.today().strftime('%Y%m%d')}.pdf"
+                st.download_button("Scarica PDF", st.session_state.pdf_bytes_final,
+                                   file_name=_fname, mime="application/pdf",
+                                   key="dl_pdf_final")
 
         if parsed:
             _ev_ov = st.session_state.get("final_ev_overrides", {})
