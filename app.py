@@ -158,12 +158,15 @@ st.markdown(f"""
     font-size: 0.82rem !important; font-weight: 500 !important; padding: 8px 16px !important;
   }}
 
-  /* ── Buttons — compact to prevent text wrapping ── */
+  /* ── Buttons — compact, text wraps cleanly ── */
   [data-testid="stButton"] > button {{
-    font-size: 0.74rem !important;
-    padding: 0.22rem 0.55rem !important;
-    line-height: 1.3 !important;
-    white-space: nowrap !important;
+    font-size: 0.72rem !important;
+    padding: 0.2rem 0.4rem !important;
+    line-height: 1.25 !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    text-align: center !important;
+    min-height: unset !important;
   }}
 </style>
 """, unsafe_allow_html=True)
