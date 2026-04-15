@@ -361,6 +361,7 @@ DEFAULTS = {
     "all_docs": "",
     "all_doc_names": [],
     "just_completed": None,
+    "checklist_open": False,
 }
 for k, v in DEFAULTS.items():
     if k not in st.session_state:
@@ -2192,6 +2193,10 @@ def render_analysis():
     _render_counterparty_card()
     client = get_client()
 
+    # Re-open checklist dialog if it was open before a rerun
+    if st.session_state.get("checklist_open"):
+        _checklist_dialog()
+
     # Pop next agent from queue (if any)
     queued_key = None
     if st.session_state.get("run_queue"):
@@ -2273,7 +2278,8 @@ def render_analysis():
                 _run_all_dialog()
         with _tr_b:
             if st.button("Checklist", key="open_checklist_top", use_container_width=True):
-                _checklist_dialog()
+                st.session_state.checklist_open = True
+                st.rerun()
         with _tr_c:
             if st.button("Valutazione finale", key="go_final_top", use_container_width=True):
                 st.session_state.step = "final"
@@ -2416,9 +2422,21 @@ def _render_final_chatbot(client, valuation_key: str):
 
 
 # ── Checklist dialog ──────────────────────────────────────────────
+_cl_dialog_kw: dict = {"width": "large"}
+try:
+    import inspect as _insp
+    if "dismissible" in _insp.signature(st.dialog).parameters:
+        _cl_dialog_kw["dismissible"] = False
+except Exception:
+    pass
+
 if hasattr(st, "dialog"):
-    @st.dialog("Checklist AML — Verifica Controparte", width="large")
+    @st.dialog("Checklist AML — Verifica Controparte", **_cl_dialog_kw)
     def _checklist_dialog():
+        if st.button("✕ Chiudi", key="cl_close_btn"):
+            st.session_state.checklist_open = False
+            st.rerun()
+
         items = _compute_checklist()
 
         n_a = sum(1 for i in items if i["status"] == "A")
@@ -2527,7 +2545,7 @@ if hasattr(st, "dialog"):
                 st.caption("Copia il testo e incollalo nel tuo client email.")
 else:
     def _checklist_dialog():
-        pass
+        st.session_state.checklist_open = False
 
 
 # ── Final valuation edit popup ────────────────────────────────────
