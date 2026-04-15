@@ -2164,7 +2164,7 @@ def _render_counterparty_card():
 
 # ── PDF helper ────────────────────────────────────────────────────
 def _generate_pdf_bytes() -> bytes:
-    state    = st.session_state.kyc_state
+    state    = st.session_state.get("kyc_state")
     ci       = st.session_state.get("counterparty_info", {})
     company  = (ci.get("ragioneSociale")
                 or (state.case.company_name
@@ -2172,14 +2172,12 @@ def _generate_pdf_bytes() -> bytes:
                     else None)
                 or "Controparte")
     case_id  = state.case.case_id if state else ""
-    results  = {}
-    for sec in MAIN_SECTIONS:
-        raw = st.session_state.edited_content.get(sec["key"], "")
-        results[sec["key"]] = raw
-    final_raw = st.session_state.edited_content.get("final_valuation", "")
+    ec       = st.session_state.get("edited_content", {})
+    results  = {sec["key"]: ec.get(sec["key"], "") for sec in MAIN_SECTIONS}
+    final_raw = ec.get("final_valuation", "")
     return build_pdf(
         company_name       = company,
-        counterparty_info  = st.session_state.get("counterparty_info", {}),
+        counterparty_info  = ci,
         section_results    = results,
         sections_meta      = MAIN_SECTIONS,
         final_result       = final_raw,
