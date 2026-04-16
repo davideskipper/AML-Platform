@@ -960,7 +960,20 @@ def render_header():
                 _co = (st.session_state.get("counterparty_info", {}).get("ragioneSociale")
                        or (_s.case.company_name if _s else "rapporto"))
                 _fn = f"AML_{_co.replace(' ','_')}_{date.today().strftime('%Y%m%d')}.pdf"
-                st.download_button("Genera PDF", data=_generate_pdf_bytes,
+                # Compute a cheap hash to avoid regenerating on every rerun
+                _ec  = st.session_state.get("edited_content", {})
+                _ci  = st.session_state.get("counterparty_info", {})
+                _ver = str({k: len(v) for k, v in _ec.items()}) + _co
+                _cached = st.session_state.get("_pdf_cache")
+                if not _cached or _cached[0] != _ver:
+                    try:
+                        _pdf_b = _generate_pdf_bytes()
+                    except Exception:
+                        _pdf_b = b""
+                    st.session_state["_pdf_cache"] = (_ver, _pdf_b)
+                else:
+                    _pdf_b = _cached[1]
+                st.download_button("Genera PDF", data=_pdf_b,
                                    file_name=_fn, mime="application/pdf",
                                    key="dl_pdf_hdr")
         with _hb_c:
